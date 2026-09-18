@@ -51,8 +51,36 @@ function Read-ParkPulseDatabase {
         return $null
     }
 
-    $Databases = @($Json | ConvertFrom-Json)
-    return $Databases | Where-Object { $_.name -eq "parkpulse" } | Select-Object -First 1
+    $Parsed = $Json | ConvertFrom-Json
+    $Databases = @()
+
+    if ($null -eq $Parsed) {
+        return $null
+    }
+    elseif ($Parsed -is [array]) {
+        $Databases = @($Parsed)
+    }
+    elseif ($Parsed.PSObject.Properties.Name -contains "result") {
+        $Databases = @($Parsed.result)
+    }
+    elseif ($Parsed.PSObject.Properties.Name -contains "databases") {
+        $Databases = @($Parsed.databases)
+    }
+    elseif ($Parsed.PSObject.Properties.Name -contains "name") {
+        $Databases = @($Parsed)
+    }
+
+    foreach ($Database in $Databases) {
+        if (
+            $null -ne $Database -and
+            $Database.PSObject.Properties.Name -contains "name" -and
+            [string]$Database.name -eq "parkpulse"
+        ) {
+            return $Database
+        }
+    }
+
+    return $null
 }
 
 Require-Command "node"

@@ -6,12 +6,12 @@ compatibility_date = "2026-09-01"
 APP_URL = "https://jamesthegreat1.github.io/park-pulse-web/"
 APP_ORIGIN = "https://jamesthegreat1.github.io"
 VAPID_SUBJECT = "https://jamesthegreat1.github.io/park-pulse-web/"
-VAPID_SERVER_PUBLIC_KEY = "REPLACE_WITH_PUBLIC_KEY"
+VAPID_SERVER_PUBLIC_KEY = "BBi6NaRXhX06p6DAqwyXTFIo8gyaMu8z6cjCvdQ7TV9dypn5mKncJzW4gMe9BJqkPlpJDa9B3XE_JBWejfUoIbM"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "parkpulse"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "1a470024-1f15-4f4e-9a92-888b8969c569"
 
 [triggers]
 crons = ["*/5 * * * *"]

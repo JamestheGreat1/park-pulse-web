@@ -11,6 +11,7 @@ $WorkerDir = Join-Path $RepoRoot "worker"
 $WranglerConfig = Join-Path $WorkerDir "wrangler.toml"
 $FrontendConfig = Join-Path $RepoRoot "assets\js\config.js"
 $AdminTokenFile = Join-Path $RepoRoot ".parkpulse-admin-token.txt"
+$VapidKeyFile = Join-Path $RepoRoot ".parkpulse-vapid-keys.json"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 function Write-Step([string]$Message) {
@@ -109,17 +110,33 @@ try {
         "database_id = `"$DatabaseId`""
     )
 
-    Write-Step "Generating the VAPID key pair used for Web Push"
-    $VapidOutput = @(& node .\scripts\generate-vapid.mjs)
-    Assert-LastCommand "Generating VAPID keys"
-    $PublicLine = $VapidOutput | Where-Object { $_ -like "VAPID_SERVER_PUBLIC_KEY=*" } | Select-Object -First 1
-    $PrivateLine = $VapidOutput | Where-Object { $_ -like "VAPID_SERVER_PRIVATE_KEY=*" } | Select-Object -First 1
-    if (-not $PublicLine -or -not $PrivateLine) {
-        throw "The VAPID generator did not return both keys."
+    Write-Step "Loading or generating the VAPID key pair used for Web Push"
+    if (Test-Path $VapidKeyFile) {
+        $SavedKeys = [IO.File]::ReadAllText($VapidKeyFile) | ConvertFrom-Json
+        $PublicKey = [string]$SavedKeys.publicKey
+        $PrivateKey = [string]$SavedKeys.privateKey
+    }
+    else {
+        $VapidOutput = @(& node .\scripts\generate-vapid.mjs)
+        Assert-LastCommand "Generating VAPID keys"
+        $PublicLine = $VapidOutput | Where-Object { $_ -like "VAPID_SERVER_PUBLIC_KEY=*" } | Select-Object -First 1
+        $PrivateLine = $VapidOutput | Where-Object { $_ -like "VAPID_SERVER_PRIVATE_KEY=*" } | Select-Object -First 1
+        if (-not $PublicLine -or -not $PrivateLine) {
+            throw "The VAPID generator did not return both keys."
+        }
+
+        $PublicKey = $PublicLine.Substring("VAPID_SERVER_PUBLIC_KEY=".Length)
+        $PrivateKey = $PrivateLine.Substring("VAPID_SERVER_PRIVATE_KEY=".Length)
+        $SavedKeys = @{
+            publicKey = $PublicKey
+            privateKey = $PrivateKey
+        } | ConvertTo-Json -Compress
+        [IO.File]::WriteAllText($VapidKeyFile, $SavedKeys + [Environment]::NewLine, $Utf8NoBom)
     }
 
-    $PublicKey = $PublicLine.Substring("VAPID_SERVER_PUBLIC_KEY=".Length)
-    $PrivateKey = $PrivateLine.Substring("VAPID_SERVER_PRIVATE_KEY=".Length)
+    if ([string]::IsNullOrWhiteSpace($PublicKey) -or [string]::IsNullOrWhiteSpace($PrivateKey)) {
+        throw "The saved VAPID key file is incomplete. Delete .parkpulse-vapid-keys.json and run the script again."
+    }
     $Toml = [regex]::Replace(
         $Toml,
         '(?m)^VAPID_SERVER_PUBLIC_KEY\s*=\s*"[^"]*"',
@@ -231,4 +248,5 @@ Write-Host "ParkPulse push deployment is complete." -ForegroundColor Green
 Write-Host "Worker: $WorkerUrl"
 Write-Host "PWA: https://jamesthegreat1.github.io/park-pulse-web/"
 Write-Host "The push test admin token is stored locally in .parkpulse-admin-token.txt. Do not share or commit it."
+Write-Host "The reusable VAPID key pair is stored locally in .parkpulse-vapid-keys.json. Keep it private and do not commit it."
 Write-Host "GitHub Pages may take a minute or two to publish the updated Worker URL."

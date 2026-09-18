@@ -1,0 +1,16 @@
+{
+  "name": "ParkPulse",
+  "short_name": "ParkPulse",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#07182e",
+  "theme_color": "#07182e",
+  "description": "A personal Walt Disney World park-day assistant for waits, plans, favorites, and smarter next-up suggestions.",
+  "icons": [
+    {"src": "./assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "./assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

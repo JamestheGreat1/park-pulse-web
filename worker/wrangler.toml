@@ -1,0 +1,17 @@
+name = "parkpulse-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+APP_URL = "https://jamesthegreat1.github.io/park-pulse-web/"
+APP_ORIGIN = "https://jamesthegreat1.github.io"
+VAPID_SUBJECT = "https://jamesthegreat1.github.io/park-pulse-web/"
+VAPID_SERVER_PUBLIC_KEY = "REPLACE_WITH_PUBLIC_KEY"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "parkpulse"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[triggers]
+crons = ["*/5 * * * *"]

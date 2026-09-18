@@ -1,4 +1,4 @@
-const CACHE_NAME = "parkpulse-v0.15.2-shell";
+const CACHE_NAME = "parkpulse-v0.15.2-shell-r2";
 const SHELL = [
   "./",
   "./index.html",
@@ -35,6 +35,20 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).catch(() => caches.match("./index.html")));
+    return;
+  }
+
+  // Runtime configuration can change independently of the app release.
+  // Prefer the network so existing installations pick up a new Worker URL,
+  // while retaining the cached copy for offline startup.
+  if (url.pathname.endsWith("/assets/js/config.js")) {
+    event.respondWith(
+      fetch(request).then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        return response;
+      }).catch(() => caches.match(request))
+    );
     return;
   }
 

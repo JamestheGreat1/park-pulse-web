@@ -625,7 +625,7 @@ async function runRideWatch(env) {
           kind = "wait";
           payload = {
             title: `${ride.name} is down to ${ride.waitTime} min`,
-            body: `Your target was ${rule.threshold} min • ${PARKS.get(ride.parkId).name`,
+            body: `Your target was ${rule.threshold} min • ${PARKS.get(ride.parkId).name}`,
             url: `${env.APP_URL || "/"}?ride=${encodeURIComponent(ride.id)}`,
             tag: `ride-${safeTag(ride.id)}-wait`,
             renotify: true

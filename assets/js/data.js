@@ -1,7 +1,7 @@
 export const PARKS = [
-  { id: 6, name: "Magic Kingdom", short: "MK", emoji: "✨" },
+  { id: 6, name: "Magic Kingdom", short: "MK", emoji: "🏰" },
   { id: 5, name: "EPCOT", short: "EPCOT", emoji: "🌐" },
-  { id: 7, name: "Hollywood Studios", short: "Studios", emoji: "🎬" },
+  { id: 7, name: "Hollywood Studios", short: "DHS", emoji: "🎬" },
   { id: 8, name: "Animal Kingdom", short: "AK", emoji: "🌿" }
 ];
 

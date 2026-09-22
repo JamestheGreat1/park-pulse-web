@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml } from "./data.js";
-import { store } from "./store.js";
-import { rideData } from "./api.js";
-import { currentSubscription, enablePush, syncRules, disablePush } from "./push.js";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml } from "./data.js?v=1.0.0";
+import { store } from "./store.js?v=1.0.0";
+import { rideData } from "./api.js?v=1.0.0";
+import { currentSubscription, enablePush, syncRules, disablePush } from "./push.js?v=1.0.0";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];

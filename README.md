@@ -1,4 +1,4 @@
-# ParkPulse v1.3 — Ride Watcher
+# ParkPulse v1.3.1 — Ride Watcher
 
 ParkPulse is an installable PWA that watches Walt Disney World ride statuses and posted standby waits so you do not have to keep refreshing a park app all day.
 
@@ -14,51 +14,92 @@ ParkPulse is an installable PWA that watches Walt Disney World ride statuses and
 - Web Push through Cloudflare Worker + D1, including while the PWA is closed.
 - Anonymous device subscriptions; no account system required.
 - 30-minute alert cooldowns, stale-data labels, last-known-state fallback, notification testing, and diagnostics.
-- A rolling 30-day ParkPulse wait-history table sampled by the five-minute Worker cron.
-- Ride-sheet trend insights including today's observed low/high and, once enough history exists, the typical wait around the current time of day.
+- A rolling ParkPulse live-sample history for today's observed low/high.
+- Authenticated ThemeParks.wiki 30-day history backfill converted into 15-minute time-of-day baselines.
+- Ride trend insights: typical wait now, usual range, today's observed range, and better/busier-than-typical labels.
+- **Best now** sorts operating rides by current wait relative to their historical baseline once a baseline is available.
 - Installable/offline-capable PWA shell with light/dark/system appearance.
 
-ParkPulse is independent and is not affiliated with Disney. ThemeParks.wiki attribution is required by its free-tier terms. Queue-Times attribution is retained because it remains the fallback source.
+ParkPulse is independent and is not affiliated with Disney. ThemeParks.wiki attribution is required by its terms. Queue-Times attribution is retained because it remains the fallback source.
 
 ## ThemeParks.wiki API key
 
-The live feed works without a key, but ParkPulse supports a free ThemeParks.wiki API key as a **Cloudflare Worker secret**. Never put the key in the PWA, GitHub, `wrangler.toml`, or a committed `.env` file.
-
-Create a free key from your ThemeParks.wiki account, then add it from the Worker directory:
+The API key is stored only as a **Cloudflare Worker secret**. Never put the key in the PWA, GitHub, `wrangler.toml`, or a committed environment file.
 
 ```bash
 cd /workspaces/park-pulse-web/worker
 npx wrangler secret put THEMEPARKS_API_KEY
 ```
 
-Paste the key only into Wrangler's hidden terminal prompt.
+The Worker sends the key in the `x-api-key` header to ThemeParks.wiki. The public health endpoint exposes only whether a key is configured and never returns the secret.
 
-When configured, the Worker sends it in the `x-api-key` header to ThemeParks.wiki. The `/health` response exposes only a boolean indicating whether a key is configured; it never returns the key itself.
+## Historical baseline backfill
+
+ThemeParks.wiki exposes authenticated entity history at:
+
+```text
+GET /v1/entity/{id}/history
+```
+
+ParkPulse requests the previous 30 completed park-local calendar days for each curated attraction. Raw history is processed inside the Worker and is **not copied into ParkPulse as a mirror**.
+
+For each ride, ParkPulse derives 15-minute time-of-day slots containing:
+
+- time-weighted median standby wait
+- 25th percentile standby wait
+- 75th percentile standby wait
+- time-weighted mean standby wait
+- number of observed operating minutes
+- number of represented days
+
+Only periods where the attraction is `OPERATING` with a numeric `STANDBY.waitTime` contribute.
+
+The cron refreshes at most four missing/stale ride baselines per five-minute run. A fresh install should therefore fill the WDW catalogue in roughly an hour, subject to provider availability. Successful baselines refresh after 24 hours; failed backfills are eligible to retry after 30 minutes.
+
+The PWA exposes progress in **Settings → Trend baselines**. The Worker also exposes:
+
+```text
+GET /api/analytics/status
+```
+
+Example:
+
+```json
+{
+  "ok": true,
+  "totalRides": 47,
+  "baselineRides": 20,
+  "pendingRides": 27,
+  "errorRides": 0,
+  "backfillComplete": false
+}
+```
 
 ## Data flow
 
 ```text
-ThemeParks.wiki
-      │ primary
-      ▼
-Cloudflare Worker ── Queue-Times fallback
-      │
-      ├─ curated ride catalogue
-      ├─ provider-independent ride IDs
-      ├─ rolling D1 wait history
-      ├─ ride trend insights
-      ├─ stale-state handling
-      └─ push alert evaluation
-      │
-      ▼
-ParkPulse PWA
+ThemeParks.wiki live + authenticated history
+                  │
+                  ▼
+          Cloudflare Worker ── Queue-Times fallback
+                  │
+                  ├─ curated ride catalogue
+                  ├─ provider-independent ride IDs
+                  ├─ 15-minute historical baselines
+                  ├─ rolling same-day D1 samples
+                  ├─ ride trend/value calculations
+                  ├─ stale-state handling
+                  └─ push alert evaluation
+                  │
+                  ▼
+              ParkPulse PWA
 ```
 
-The Worker polls on the existing five-minute schedule. ParkPulse keeps only a rolling 31-day operational history of its own live observations for product analytics.
+The Worker polls live data on the existing five-minute schedule. D1 writes are grouped through JSON-expanded batch operations to keep database round-trips small.
 
-## Deploying the 1.3 migration
+## Deploying v1.3.1
 
-The static frontend publishes through GitHub Pages. The Worker needs one non-destructive D1 migration and redeploy:
+The frontend publishes through GitHub Pages. The Worker needs the new baseline tables before the new cron code is deployed:
 
 ```bash
 cd /workspaces/park-pulse-web
@@ -67,13 +108,17 @@ git pull origin main
 cd worker
 npm install
 npx wrangler d1 execute parkpulse --remote --file=./schema.sql
-
-# Run once after creating your free ThemeParks.wiki key:
-npx wrangler secret put THEMEPARKS_API_KEY
-
 npm run deploy
 ```
 
-Existing subscriptions, VAPID keys, and legacy ride-state tables remain in place. Existing saved watches continue using the provider-independent ride catalogue.
+The ThemeParks API key secret already configured in Cloudflare persists through ordinary Worker deployments.
 
-Trend insights intentionally degrade gracefully: today's range appears after multiple samples have been collected, while "Typical now" waits until there are enough comparable historical samples to avoid pretending a tiny sample is meaningful.
+After deployment:
+
+```bash
+curl -s https://parkpulse-api.jamesp5297.workers.dev/health | python -m json.tool
+
+curl -s https://parkpulse-api.jamesp5297.workers.dev/api/analytics/status | python -m json.tool
+```
+
+Existing subscriptions, VAPID keys, ride-state data, and saved watches remain in place.

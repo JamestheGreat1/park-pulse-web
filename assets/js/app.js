@@ -117,6 +117,7 @@ function bindDynamic() {
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
   const search = $("#rideSearch"); if (search) search.oninput = () => store.update((s) => { s.query = search.value; }, "search");
   const type = $("#typeSelect"); if (type) type.onchange = () => store.update((s) => { s.attractionFilter = type.value; }, "filter");
+  const type = $("#typeSelect"); if (type) type.onchange = () => store.update((s) => { s.attractionMode = type.value; }, "filter");
   const sort = $("#sortSelect"); if (sort) sort.onchange = () => store.update((s) => { s.sort = sort.value; }, "sort");
   $$('[data-delete-watch]').forEach((b) => b.onclick = async () => { store.removeRule(Number(b.dataset.deleteWatch)); await safeSync(); toast("Watch removed"); });
   $$('[data-enable-push]').forEach((b) => b.onclick = activatePush);

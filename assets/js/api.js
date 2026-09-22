@@ -1,4 +1,4 @@
-import { PARKS } from "./data.js?v=1.0.0";
+import { PARKS, cleanAttractionName, isSingleRiderName, attractionKind } from "./data.js?v=1.0.4";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");
@@ -15,15 +15,26 @@ async function fetchJson(url, options = {}) {
 }
 
 function normalizeRide(parkId, ride, land) {
-  return { id:Number(ride.id), parkId:Number(parkId), name:String(ride.name||"Attraction"), land:String(land||"Other"), isOpen:Boolean(ride.is_open), waitTime:Math.max(0,Number(ride.wait_time||0)), lastUpdated:ride.last_updated||null };
+  const rawName = String(ride.name || "Attraction");
+  return {
+    id:Number(ride.id),
+    parkId:Number(parkId),
+    name:cleanAttractionName(rawName),
+    rawName,
+    land:String(land||"Other"),
+    kind:attractionKind(rawName),
+    isOpen:Boolean(ride.is_open),
+    waitTime:Math.max(0,Number(ride.wait_time||0)),
+    lastUpdated:ride.last_updated||null
+  };
 }
 
 export async function fetchPark(parkId) {
   const url = workerBase ? `${workerBase}/api/park/${parkId}` : `https://queue-times.com/parks/${parkId}/queue_times.json`;
   const payload = await fetchJson(url);
   const rides = [];
-  for (const land of payload?.lands || []) for (const ride of land?.rides || []) rides.push(normalizeRide(parkId, ride, land.name));
-  for (const ride of payload?.rides || []) rides.push(normalizeRide(parkId, ride, "Other"));
+  for (const land of payload?.lands || []) for (const ride of land?.rides || []) if (!isSingleRiderName(ride?.name)) rides.push(normalizeRide(parkId, ride, land.name));
+  for (const ride of payload?.rides || []) if (!isSingleRiderName(ride?.name)) rides.push(normalizeRide(parkId, ride, "Other"));
   return [...new Map(rides.map((ride) => [ride.id, ride])).values()];
 }
 

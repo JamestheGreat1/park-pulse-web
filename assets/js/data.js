@@ -60,6 +60,22 @@ const SHOW_PATTERNS = [
   /\benchanted tiki room\b/i
 ];
 
+const OTHER_ATTRACTION_PATTERNS = [
+  /^Casey Jr\. Splash ['’]N['’] Soak Station$/i,
+  /^A Pirate['’]s Adventure/i,
+  /^Swiss Family Treehouse$/i,
+  /^Tom Sawyer Island$/i,
+  /^Gorilla Falls Exploration Trail$/i,
+  /^Maharajah Jungle Trek$/i,
+  /^The Boneyard$/i,
+  /^Affection Section$/i,
+  /^Conservation Station$/i,
+  /^Walt Disney Presents$/i,
+  /^The Animation Experience/i,
+  /^Meet\b/i,
+  /character greeting/i
+];
+
 const NAME_OVERRIDES = new Map([
   ["A Pirate's Adventure ~ Treasures of the Seven Seas", "A Pirate's Adventure"],
   ["Expedition Everest - Legend of the Forbidden Mountain", "Expedition Everest"]
@@ -83,5 +99,7 @@ export function isSingleRiderName(value) {
 
 export function attractionKind(value) {
   const name = cleanAttractionName(value);
-  return SHOW_PATTERNS.some((pattern) => pattern.test(name)) ? "show" : "ride";
+  if (SHOW_PATTERNS.some((pattern) => pattern.test(name))) return "show";
+  if (OTHER_ATTRACTION_PATTERNS.some((pattern) => pattern.test(name))) return "other";
+  return "ride";
 }

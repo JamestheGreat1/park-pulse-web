@@ -1,14 +1,14 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.3";
-import { store } from "./store.js?v=1.3.3";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.3";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.3";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.4";
+import { store } from "./store.js?v=1.3.4";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.4";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.4";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.3.3";
+const APP_VERSION = "1.3.4";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -113,7 +113,7 @@ function rideListMarkup(state = store.snapshot) {
     : `<div class="empty liquid-glass">${rideData.error || "No rides match that search."}</div>`;
 }
 function bindRideCards(root = views.explore) {
-  $('[data-open-ride]', root).forEach((button) => {
+  $$('[data-open-ride]', root).forEach((button) => {
     button.onclick = () => openRide(button.dataset.openRide);
   });
 }
@@ -209,7 +209,7 @@ function render() {
   setTheme(); bindDynamic();
 }
 function bindDynamic() {
-  $('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
+  $$('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
   bindRideCards();
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));

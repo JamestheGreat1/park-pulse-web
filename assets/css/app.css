@@ -15,3 +15,14 @@
 .health-pill.bad{color:var(--red)}
 .health-pill.bad:before{background:var(--red)}
 @media(max-width:640px){.status-label{max-width:92px;display:block;line-height:1.15;margin-top:2px}.health-pill,.setting-value{max-width:48%;font-size:.74rem}}
+
+.ride-insights{margin:0 0 14px;padding:13px 14px;border:1px solid var(--hair);border-radius:16px;background:rgba(255,255,255,.035)}
+.insight-loading{display:block;color:var(--muted);font-size:.76rem;line-height:1.4}
+.insight-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;font-size:.75rem;color:var(--muted)}
+.insight-head>b{color:var(--blue);font-size:.72rem;text-align:right}
+.insight-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.insight-grid>div{padding:10px 11px;border-radius:13px;background:rgba(255,255,255,.045);display:flex;flex-direction:column;gap:2px}
+.insight-grid span,.ride-insights small{font-size:.68rem;color:var(--muted)}
+.insight-grid strong{font-size:.95rem}
+.ride-insights small{display:block;line-height:1.35}
+@media(max-width:420px){.insight-grid{grid-template-columns:1fr 1fr}}

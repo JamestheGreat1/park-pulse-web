@@ -1,14 +1,14 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.2.1";
-import { store } from "./store.js?v=1.2.1";
-import { rideData } from "./api.js?v=1.2.1";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.2.1";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.0";
+import { store } from "./store.js?v=1.3.0";
+import { rideData, fetchRideInsights } from "./api.js?v=1.3.0";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.0";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "1.3.0";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -142,6 +142,7 @@ function renderSettings() {
       <div class="setting-row"><div><strong>Worker</strong><small>Backend and notification monitor</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
       <div class="setting-row"><div><strong>Ride data</strong><small>Last successful app refresh</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
       <div class="setting-row"><div><strong>Data source</strong><small>ThemeParks.wiki primary · Queue-Times fallback</small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
+      <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Stored only as a Cloudflare Worker secret.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
       <div class="setting-row"><div><strong>App version</strong><small>Installed ParkPulse frontend</small></div><span class="setting-value">v${APP_VERSION}</span></div>
       <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status only — no push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
     </section>
@@ -178,6 +179,7 @@ function openRide(id) {
   const model = ride || existing;
   sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(model.name || model.rideName)}</h2></div><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div>
     <div class="sheet-status"><span class="wait ${rideStatus(ride).stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(rideStatus(ride).wait)}</span><small>${escapeHtml(rideStatus(ride).label)}</small></div>
+    <div id="rideInsights" class="ride-insights"><span class="insight-loading">Loading ParkPulse trend data…</span></div>
     <form id="watchForm">
       <label class="toggle-row"><div><strong>Notify when it reopens</strong><small>Great for temporary downtime.</small></div><input id="reopenToggle" type="checkbox" ${existing?.reopen !== false ? "checked" : ""}><span class="switch"></span></label>
       <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when the posted wait drops to or below:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>
@@ -186,6 +188,7 @@ function openRide(id) {
       ${existing ? `<button class="danger-text" type="button" data-remove-current>Stop watching this ride</button>` : ""}
     </form>`;
   sheet.classList.remove("hidden"); backdrop.classList.remove("hidden"); document.body.classList.add("sheet-open");
+  loadRideInsights(id);
   let thresholdEnabled = Boolean(existing?.threshold), threshold = Number(existing?.threshold || 30);
   const refreshThreshold = () => { $("#thresholdValue").textContent = threshold; $("#thresholdControls").classList.toggle("disabled", !thresholdEnabled); $("#thresholdToggle").classList.toggle("active", thresholdEnabled); $("#thresholdToggle").textContent = thresholdEnabled ? "On" : "Off"; };
   $("#thresholdToggle").onclick = () => { thresholdEnabled = !thresholdEnabled; refreshThreshold(); };
@@ -204,6 +207,31 @@ function openRide(id) {
     closeSheet();
   };
 }
+async function loadRideInsights(id) {
+  const data = await fetchRideInsights(id);
+  const host = $("#rideInsights");
+  if (!host || sheet.classList.contains("hidden")) return;
+
+  if (!data?.available) {
+    host.innerHTML = '<span class="insight-loading">ParkPulse is building trend history. This gets smarter as the 5-minute samples accumulate.</span>';
+    return;
+  }
+
+  const stats = [];
+  if (data.todayLow != null && data.todayHigh != null) {
+    stats.push(`<div><span>Today</span><strong>${data.todayLow}–${data.todayHigh} min</strong></div>`);
+  }
+  if (data.typicalNow != null) {
+    stats.push(`<div><span>Typical now</span><strong>${data.typicalNow} min</strong></div>`);
+  }
+
+  host.innerHTML = `
+    <div class="insight-head"><span>ParkPulse trend</span>${data.comparison?.label ? `<b>${escapeHtml(data.comparison.label)}</b>` : ""}</div>
+    ${stats.length ? `<div class="insight-grid">${stats.join("")}</div>` : ""}
+    <small>Based on ParkPulse’s rolling ride samples; more history improves the comparison.</small>
+  `;
+}
+
 function closeSheet() { sheet.classList.add("hidden"); backdrop.classList.add("hidden"); document.body.classList.remove("sheet-open"); }
 function migrateLegacyRules() {
   const current = store.snapshot.rules;
@@ -241,7 +269,8 @@ async function copyDiagnostics() {
     `Notification permission: ${"Notification" in window ? Notification.permission : "unsupported"}`,
     `Last app refresh: ${rideData.updatedAt || "none"}`,
     `Active watches: ${store.snapshot.rules.length}`,
-    `Ride sources: ${rideData.sourceSummary || "none"}`
+    `Ride sources: ${rideData.sourceSummary || "none"}`,
+    `ThemeParks API key: ${backendState?.themeParksApiKeyConfigured ? "configured" : "anonymous"}`
   ];
   try { await navigator.clipboard.writeText(lines.join("\n")); toast("Diagnostics copied"); }
   catch { toast(lines.join(" · ")); }

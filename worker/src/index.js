@@ -324,7 +324,7 @@ async function fetchThemeParksRides(parkId, park) {
 
     const standby = item?.queue?.STANDBY;
     const waitValue = standby?.waitTime;
-    const waitTime = Number.isFinite(Number(waitValue)) ? Math.max(0, Number(waitValue)) : null;
+    const waitTime = waitValue == null ? null : Number.isFinite(Number(waitValue)) ? Math.max(0, Number(waitValue)) : null;
 
     results.push({
       id: catalogRide.key,

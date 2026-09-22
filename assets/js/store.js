@@ -5,7 +5,6 @@ const defaults = {
   activeView: "explore",
   query: "",
   openOnly: false,
-  attractionFilter: "rides",
   sort: "recommended",
   theme: "system",
   rules: []
@@ -16,9 +15,9 @@ function parse(raw, fallback) {
 }
 
 function cleanRule(rule) {
-  if (!rule || !Number.isFinite(Number(rule.rideId))) return null;
+  if (!rule || rule.rideId == null || String(rule.rideId).trim() === "") return null;
   return {
-    rideId: Number(rule.rideId),
+    rideId: String(rule.rideId),
     parkId: Number(rule.parkId),
     rideName: String(rule.rideName || "Attraction"),
     land: String(rule.land || ""),
@@ -34,8 +33,6 @@ export class Store extends EventTarget {
     super();
     const saved = parse(localStorage.getItem(KEY), {});
     this.state = { ...defaults, ...saved };
-    if (saved.attractionFilter == null && saved.attractionMode) this.state.attractionFilter = saved.attractionMode === "all" ? "all" : "rides";
-    if (!["rides", "all"].includes(this.state.attractionFilter)) this.state.attractionFilter = "rides";
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
     this.pruneExpired(false);
   }
@@ -57,19 +54,19 @@ export class Store extends EventTarget {
   }
   ruleForRide(rideId) {
     this.pruneExpired(false);
-    return this.state.rules.find((rule) => rule.rideId === Number(rideId)) || null;
+    return this.state.rules.find((rule) => String(rule.rideId) === String(rideId)) || null;
   }
   saveRule(rule) {
     const cleaned = cleanRule(rule);
     if (!cleaned) return;
     this.update((state) => {
-      state.rules = state.rules.filter((item) => item.rideId !== cleaned.rideId);
+      state.rules = state.rules.filter((item) => String(item.rideId) !== String(cleaned.rideId));
       state.rules.push(cleaned);
     }, "rules");
   }
   removeRule(rideId) {
     this.update((state) => {
-      state.rules = state.rules.filter((rule) => rule.rideId !== Number(rideId));
+      state.rules = state.rules.filter((rule) => String(rule.rideId) !== String(rideId));
     }, "rules");
   }
 }

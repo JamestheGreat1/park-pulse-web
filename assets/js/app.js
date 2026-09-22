@@ -1,6 +1,6 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml } from "./data.js?v=1.0.4";
-import { store } from "./store.js?v=1.0.4";
-import { rideData } from "./api.js?v=1.0.4";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml } from "./data.js?v=1.0.5";
+import { store } from "./store.js?v=1.0.5";
+import { rideData } from "./api.js?v=1.0.5";
 import { currentSubscription, enablePush, syncRules, disablePush } from "./push.js?v=1.0.0";
 
 const $ = (s, root = document) => root.querySelector(s);

@@ -36,7 +36,12 @@ function normalizedWorkerRide(parkId, ride) {
     source: String(ride.source || "unknown"),
     sourceId: ride.sourceId ? String(ride.sourceId) : null,
     sourceStale: Boolean(ride.sourceStale),
-    sourceMissing: Boolean(ride.sourceMissing)
+    sourceMissing: Boolean(ride.sourceMissing),
+    typicalWait: ride.typicalWait == null ? null : Number(ride.typicalWait),
+    typicalLow: ride.typicalLow == null ? null : Number(ride.typicalLow),
+    typicalHigh: ride.typicalHigh == null ? null : Number(ride.typicalHigh),
+    baselineDays: Number(ride.baselineDays || 0),
+    valueRatio: ride.valueRatio == null ? null : Number(ride.valueRatio)
   };
 }
 

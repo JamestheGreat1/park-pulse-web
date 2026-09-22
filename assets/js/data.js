@@ -46,6 +46,8 @@ const OTHER_ATTRACTION_PATTERNS = [
   /character greeting/i
 ];
 
+const RIDE_OVERRIDES = [/^remy['’]s ratatouille adventure$/i];
+
 const NAME_OVERRIDES = new Map([
   ["it's a small world", "it's a small world"],
   ["a pirate's adventure ~ treasures of the seven seas", "A Pirate's Adventure"],
@@ -84,6 +86,7 @@ export function isShowName(name) {
 
 export function attractionKind(name) {
   const value = cleanAttractionName(name);
+  if (RIDE_OVERRIDES.some((pattern) => pattern.test(value))) return "ride";
   if (SHOW_PATTERNS.some((pattern) => pattern.test(value))) return "show";
   if (OTHER_ATTRACTION_PATTERNS.some((pattern) => pattern.test(value))) return "other";
   return "ride";

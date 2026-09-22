@@ -1,6 +1,6 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml } from "./data.js?v=1.0.1";
-import { store } from "./store.js?v=1.0.0";
-import { rideData } from "./api.js?v=1.0.0";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml } from "./data.js?v=1.0.4";
+import { store } from "./store.js?v=1.0.4";
+import { rideData } from "./api.js?v=1.0.4";
 import { currentSubscription, enablePush, syncRules, disablePush } from "./push.js?v=1.0.0";
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -41,7 +41,7 @@ function selectView(name) {
 }
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
-  let list = rides.filter((r) => (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) && (!state.openOnly || r.isOpen));
+  let list = rides.filter((r) => (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) && (!state.openOnly || r.isOpen) && (state.attractionFilter !== "rides" || r.kind === "ride"));
   if (state.sort === "wait") list.sort((a,b) => (a.isOpen === b.isOpen ? a.waitTime - b.waitTime : a.isOpen ? -1 : 1));
   else if (state.sort === "name") list.sort((a,b) => a.name.localeCompare(b.name));
   else list.sort((a,b) => (Number(b.isOpen) - Number(a.isOpen)) || (a.waitTime - b.waitTime) || a.name.localeCompare(b.name));
@@ -72,6 +72,7 @@ function renderExplore() {
     <section class="toolbar liquid-glass">
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
+      <select id="typeSelect" aria-label="Attraction type"><option value="rides" ${state.attractionFilter === "rides" ? "selected" : ""}>Rides</option><option value="all" ${state.attractionFilter === "all" ? "selected" : ""}>All</option></select>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
     <div class="section-heading"><div><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
@@ -115,6 +116,7 @@ function bindDynamic() {
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
   const search = $("#rideSearch"); if (search) search.oninput = () => store.update((s) => { s.query = search.value; }, "search");
+  const type = $("#typeSelect"); if (type) type.onchange = () => store.update((s) => { s.attractionFilter = type.value; }, "filter");
   const sort = $("#sortSelect"); if (sort) sort.onchange = () => store.update((s) => { s.sort = sort.value; }, "sort");
   $$('[data-delete-watch]').forEach((b) => b.onclick = async () => { store.removeRule(Number(b.dataset.deleteWatch)); await safeSync(); toast("Watch removed"); });
   $$('[data-enable-push]').forEach((b) => b.onclick = activatePush);

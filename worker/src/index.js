@@ -1,6 +1,6 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 
-const VERSION = "1.2.0";
+const VERSION = "1.2.1";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 
 const PARKS = new Map([

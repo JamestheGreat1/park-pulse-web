@@ -1,17 +1,18 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.0";
-import { store } from "./store.js?v=1.3.0";
-import { rideData, fetchRideInsights } from "./api.js?v=1.3.0";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.0";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.1";
+import { store } from "./store.js?v=1.3.1";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.1";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.1";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.3.1";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
+let analyticsState = null;
 
 function iconBell(active = false) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>${active ? '<circle cx="18" cy="5" r="3" class="bell-dot"/>' : ""}</svg>`;
@@ -143,6 +144,7 @@ function renderSettings() {
       <div class="setting-row"><div><strong>Ride data</strong><small>Last successful app refresh</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
       <div class="setting-row"><div><strong>Data source</strong><small>ThemeParks.wiki primary · Queue-Times fallback</small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
       <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Stored only as a Cloudflare Worker secret.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
+      <div class="setting-row"><div><strong>Trend baselines</strong><small>30-day time-of-day history backfill</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : "Building…"}</span></div>
       <div class="setting-row"><div><strong>App version</strong><small>Installed ParkPulse frontend</small></div><span class="setting-value">v${APP_VERSION}</span></div>
       <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status only — no push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
     </section>
@@ -224,11 +226,18 @@ async function loadRideInsights(id) {
   if (data.typicalNow != null) {
     stats.push(`<div><span>Typical now</span><strong>${data.typicalNow} min</strong></div>`);
   }
+  if (data.typicalRange?.low != null && data.typicalRange?.high != null) {
+    stats.push(`<div><span>Usual range</span><strong>${data.typicalRange.low}–${data.typicalRange.high} min</strong></div>`);
+  }
+
+  const sourceCopy = data.baselineSource === "themeparks-history"
+    ? `30-day ThemeParks history · ${data.samples?.baselineDays || 0} days represented`
+    : "ParkPulse is still building the historical baseline.";
 
   host.innerHTML = `
     <div class="insight-head"><span>ParkPulse trend</span>${data.comparison?.label ? `<b>${escapeHtml(data.comparison.label)}</b>` : ""}</div>
     ${stats.length ? `<div class="insight-grid">${stats.join("")}</div>` : ""}
-    <small>Based on ParkPulse’s rolling ride samples; more history improves the comparison.</small>
+    <small>${escapeHtml(sourceCopy)} Today’s range comes from ParkPulse’s own live samples.</small>
   `;
 }
 
@@ -270,7 +279,8 @@ async function copyDiagnostics() {
     `Last app refresh: ${rideData.updatedAt || "none"}`,
     `Active watches: ${store.snapshot.rules.length}`,
     `Ride sources: ${rideData.sourceSummary || "none"}`,
-    `ThemeParks API key: ${backendState?.themeParksApiKeyConfigured ? "configured" : "anonymous"}`
+    `ThemeParks API key: ${backendState?.themeParksApiKeyConfigured ? "configured" : "anonymous"}`,
+    `Trend baselines: ${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides}` : "unknown"}`
   ];
   try { await navigator.clipboard.writeText(lines.join("\n")); toast("Diagnostics copied"); }
   catch { toast(lines.join(" · ")); }
@@ -292,6 +302,7 @@ async function init() {
     await navigator.serviceWorker.register("./service-worker.js").catch(() => {});
   }
   backendState = await backendHealth().catch(() => ({ok:false}));
+  analyticsState = await fetchAnalyticsStatus().catch(() => null);
   pushOn = Boolean(await currentSubscription().catch(() => null));
   $$('[data-view-target]').forEach((button) => button.onclick = () => selectView(button.dataset.viewTarget));
   $("#refreshButton").onclick = () => rideData.refresh();
@@ -306,6 +317,10 @@ async function init() {
   if (pushOn) await safeSync();
   const deepLinkRide = new URL(location.href).searchParams.get("ride");
   if (deepLinkRide && rideData.rideById(deepLinkRide)) openRide(deepLinkRide);
-  setInterval(() => rideData.refresh(), Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
+  setInterval(async () => {
+    await rideData.refresh();
+    analyticsState = await fetchAnalyticsStatus().catch(() => analyticsState);
+    render();
+  }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
 }
 init();

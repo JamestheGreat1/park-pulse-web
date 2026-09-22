@@ -1,155 +1,74 @@
-import { todayKey } from "./data.js";
+const KEY = "parkpulse.rideWatcher.v1";
 
-const STATE_KEY = "parkpulse.state.v0152";
-const QUEUE_CACHE_KEY = "parkpulse.queueCache.v1";
-const HISTORY_KEY = "parkpulse.waitHistory.v1";
-const SCROLL_KEY = "parkpulse.scrollPositions.v1";
+const defaults = {
+  selectedParkId: Number(window.PARKPULSE_CONFIG?.DEFAULT_PARK_ID || 6),
+  activeView: "explore",
+  query: "",
+  openOnly: false,
+  sort: "recommended",
+  theme: "system",
+  rules: []
+};
 
-function uid(prefix = "item") {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function defaultState() {
-  return {
-    selectedParkId: 6,
-    activeTab: "for-you",
-    favorites: [],
-    priorities: {},
-    itinerary: [],
-    appearance: { theme: "system", accent: "blue" },
-    waits: { query: "", filter: "rides", openOnly: false },
-    parkDay: { active: false, startedAt: null, skippedUids: [] },
-    daily: { date: todayKey(), doneUids: [], riddenRideIds: [] },
-    onboardingDismissed: false,
-    planEditMode: false
-  };
-}
-
-function safeParse(raw, fallback) {
+function parse(raw, fallback) {
   try { return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
 }
 
-export class ParkPulseStore extends EventTarget {
+function cleanRule(rule) {
+  if (!rule || !Number.isFinite(Number(rule.rideId))) return null;
+  return {
+    rideId: Number(rule.rideId),
+    parkId: Number(rule.parkId),
+    rideName: String(rule.rideName || "Attraction"),
+    land: String(rule.land || ""),
+    reopen: rule.reopen !== false,
+    threshold: rule.threshold == null || rule.threshold === "" ? null : Math.max(5, Math.min(300, Number(rule.threshold))),
+    expiresAt: rule.expiresAt == null ? null : Number(rule.expiresAt),
+    createdAt: Number(rule.createdAt || Date.now())
+  };
+}
+
+export class Store extends EventTarget {
   constructor() {
     super();
-    const saved = safeParse(localStorage.getItem(STATE_KEY), {});
-    this.state = this.#sanitize({ ...defaultState(), ...saved });
-    this.#rollDateIfNeeded();
+    const saved = parse(localStorage.getItem(KEY), {});
+    this.state = { ...defaults, ...saved };
+    this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
+    this.pruneExpired(false);
   }
-
-  #sanitize(state) {
-    state.favorites = Array.isArray(state.favorites) ? [...new Set(state.favorites.map(Number).filter(Number.isFinite))] : [];
-    state.priorities = state.priorities && typeof state.priorities === "object" ? state.priorities : {};
-    state.itinerary = Array.isArray(state.itinerary) ? state.itinerary.filter(Boolean) : [];
-    state.appearance = { ...defaultState().appearance, ...(state.appearance || {}) };
-    state.waits = { ...defaultState().waits, ...(state.waits || {}) };
-    state.parkDay = { ...defaultState().parkDay, ...(state.parkDay || {}) };
-    state.daily = { ...defaultState().daily, ...(state.daily || {}) };
-    return state;
-  }
-
-  #rollDateIfNeeded() {
-    const today = todayKey();
-    if (this.state.daily.date !== today) {
-      this.state.daily = { date: today, doneUids: [], riddenRideIds: [] };
-      this.state.parkDay = { active: false, startedAt: null, skippedUids: [] };
-      this.#persist(false);
-    }
-  }
-
-  get snapshot() {
-    this.#rollDateIfNeeded();
-    return structuredClone(this.state);
-  }
-
+  get snapshot() { return structuredClone(this.state); }
   update(mutator, reason = "state") {
-    this.#rollDateIfNeeded();
     mutator(this.state);
-    this.#persist(true, reason);
+    this.pruneExpired(false);
+    localStorage.setItem(KEY, JSON.stringify(this.state));
+    this.dispatchEvent(new CustomEvent("change", { detail: { reason } }));
   }
-
-  replace(nextState, reason = "state") {
-    this.state = this.#sanitize(nextState);
-    this.#rollDateIfNeeded();
-    this.#persist(true, reason);
-  }
-
-  #persist(emit = true, reason = "state") {
-    localStorage.setItem(STATE_KEY, JSON.stringify(this.state));
-    if (emit) this.dispatchEvent(new CustomEvent("change", { detail: { reason } }));
-  }
-
-  addRideToPlan(ride, { afterUid = null } = {}) {
-    if (!ride) return;
-    const exists = this.state.itinerary.some((item) => item.type === "ride" && Number(item.rideId) === Number(ride.id));
-    if (exists) return;
-    const item = { uid: uid("ride"), type: "ride", rideId: Number(ride.id), parkId: Number(ride.parkId), name: ride.name };
-    this.update((state) => {
-      if (!afterUid) state.itinerary.push(item);
-      else {
-        const index = state.itinerary.findIndex((entry) => entry.uid === afterUid);
-        state.itinerary.splice(index >= 0 ? index + 1 : state.itinerary.length, 0, item);
-      }
-    }, "itinerary");
-  }
-
-  addCustomBlock(block) {
-    const kind = block.kind || "note";
-    this.update((state) => state.itinerary.push({
-      uid: uid("block"),
-      type: "custom",
-      kind,
-      title: String(block.title || "Plan block").trim() || "Plan block",
-      note: String(block.note || "").trim(),
-      parkId: Number(block.parkId || state.selectedParkId),
-      time: String(block.time || "")
-    }), "itinerary");
-  }
-
-  resetAll() {
-    this.state = defaultState();
-    this.#persist(true, "reset");
-    localStorage.removeItem(QUEUE_CACHE_KEY);
-    localStorage.removeItem(HISTORY_KEY);
-    localStorage.removeItem(SCROLL_KEY);
-  }
-}
-
-export const store = new ParkPulseStore();
-
-export function loadQueueCache() {
-  return safeParse(localStorage.getItem(QUEUE_CACHE_KEY), {});
-}
-
-export function saveQueueCache(cache) {
-  localStorage.setItem(QUEUE_CACHE_KEY, JSON.stringify(cache));
-}
-
-export function loadHistory() {
-  return safeParse(localStorage.getItem(HISTORY_KEY), {});
-}
-
-export function appendHistory(rides) {
-  const history = loadHistory();
-  const now = Date.now();
-  for (const ride of rides) {
-    const key = String(ride.id);
-    const samples = Array.isArray(history[key]) ? history[key] : [];
-    const last = samples.at(-1);
-    if (!last || now - last.t >= 4 * 60 * 1000 || last.w !== ride.waitTime || last.o !== ride.isOpen) {
-      samples.push({ t: now, w: ride.waitTime, o: ride.isOpen });
+  pruneExpired(emit = true) {
+    const before = this.state.rules.length;
+    const now = Date.now();
+    this.state.rules = this.state.rules.filter((rule) => !rule.expiresAt || rule.expiresAt > now);
+    if (before !== this.state.rules.length) {
+      localStorage.setItem(KEY, JSON.stringify(this.state));
+      if (emit) this.dispatchEvent(new CustomEvent("change", { detail: { reason: "expired" } }));
     }
-    history[key] = samples.slice(-36);
   }
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  ruleForRide(rideId) {
+    this.pruneExpired(false);
+    return this.state.rules.find((rule) => rule.rideId === Number(rideId)) || null;
+  }
+  saveRule(rule) {
+    const cleaned = cleanRule(rule);
+    if (!cleaned) return;
+    this.update((state) => {
+      state.rules = state.rules.filter((item) => item.rideId !== cleaned.rideId);
+      state.rules.push(cleaned);
+    }, "rules");
+  }
+  removeRule(rideId) {
+    this.update((state) => {
+      state.rules = state.rules.filter((rule) => rule.rideId !== Number(rideId));
+    }, "rules");
+  }
 }
 
-export function getScrollPositions() {
-  return safeParse(sessionStorage.getItem(SCROLL_KEY), {});
-}
-
-export function setScrollPosition(tab, y) {
-  const positions = getScrollPositions();
-  positions[tab] = Math.max(0, Math.round(y));
-  sessionStorage.setItem(SCROLL_KEY, JSON.stringify(positions));
-}
+export const store = new Store();

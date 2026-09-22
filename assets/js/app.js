@@ -1,14 +1,14 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.1.2";
-import { store } from "./store.js?v=1.1.2";
-import { rideData } from "./api.js?v=1.1.2";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.1.2";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale, normalizeRideName } from "./data.js?v=1.2.0";
+import { store } from "./store.js?v=1.2.0";
+import { rideData } from "./api.js?v=1.2.0";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.2.0";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.1.2";
+const APP_VERSION = "1.2.0";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -55,7 +55,7 @@ function remaining(rule) {
 function rideStatus(ride) {
   if (!ride) return { stale:true, wait:"—", label:"No live data", updated:"Unavailable" };
   const stale = isRideStale(ride);
-  if (ride.sourceMissing) return { stale:true, wait:"No data", label:"Standby feed unavailable", updated:"Waiting for Queue-Times" };
+  if (ride.sourceMissing) return { stale:true, wait:"No data", label:"Standby feed unavailable", updated:"Waiting for live standby data" };
   const wait = minutesLabel(ride.waitTime, ride.isOpen);
   if (stale) return { stale:true, wait, label:`Stale · last seen ${relativeTime(ride.lastUpdated)}`, updated:`Last seen ${relativeTime(ride.lastUpdated)}` };
   return { stale:false, wait, label:ride.isOpen ? "Operating" : "Unavailable", updated:`Updated ${relativeTime(ride.lastUpdated)}` };
@@ -75,7 +75,7 @@ function selectView(name) {
 }
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
-  let list = rides.filter((r) => (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) && (!state.openOnly || (r.isOpen && !isRideStale(r))) && (state.attractionFilter !== "rides" || r.kind === "ride"));
+  let list = rides.filter((r) => (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) && (!state.openOnly || (r.isOpen && !isRideStale(r))));
   const staleRank = (ride) => isRideStale(ride) ? 1 : 0;
   if (state.sort === "wait") list.sort((a,b) => staleRank(a) - staleRank(b) || (a.isOpen === b.isOpen ? a.waitTime - b.waitTime : a.isOpen ? -1 : 1));
   else if (state.sort === "name") list.sort((a,b) => staleRank(a) - staleRank(b) || a.name.localeCompare(b.name));
@@ -108,7 +108,6 @@ function renderExplore() {
     <section class="toolbar liquid-glass">
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
-      <select id="typeSelect" aria-label="Attraction type"><option value="rides" ${state.attractionFilter === "rides" ? "selected" : ""}>Rides</option><option value="all" ${state.attractionFilter === "all" ? "selected" : ""}>All</option></select>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
     <div class="section-heading"><div><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
@@ -142,10 +141,11 @@ function renderSettings() {
     <section class="settings-group liquid-glass">
       <div class="setting-row"><div><strong>Worker</strong><small>Backend and notification monitor</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
       <div class="setting-row"><div><strong>Ride data</strong><small>Last successful app refresh</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
+      <div class="setting-row"><div><strong>Data source</strong><small>ThemeParks.wiki primary · Queue-Times fallback</small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
       <div class="setting-row"><div><strong>App version</strong><small>Installed ParkPulse frontend</small></div><span class="setting-value">v${APP_VERSION}</span></div>
       <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status only — no push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
     </section>
-    <section class="settings-group liquid-glass"><div class="about-row"><strong>Data</strong><p>Ride status and posted wait times come from Queue-Times and update about every five minutes. Stale or missing standby data is labeled instead of being presented as live.</p><a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Powered by Queue-Times.com ↗</a></div></section>
+    <section class="settings-group liquid-glass"><div class="about-row"><strong>Data</strong><p>ThemeParks.wiki is ParkPulse’s primary live source. Queue-Times is used only as a fallback when a curated ride is missing. Stale or missing standby data is labeled instead of being presented as live.</p><a href="https://www.themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki ↗</a> · <a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times ↗</a></div></section>
     <p class="fine-print">ParkPulse is an independent project and is not affiliated with or endorsed by Disney.</p>`;
 }
 function render() {
@@ -162,7 +162,6 @@ function bindDynamic() {
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
   const search = $("#rideSearch"); if (search) search.oninput = () => store.update((s) => { s.query = search.value; }, "search");
-  const type = $("#typeSelect"); if (type) type.onchange = () => store.update((s) => { s.attractionFilter = type.value; }, "filter");
   const sort = $("#sortSelect"); if (sort) sort.onchange = () => store.update((s) => { s.sort = sort.value; }, "sort");
   $$('[data-delete-watch]').forEach((b) => b.onclick = async () => { store.removeRule(Number(b.dataset.deleteWatch)); await safeSync(); toast("Watch removed"); });
   $$('[data-enable-push]').forEach((b) => b.onclick = activatePush);
@@ -206,6 +205,24 @@ function openRide(id) {
   };
 }
 function closeSheet() { sheet.classList.add("hidden"); backdrop.classList.add("hidden"); document.body.classList.remove("sheet-open"); }
+function migrateLegacyRules() {
+  const current = store.snapshot.rules;
+  let changed = false;
+  const next = current.map((rule) => {
+    if (rideData.rideById(rule.rideId)) return rule;
+    const match = rideData.rideByName(rule.parkId, rule.rideName);
+    if (!match) return rule;
+    changed = true;
+    return {
+      ...rule,
+      rideId: String(match.id),
+      rideName: match.name,
+      land: match.land
+    };
+  });
+  if (changed) store.update((state) => { state.rules = next; }, "rule-migration");
+  return changed;
+}
 async function safeSync() { try { await syncRules(store.snapshot.rules); } catch { toast("Saved locally; notification sync failed."); } }
 async function activatePush() {
   try { await enablePush(); pushOn = true; await syncRules(store.snapshot.rules); render(); toast("Notifications are on"); }
@@ -223,7 +240,8 @@ async function copyDiagnostics() {
     `Push: ${pushOn ? "connected" : "not connected"}`,
     `Notification permission: ${"Notification" in window ? Notification.permission : "unsupported"}`,
     `Last app refresh: ${rideData.updatedAt || "none"}`,
-    `Active watches: ${store.snapshot.rules.length}`
+    `Active watches: ${store.snapshot.rules.length}`,
+    `Ride sources: ${rideData.sourceSummary || "none"}`
   ];
   try { await navigator.clipboard.writeText(lines.join("\n")); toast("Diagnostics copied"); }
   catch { toast(lines.join(" · ")); }
@@ -255,9 +273,10 @@ async function init() {
   const active = store.snapshot.activeView in views ? store.snapshot.activeView : "explore";
   selectView(active);
   await rideData.refresh();
+  migrateLegacyRules();
   if (pushOn) await safeSync();
-  const deepLinkRide = Number(new URL(location.href).searchParams.get("ride"));
-  if (Number.isFinite(deepLinkRide) && deepLinkRide > 0 && rideData.rideById(deepLinkRide)) openRide(deepLinkRide);
+  const deepLinkRide = new URL(location.href).searchParams.get("ride");
+  if (deepLinkRide && rideData.rideById(deepLinkRide)) openRide(deepLinkRide);
   setInterval(() => rideData.refresh(), Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
 }
 init();

@@ -1,4 +1,4 @@
-import { workerBase } from "./api.js?v=1.0.0";
+import { workerBase } from "./api.js?v=1.1.0";
 
 function base64ToBytes(value) {
   const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, "=").replace(/-/g, "+").replace(/_/g, "/");
@@ -30,4 +30,31 @@ export async function disablePush(){
   const sub=await currentSubscription();if(!sub)return;
   if(workerBase)await fetch(`${workerBase}/subscriptions`,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{});
   await sub.unsubscribe();
+}
+
+
+export async function backendHealth(){
+  if(!workerBase) return {ok:false,reason:"backend"};
+  try{
+    const response=await fetch(`${workerBase}/health`,{cache:"no-store"});
+    if(!response.ok) return {ok:false,status:response.status};
+    return await response.json();
+  }catch{
+    return {ok:false,reason:"network"};
+  }
+}
+
+export async function sendTestPush(){
+  const sub=await currentSubscription();
+  if(!sub) throw new Error("Enable notifications first.");
+  const response=await fetch(`${workerBase}/subscriptions/test`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({subscription:sub.toJSON()})
+  });
+  if(!response.ok){
+    if(response.status===410) throw new Error("This notification subscription expired. Disable and re-enable notifications.");
+    throw new Error("Couldn't send a test notification.");
+  }
+  return response.json();
 }

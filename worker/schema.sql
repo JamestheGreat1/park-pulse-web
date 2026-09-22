@@ -84,3 +84,13 @@ CREATE TABLE IF NOT EXISTS ride_baseline (
 
 CREATE INDEX IF NOT EXISTS idx_ride_baseline_refresh
   ON ride_baseline(refreshed_at);
+
+
+CREATE TABLE IF NOT EXISTS ride_baseline_meta (
+  ride_key TEXT PRIMARY KEY,
+  source_id TEXT,
+  status TEXT NOT NULL,
+  slot_count INTEGER NOT NULL DEFAULT 0,
+  refreshed_at INTEGER NOT NULL,
+  last_error TEXT
+);

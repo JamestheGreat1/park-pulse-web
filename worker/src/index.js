@@ -1,7 +1,10 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 
-const VERSION = "1.3.0";
+const VERSION = "1.3.1";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
+const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
+const BASELINE_RETRY_MS = 30 * 60 * 1000;
+const BASELINE_BATCH_SIZE = 4;
 
 const PARKS = new Map([
   [5, {
@@ -99,6 +102,8 @@ export default {
           fallbackDataSource: "Queue-Times",
           themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),
           historyDays: 30,
+          historyBackfillEnabled: Boolean(env.THEMEPARKS_API_KEY),
+          historyBackfillBatchSize: BASELINE_BATCH_SIZE,
           now: new Date().toISOString()
         }, 200, cors);
       }
@@ -135,6 +140,10 @@ export default {
         if (!catalogRideByKey(rideKey)) return json({ error: "Unknown ride" }, 404, cors);
         const insights = await getRideInsights(env, rideKey);
         return json(insights, 200, { ...cors, "Cache-Control": "public, max-age=120" });
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/analytics/status") {
+        return json(await getAnalyticsStatus(env), 200, { ...cors, "Cache-Control": "no-store" });
       }
 
       if (request.method === "POST" && url.pathname === "/subscriptions") {
@@ -680,6 +689,12 @@ async function runRideWatch(env) {
   await env.DB.prepare(
     "DELETE FROM ride_history WHERE observed_at < ?"
   ).bind(Date.now() - 31 * 24 * 60 * 60 * 1000).run().catch(() => {});
+
+  if (env.THEMEPARKS_API_KEY) {
+    await refreshRideBaselines(env, current).catch((error) => {
+      console.warn("Baseline refresh failed", error);
+    });
+  }
 }
 
 function catalogRideByKey(rideKey) {
@@ -741,14 +756,319 @@ function median(values) {
     : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
+function localDateOffset(days, now = Date.now(), timeZone = "America/New_York") {
+  const p = zoneParts(new Date(now), timeZone);
+  const date = new Date(Date.UTC(p.year, p.month - 1, p.day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function localDayEndMs(dateString, timeZone = "America/New_York") {
+  const [year, month, day] = String(dateString).split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day));
+  next.setUTCDate(next.getUTCDate() + 1);
+  return zonedDateToUtc(
+    next.getUTCFullYear(),
+    next.getUTCMonth() + 1,
+    next.getUTCDate(),
+    0,
+    timeZone
+  );
+}
+
+function weightedQuantile(weightMap, quantile) {
+  const entries = [...weightMap.entries()]
+    .map(([value, weight]) => [Number(value), Number(weight)])
+    .filter(([value, weight]) => Number.isFinite(value) && Number.isFinite(weight) && weight > 0)
+    .sort((a, b) => a[0] - b[0]);
+
+  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  if (!total) return null;
+
+  const target = total * quantile;
+  let cumulative = 0;
+  for (const [value, weight] of entries) {
+    cumulative += weight;
+    if (cumulative >= target) return Math.round(value);
+  }
+  return Math.round(entries.at(-1)[0]);
+}
+
+function historyStateWait(state) {
+  if (String(state?.status || "").toUpperCase() !== "OPERATING") return null;
+  const wait = state?.queue?.STANDBY?.waitTime;
+  return wait == null || !Number.isFinite(Number(wait)) ? null : Math.max(0, Number(wait));
+}
+
+function buildTimeBaselines(historyPayload) {
+  const timezone = historyPayload?.timezone || "America/New_York";
+  const endMs = localDayEndMs(historyPayload?.range?.to, timezone);
+  const states = [];
+
+  if (historyPayload?.opening?.time) states.push(historyPayload.opening);
+  for (const row of historyPayload?.history || []) {
+    if (row?.time) states.push(row);
+  }
+
+  states.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+
+  const slots = new Map();
+
+  for (let index = 0; index < states.length; index++) {
+    const state = states[index];
+    const wait = historyStateWait(state);
+    if (wait == null) continue;
+
+    let cursor = new Date(state.time).getTime();
+    const nextTime = index + 1 < states.length
+      ? new Date(states[index + 1].time).getTime()
+      : endMs;
+    const intervalEnd = Math.min(nextTime, endMs);
+
+    if (!Number.isFinite(cursor) || !Number.isFinite(intervalEnd) || intervalEnd <= cursor) continue;
+
+    while (cursor < intervalEnd) {
+      const parts = zoneParts(new Date(cursor), timezone);
+      const minuteOfDay = parts.hour * 60 + parts.minute;
+      const slotMinute = Math.floor(minuteOfDay / 15) * 15;
+      const secondsIntoSlot = (parts.minute % 15) * 60 + parts.second;
+      const msToNextSlot = Math.max(1000, (15 * 60 - secondsIntoSlot) * 1000);
+      const segmentEnd = Math.min(intervalEnd, cursor + msToNextSlot);
+      const weightMinutes = (segmentEnd - cursor) / 60000;
+      const dayKey = `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+
+      let slot = slots.get(slotMinute);
+      if (!slot) {
+        slot = {
+          weights: new Map(),
+          totalMinutes: 0,
+          weightedSum: 0,
+          days: new Set()
+        };
+        slots.set(slotMinute, slot);
+      }
+
+      slot.weights.set(wait, (slot.weights.get(wait) || 0) + weightMinutes);
+      slot.totalMinutes += weightMinutes;
+      slot.weightedSum += wait * weightMinutes;
+      slot.days.add(dayKey);
+      cursor = segmentEnd;
+    }
+  }
+
+  return [...slots.entries()]
+    .map(([slotMinute, slot]) => ({
+      slotMinute,
+      medianWait: weightedQuantile(slot.weights, 0.5),
+      p25Wait: weightedQuantile(slot.weights, 0.25),
+      p75Wait: weightedQuantile(slot.weights, 0.75),
+      meanWait: slot.totalMinutes > 0 ? Math.round(slot.weightedSum / slot.totalMinutes) : null,
+      sampleMinutes: Math.round(slot.totalMinutes),
+      sampleDays: slot.days.size
+    }))
+    .filter((row) => row.medianWait != null && row.sampleMinutes > 0)
+    .sort((a, b) => a.slotMinute - b.slotMinute);
+}
+
+async function fetchThemeParksHistory(env, ride) {
+  if (!env.THEMEPARKS_API_KEY || !ride?.sourceId) {
+    throw new Error("ThemeParks history requires an authenticated attraction id");
+  }
+
+  const from = localDateOffset(-30);
+  const to = localDateOffset(-1);
+  const url = new URL(`https://api.themeparks.wiki/v1/entity/${encodeURIComponent(ride.sourceId)}/history`);
+  url.searchParams.set("from", from);
+  url.searchParams.set("to", to);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": `ParkPulse/${VERSION}`,
+      "x-api-key": env.THEMEPARKS_API_KEY
+    }
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const type = payload?.error?.type || `HTTP_${response.status}`;
+    const message = payload?.error?.message || `ThemeParks history returned ${response.status}`;
+    const error = new Error(`${type}: ${message}`);
+    error.retryAfter = Number(payload?.error?.retryAfter || response.headers.get("Retry-After") || 0);
+    throw error;
+  }
+
+  if (payload?.entityType === "PARK" || Array.isArray(payload?.entities)) {
+    throw new Error("Unexpected park history response for attraction");
+  }
+
+  return payload;
+}
+
+async function saveRideBaseline(env, ride, rows) {
+  if (!rows.length) throw new Error("No standby history was available for this ride");
+
+  const now = Date.now();
+  const statements = [
+    env.DB.prepare("DELETE FROM ride_baseline WHERE ride_key=?").bind(String(ride.id))
+  ];
+
+  for (const row of rows) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO ride_baseline(
+           ride_key,slot_minute,median_wait,p25_wait,p75_wait,mean_wait,
+           sample_minutes,sample_days,refreshed_at
+         ) VALUES(?,?,?,?,?,?,?,?,?)`
+      ).bind(
+        String(ride.id),
+        Number(row.slotMinute),
+        Number(row.medianWait),
+        row.p25Wait == null ? null : Number(row.p25Wait),
+        row.p75Wait == null ? null : Number(row.p75Wait),
+        row.meanWait == null ? null : Number(row.meanWait),
+        Number(row.sampleMinutes),
+        Number(row.sampleDays),
+        now
+      )
+    );
+  }
+
+  statements.push(
+    env.DB.prepare(
+      `INSERT INTO ride_baseline_meta(ride_key,source_id,status,slot_count,refreshed_at,last_error)
+       VALUES(?,?,?,?,?,NULL)
+       ON CONFLICT(ride_key) DO UPDATE SET
+         source_id=excluded.source_id,
+         status=excluded.status,
+         slot_count=excluded.slot_count,
+         refreshed_at=excluded.refreshed_at,
+         last_error=NULL`
+    ).bind(String(ride.id), String(ride.sourceId || ""), "ok", rows.length, now)
+  );
+
+  await env.DB.batch(statements);
+}
+
+async function markBaselineError(env, ride, error) {
+  const message = String(error?.message || error || "Unknown baseline error").slice(0, 300);
+  await env.DB.prepare(
+    `INSERT INTO ride_baseline_meta(ride_key,source_id,status,slot_count,refreshed_at,last_error)
+     VALUES(?,?,?,?,?,?)
+     ON CONFLICT(ride_key) DO UPDATE SET
+       source_id=excluded.source_id,
+       status=excluded.status,
+       refreshed_at=excluded.refreshed_at,
+       last_error=excluded.last_error`
+  ).bind(
+    String(ride.id),
+    String(ride.sourceId || ""),
+    "error",
+    0,
+    Date.now(),
+    message
+  ).run().catch(() => {});
+}
+
+async function refreshRideBaselines(env, currentRides) {
+  if (!env.THEMEPARKS_API_KEY) return { processed: 0, refreshed: 0, failed: 0 };
+
+  let metaRows = [];
+  try {
+    metaRows = (await env.DB.prepare(
+      "SELECT ride_key,source_id,status,slot_count,refreshed_at,last_error FROM ride_baseline_meta"
+    ).all()).results || [];
+  } catch {
+    return { processed: 0, refreshed: 0, failed: 0, reason: "schema-not-ready" };
+  }
+
+  const meta = new Map(metaRows.map((row) => [String(row.ride_key), row]));
+  const now = Date.now();
+
+  const candidates = currentRides
+    .filter((ride) => ride.source === "themeparks.wiki" && ride.sourceId && !ride.sourceStale)
+    .filter((ride) => {
+      const row = meta.get(String(ride.id));
+      if (!row) return true;
+      if (String(row.source_id || "") !== String(ride.sourceId || "")) return true;
+      const age = now - Number(row.refreshed_at || 0);
+      return age >= (row.status === "ok" ? BASELINE_REFRESH_MS : BASELINE_RETRY_MS);
+    })
+    .sort((a, b) => {
+      const aMeta = meta.get(String(a.id));
+      const bMeta = meta.get(String(b.id));
+      return Number(aMeta?.refreshed_at || 0) - Number(bMeta?.refreshed_at || 0);
+    })
+    .slice(0, BASELINE_BATCH_SIZE);
+
+  let refreshed = 0;
+  let failed = 0;
+
+  for (const ride of candidates) {
+    try {
+      const payload = await fetchThemeParksHistory(env, ride);
+      const rows = buildTimeBaselines(payload);
+      await saveRideBaseline(env, ride, rows);
+      refreshed++;
+    } catch (error) {
+      failed++;
+      console.warn("Ride baseline failed", ride.name, error);
+      await markBaselineError(env, ride, error);
+      if (Number(error?.retryAfter) > 0) break;
+    }
+  }
+
+  return { processed: candidates.length, refreshed, failed };
+}
+
+async function getAnalyticsStatus(env) {
+  const totalRides = [...PARKS.values()].reduce((sum, park) => sum + park.rides.length, 0);
+
+  try {
+    const rows = (await env.DB.prepare(
+      "SELECT ride_key,status,slot_count,refreshed_at,last_error FROM ride_baseline_meta"
+    ).all()).results || [];
+
+    const ready = rows.filter((row) => row.status === "ok" && Number(row.slot_count) > 0);
+    const errors = rows.filter((row) => row.status === "error");
+
+    return {
+      ok: true,
+      totalRides,
+      baselineRides: ready.length,
+      pendingRides: Math.max(0, totalRides - ready.length),
+      errorRides: errors.length,
+      latestRefresh: ready.length
+        ? new Date(Math.max(...ready.map((row) => Number(row.refreshed_at || 0)))).toISOString()
+        : null,
+      backfillComplete: ready.length >= totalRides
+    };
+  } catch {
+    return {
+      ok: false,
+      totalRides,
+      baselineRides: 0,
+      pendingRides: totalRides,
+      errorRides: 0,
+      latestRefresh: null,
+      backfillComplete: false,
+      reason: "schema-not-ready"
+    };
+  }
+}
+
 async function getRideInsights(env, rideKey) {
   const catalog = catalogRideByKey(rideKey);
   const now = Date.now();
   const todayStart = parkDayStartMs(new Date(now));
+  const currentMinute = easternMinutes(now);
+  const slotMinute = Math.floor(currentMinute / 15) * 15;
 
   let todayRows = [];
   let historyRows = [];
   let latest = null;
+  let baseline = null;
 
   try {
     todayRows = (await env.DB.prepare(
@@ -762,6 +1082,11 @@ async function getRideInsights(env, rideKey) {
        WHERE ride_key=? AND observed_at>=? AND observed_at<? AND is_open=1 AND wait_time IS NOT NULL
        ORDER BY observed_at ASC`
     ).bind(rideKey, now - 30 * 24 * 60 * 60 * 1000, todayStart).all()).results || [];
+
+    baseline = await env.DB.prepare(
+      `SELECT median_wait,p25_wait,p75_wait,mean_wait,sample_minutes,sample_days,refreshed_at
+       FROM ride_baseline WHERE ride_key=? AND slot_minute=?`
+    ).bind(rideKey, slotMinute).first();
 
     latest = await env.DB.prepare(
       `SELECT wait_time,is_open,source,source_updated_at,updated_at
@@ -777,13 +1102,31 @@ async function getRideInsights(env, rideKey) {
   }
 
   const todayValues = todayRows.map((row) => Number(row.wait_time)).filter(Number.isFinite);
-  const currentMinute = easternMinutes(now);
   const comparable = historyRows
     .filter((row) => circularMinuteDifference(easternMinutes(Number(row.observed_at)), currentMinute) <= 30)
     .map((row) => Number(row.wait_time))
     .filter(Number.isFinite);
 
-  const typicalNow = comparable.length >= 8 ? median(comparable) : null;
+  const baselineReady =
+    baseline &&
+    Number(baseline.sample_days || 0) >= 5 &&
+    Number(baseline.sample_minutes || 0) >= 60;
+
+  const typicalNow = baselineReady
+    ? Number(baseline.median_wait)
+    : comparable.length >= 8
+      ? median(comparable)
+      : null;
+
+  const typicalRange = baselineReady &&
+    baseline.p25_wait != null &&
+    baseline.p75_wait != null
+      ? {
+          low: Number(baseline.p25_wait),
+          high: Number(baseline.p75_wait)
+        }
+      : null;
+
   const currentWait = latest?.wait_time == null ? null : Number(latest.wait_time);
   const todayLow = todayValues.length >= 2 ? Math.min(...todayValues) : null;
   const todayHigh = todayValues.length >= 2 ? Math.max(...todayValues) : null;
@@ -809,19 +1152,27 @@ async function getRideInsights(env, rideKey) {
     rideId: rideKey,
     rideName: catalog?.name || rideKey,
     parkId: catalog?.parkId || null,
-    available: Boolean(todayValues.length || comparable.length),
+    available: Boolean(todayValues.length || typicalNow != null),
     currentWait: Number.isFinite(currentWait) ? currentWait : null,
     todayLow,
     todayHigh,
     typicalNow,
+    typicalRange,
     comparison,
+    baselineSource: baselineReady ? "themeparks-history" : "parkpulse-samples",
+    baselineRefreshedAt: baselineReady && baseline.refreshed_at
+      ? new Date(Number(baseline.refreshed_at)).toISOString()
+      : null,
     samples: {
       today: todayValues.length,
       comparable: comparable.length,
-      history: historyRows.length
+      history: historyRows.length,
+      baselineDays: baselineReady ? Number(baseline.sample_days || 0) : 0,
+      baselineMinutes: baselineReady ? Number(baseline.sample_minutes || 0) : 0
     },
     window: {
       days: 30,
+      slotMinutes: 15,
       comparableMinutes: 30
     }
   };

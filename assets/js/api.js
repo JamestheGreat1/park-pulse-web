@@ -27,6 +27,7 @@ function normalizedWorkerRide(parkId, ride) {
     parkId: Number(parkId),
     name: String(ride.name || "Attraction"),
     rawName: String(ride.rawName || ride.name || "Attraction"),
+    aliases: Array.isArray(ride.aliases) ? ride.aliases.map(String) : [],
     land: String(ride.land || "Other"),
     kind: "ride",
     isOpen: Boolean(ride.isOpen),
@@ -47,6 +48,7 @@ function legacyQueueTimesRide(parkId, ride, land) {
     parkId: Number(parkId),
     name: rawName.replace(/[®™]/g, "").trim(),
     rawName,
+    aliases: [],
     land: String(land || "Other"),
     kind: "ride",
     isOpen: Boolean(ride.is_open),
@@ -111,7 +113,7 @@ export class RideData extends EventTarget {
 
   rideByName(parkId, name) {
     const wanted = normalizeRideName(name);
-    return this.ridesForPark(parkId).find((ride) => normalizeRideName(ride.name) === wanted) || null;
+    return this.ridesForPark(parkId).find((ride) => [ride.name, ...(ride.aliases || [])].some((name) => normalizeRideName(name) === wanted)) || null;
   }
 
   async refresh({ parkId = null } = {}) {

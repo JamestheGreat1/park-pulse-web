@@ -34,6 +34,8 @@ export class Store extends EventTarget {
     super();
     const saved = parse(localStorage.getItem(KEY), {});
     this.state = { ...defaults, ...saved };
+    if (saved.attractionFilter == null && saved.attractionMode) this.state.attractionFilter = saved.attractionMode === "all" ? "all" : "rides";
+    if (!["rides", "all"].includes(this.state.attractionFilter)) this.state.attractionFilter = "rides";
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
     this.pruneExpired(false);
   }

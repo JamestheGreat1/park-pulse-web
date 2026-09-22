@@ -21,11 +21,13 @@ function normalizeRide(parkId, ride, land) {
     parkId:Number(parkId),
     name:(catalogRide(parkId, rawName, ride.id)?.name || cleanAttractionName(rawName)),
     rawName,
-    land:String(land||"Other"),
+    land:String((Number(parkId) === 5 && Number(ride.id) === 10914 && (!land || land === "Other")) ? "World Showcase" : (land || "Other")),
     kind:attractionKind(parkId, rawName, ride.id),
     isOpen:Boolean(ride.is_open),
     waitTime:Math.max(0,Number(ride.wait_time||0)),
-    lastUpdated:ride.last_updated||null
+    lastUpdated:ride.last_updated||null,
+    sourceStale:Boolean(ride.parkpulse_stale),
+    sourceMissing:false
   };
 }
 
@@ -35,6 +37,7 @@ export async function fetchPark(parkId) {
   const rides = [];
   for (const land of payload?.lands || []) for (const ride of land?.rides || []) if (!isSingleRiderName(ride?.name)) rides.push(normalizeRide(parkId, ride, land.name));
   for (const ride of payload?.rides || []) if (!isSingleRiderName(ride?.name)) rides.push(normalizeRide(parkId, ride, "Other"));
+  for (const ride of payload?.parkpulse_stale || []) if (!isSingleRiderName(ride?.name)) rides.push(normalizeRide(parkId, ride, "Other"));
   const live = [...new Map(rides.map((ride) => [ride.id, ride])).values()];
   return [...live, ...catalogPlaceholders(parkId, live)];
 }

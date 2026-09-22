@@ -31,7 +31,7 @@ function normalizedWorkerRide(parkId, ride) {
     land: String(ride.land || "Other"),
     kind: "ride",
     isOpen: Boolean(ride.isOpen),
-    waitTime: Number.isFinite(Number(ride.waitTime)) ? Math.max(0, Number(ride.waitTime)) : null,
+    waitTime: ride.waitTime == null ? null : Number.isFinite(Number(ride.waitTime)) ? Math.max(0, Number(ride.waitTime)) : null,
     lastUpdated: ride.lastUpdated || null,
     source: String(ride.source || "unknown"),
     sourceId: ride.sourceId ? String(ride.sourceId) : null,

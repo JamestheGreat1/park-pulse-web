@@ -1,6 +1,6 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 
-const VERSION = "1.2.1";
+const VERSION = "1.3.0";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 
 const PARKS = new Map([
@@ -97,6 +97,8 @@ export default {
           version: VERSION,
           primaryDataSource: "ThemeParks.wiki",
           fallbackDataSource: "Queue-Times",
+          themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),
+          historyDays: 30,
           now: new Date().toISOString()
         }, 200, cors);
       }
@@ -111,7 +113,7 @@ export default {
         const park = PARKS.get(parkId);
         if (!park) return json({ error: "Unsupported park" }, 404, cors);
 
-        const snapshot = await fetchFreshParkRides(parkId, park);
+        const snapshot = await fetchFreshParkRides(parkId, park, env);
         const rides = await addDisplayFallbacks(env, parkId, park, snapshot);
 
         return json({
@@ -125,6 +127,14 @@ export default {
           generatedAt: new Date().toISOString(),
           rides
         }, 200, { ...cors, "Cache-Control": "public, max-age=120" });
+      }
+
+      const insightMatch = url.pathname.match(/^\/api\/ride\/([^/]+)\/insights$/);
+      if (request.method === "GET" && insightMatch) {
+        const rideKey = decodeURIComponent(insightMatch[1]);
+        if (!catalogRideByKey(rideKey)) return json({ error: "Unknown ride" }, 404, cors);
+        const insights = await getRideInsights(env, rideKey);
+        return json(insights, 200, { ...cors, "Cache-Control": "public, max-age=120" });
       }
 
       if (request.method === "POST" && url.pathname === "/subscriptions") {
@@ -258,14 +268,14 @@ function findCatalogRide(park, name) {
   return null;
 }
 
-async function fetchFreshParkRides(parkId, park) {
+async function fetchFreshParkRides(parkId, park, env) {
   const merged = new Map();
   let primaryAvailable = false;
   let fallbackAvailable = false;
   let fallbackUsed = false;
 
   try {
-    const primary = await fetchThemeParksRides(parkId, park);
+    const primary = await fetchThemeParksRides(parkId, park, env);
     primaryAvailable = true;
     for (const item of primary) merged.set(item.id, item);
   } catch (error) {
@@ -299,13 +309,14 @@ async function fetchFreshParkRides(parkId, park) {
   };
 }
 
-async function fetchThemeParksRides(parkId, park) {
+async function fetchThemeParksRides(parkId, park, env) {
   const response = await fetch(
     `https://api.themeparks.wiki/v1/entity/${park.themeParksId}/live`,
     {
       headers: {
         Accept: "application/json",
-        "User-Agent": `ParkPulse/${VERSION}`
+        "User-Agent": `ParkPulse/${VERSION}`,
+        ...(env.THEMEPARKS_API_KEY ? { "x-api-key": env.THEMEPARKS_API_KEY } : {})
       },
       cf: { cacheEverything: true, cacheTtl: 240 }
     }
@@ -551,7 +562,7 @@ async function runRideWatch(env) {
 
   const current = [];
   for (const [parkId, park] of PARKS) {
-    const snapshot = await fetchFreshParkRides(parkId, park);
+    const snapshot = await fetchFreshParkRides(parkId, park, env);
     current.push(...snapshot.rides);
   }
 
@@ -659,11 +670,186 @@ async function runRideWatch(env) {
     }
 
     await writeRideState(env, ride);
+    await writeRideHistory(env, ride);
   }
 
   await env.DB.prepare(
     "DELETE FROM notification_log_v2 WHERE last_sent < ?"
   ).bind(Date.now() - 7 * 24 * 60 * 60 * 1000).run().catch(() => {});
+
+  await env.DB.prepare(
+    "DELETE FROM ride_history WHERE observed_at < ?"
+  ).bind(Date.now() - 31 * 24 * 60 * 60 * 1000).run().catch(() => {});
+}
+
+function catalogRideByKey(rideKey) {
+  for (const [parkId, park] of PARKS) {
+    const found = park.rides.find((item) => item.key === rideKey);
+    if (found) return { ...found, parkId, parkName: park.name };
+  }
+  return null;
+}
+
+function zoneParts(date, timeZone = "America/New_York") {
+  const out = {};
+  for (const part of new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date)) {
+    if (part.type !== "literal") out[part.type] = Number(part.value);
+  }
+  return out;
+}
+
+function zonedDateToUtc(year, month, day, hour, timeZone = "America/New_York") {
+  let guess = Date.UTC(year, month - 1, day, hour, 0, 0);
+  const parts = zoneParts(new Date(guess), timeZone);
+  const represented = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  guess -= represented - guess;
+  return guess;
+}
+
+function parkDayStartMs(now = new Date()) {
+  const p = zoneParts(now);
+  const date = new Date(Date.UTC(p.year, p.month - 1, p.day));
+  if (p.hour < 3) date.setUTCDate(date.getUTCDate() - 1);
+  return zonedDateToUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), 3);
+}
+
+function easternMinutes(ms) {
+  const p = zoneParts(new Date(ms));
+  return p.hour * 60 + p.minute;
+}
+
+function circularMinuteDifference(a, b) {
+  const raw = Math.abs(a - b);
+  return Math.min(raw, 1440 - raw);
+}
+
+function median(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[mid]
+    : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+async function getRideInsights(env, rideKey) {
+  const catalog = catalogRideByKey(rideKey);
+  const now = Date.now();
+  const todayStart = parkDayStartMs(new Date(now));
+
+  let todayRows = [];
+  let historyRows = [];
+  let latest = null;
+
+  try {
+    todayRows = (await env.DB.prepare(
+      `SELECT wait_time,observed_at FROM ride_history
+       WHERE ride_key=? AND observed_at>=? AND is_open=1 AND wait_time IS NOT NULL
+       ORDER BY observed_at ASC`
+    ).bind(rideKey, todayStart).all()).results || [];
+
+    historyRows = (await env.DB.prepare(
+      `SELECT wait_time,observed_at FROM ride_history
+       WHERE ride_key=? AND observed_at>=? AND observed_at<? AND is_open=1 AND wait_time IS NOT NULL
+       ORDER BY observed_at ASC`
+    ).bind(rideKey, now - 30 * 24 * 60 * 60 * 1000, todayStart).all()).results || [];
+
+    latest = await env.DB.prepare(
+      `SELECT wait_time,is_open,source,source_updated_at,updated_at
+       FROM ride_state_v2 WHERE ride_key=?`
+    ).bind(rideKey).first();
+  } catch {
+    return {
+      rideId: rideKey,
+      rideName: catalog?.name || "Attraction",
+      available: false,
+      reason: "history-not-ready"
+    };
+  }
+
+  const todayValues = todayRows.map((row) => Number(row.wait_time)).filter(Number.isFinite);
+  const currentMinute = easternMinutes(now);
+  const comparable = historyRows
+    .filter((row) => circularMinuteDifference(easternMinutes(Number(row.observed_at)), currentMinute) <= 30)
+    .map((row) => Number(row.wait_time))
+    .filter(Number.isFinite);
+
+  const typicalNow = comparable.length >= 8 ? median(comparable) : null;
+  const currentWait = latest?.wait_time == null ? null : Number(latest.wait_time);
+  const todayLow = todayValues.length >= 2 ? Math.min(...todayValues) : null;
+  const todayHigh = todayValues.length >= 2 ? Math.max(...todayValues) : null;
+
+  let comparison = null;
+  if (Number.isFinite(currentWait) && Number.isFinite(typicalNow)) {
+    const delta = currentWait - typicalNow;
+    comparison = {
+      delta,
+      label: delta <= -15
+        ? "Much better than typical"
+        : delta <= -5
+          ? "Better than typical"
+          : delta >= 15
+            ? "Busier than typical"
+            : delta >= 5
+              ? "A little busier than typical"
+              : "Typical for this time"
+    };
+  }
+
+  return {
+    rideId: rideKey,
+    rideName: catalog?.name || rideKey,
+    parkId: catalog?.parkId || null,
+    available: Boolean(todayValues.length || comparable.length),
+    currentWait: Number.isFinite(currentWait) ? currentWait : null,
+    todayLow,
+    todayHigh,
+    typicalNow,
+    comparison,
+    samples: {
+      today: todayValues.length,
+      comparable: comparable.length,
+      history: historyRows.length
+    },
+    window: {
+      days: 30,
+      comparableMinutes: 30
+    }
+  };
+}
+
+async function writeRideHistory(env, ride) {
+  if (!ride || ride.sourceStale || ride.sourceMissing) return;
+
+  const bucket = Math.floor(Date.now() / (5 * 60 * 1000)) * (5 * 60 * 1000);
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO ride_history(ride_key,park_id,wait_time,is_open,source,observed_at)
+       VALUES(?,?,?,?,?,?)
+       ON CONFLICT(ride_key,observed_at) DO UPDATE SET
+         park_id=excluded.park_id,
+         wait_time=excluded.wait_time,
+         is_open=excluded.is_open,
+         source=excluded.source`
+    ).bind(
+      String(ride.id),
+      Number(ride.parkId),
+      ride.waitTime == null ? null : Number(ride.waitTime),
+      ride.isOpen ? 1 : 0,
+      String(ride.source || "unknown"),
+      bucket
+    ).run();
+  } catch {}
 }
 
 async function readPriorRideState(env) {

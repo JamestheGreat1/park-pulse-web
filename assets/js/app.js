@@ -179,16 +179,37 @@ function renderSettings() {
     <section class="settings-group liquid-glass"><div class="about-row"><strong>Data</strong><p>ThemeParks.wiki is ParkPulse’s primary live source. Queue-Times is used only as a fallback when a curated ride is missing. Stale or missing standby data is labeled instead of being presented as live.</p><a href="https://www.themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki ↗</a> · <a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times ↗</a></div></section>
     <p class="fine-print">ParkPulse is an independent project and is not affiliated with or endorsed by Disney.</p>`;
 }
-function render() {
-  store.pruneExpired(false);
-  renderExplore(); renderWatching(); renderSettings();
+function updateWatchBadge() {
   const n = store.snapshot.rules.length;
   $("#watchingBadge").textContent = n > 9 ? "9+" : String(n);
   $("#watchingBadge").classList.toggle("hidden", n === 0);
+}
+function renderRefreshCopy() {
+  const el = $(".refresh-copy", views.explore);
+  if (el) el.textContent = rideData.refreshing
+    ? "Refreshing…"
+    : rideData.updatedAt
+      ? `Updated ${relativeTime(rideData.updatedAt)}`
+      : "Loading…";
+}
+function renderRideDataUpdate() {
+  if (document.activeElement?.id !== "rideSearch") return render();
+  renderRideResults();
+  renderRefreshCopy();
+  renderWatching();
+  renderSettings();
+  updateWatchBadge();
+  setTheme();
+  bindDynamic();
+}
+function render() {
+  store.pruneExpired(false);
+  renderExplore(); renderWatching(); renderSettings();
+  updateWatchBadge();
   setTheme(); bindDynamic();
 }
 function bindDynamic() {
-  $$('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); render(); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
+  $('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
   bindRideCards();
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
@@ -336,8 +357,12 @@ async function init() {
   $("#refreshButton").onclick = () => rideData.refresh();
   window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; });
   window.addEventListener("online", () => rideData.refresh({ parkId: store.snapshot.selectedParkId }));
-  rideData.addEventListener("update", render); rideData.addEventListener("status", render);
-  store.addEventListener("change", (e) => { if (e.detail.reason === "search") renderRideResults(); else render(); });
+  rideData.addEventListener("update", renderRideDataUpdate);
+  rideData.addEventListener("status", renderRefreshCopy);
+  store.addEventListener("change", (e) => {
+    if (e.detail.reason === "search") renderRideResults();
+    else if (e.detail.reason !== "view") render();
+  });
   const active = store.snapshot.activeView in views ? store.snapshot.activeView : "explore";
   selectView(active);
   await rideData.refresh();

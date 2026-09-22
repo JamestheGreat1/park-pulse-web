@@ -720,9 +720,9 @@ async function runRideWatch(env) {
       }
     }
 
-    await writeRideState(env, ride);
-    await writeRideHistory(env, ride);
   }
+
+  await writeCurrentRideSnapshot(env, current);
 
   await env.DB.prepare(
     "DELETE FROM notification_log_v2 WHERE last_sent < ?"
@@ -952,32 +952,35 @@ async function saveRideBaseline(env, ride, rows) {
   if (!rows.length) throw new Error("No standby history was available for this ride");
 
   const now = Date.now();
-  const statements = [
-    env.DB.prepare("DELETE FROM ride_baseline WHERE ride_key=?").bind(String(ride.id))
-  ];
+  const payload = rows.map((row) => ({
+    slotMinute: Number(row.slotMinute),
+    medianWait: Number(row.medianWait),
+    p25Wait: row.p25Wait == null ? null : Number(row.p25Wait),
+    p75Wait: row.p75Wait == null ? null : Number(row.p75Wait),
+    meanWait: row.meanWait == null ? null : Number(row.meanWait),
+    sampleMinutes: Number(row.sampleMinutes),
+    sampleDays: Number(row.sampleDays)
+  }));
 
-  for (const row of rows) {
-    statements.push(
-      env.DB.prepare(
-        `INSERT INTO ride_baseline(
-           ride_key,slot_minute,median_wait,p25_wait,p75_wait,mean_wait,
-           sample_minutes,sample_days,refreshed_at
-         ) VALUES(?,?,?,?,?,?,?,?,?)`
-      ).bind(
-        String(ride.id),
-        Number(row.slotMinute),
-        Number(row.medianWait),
-        row.p25Wait == null ? null : Number(row.p25Wait),
-        row.p75Wait == null ? null : Number(row.p75Wait),
-        row.meanWait == null ? null : Number(row.meanWait),
-        Number(row.sampleMinutes),
-        Number(row.sampleDays),
-        now
-      )
-    );
-  }
-
-  statements.push(
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM ride_baseline WHERE ride_key=?").bind(String(ride.id)),
+    env.DB.prepare(
+      `INSERT INTO ride_baseline(
+         ride_key,slot_minute,median_wait,p25_wait,p75_wait,mean_wait,
+         sample_minutes,sample_days,refreshed_at
+       )
+       SELECT
+         ?1,
+         CAST(json_extract(value,'$.slotMinute') AS INTEGER),
+         CAST(json_extract(value,'$.medianWait') AS INTEGER),
+         CAST(json_extract(value,'$.p25Wait') AS INTEGER),
+         CAST(json_extract(value,'$.p75Wait') AS INTEGER),
+         CAST(json_extract(value,'$.meanWait') AS INTEGER),
+         CAST(json_extract(value,'$.sampleMinutes') AS INTEGER),
+         CAST(json_extract(value,'$.sampleDays') AS INTEGER),
+         ?2
+       FROM json_each(?3)`
+    ).bind(String(ride.id), now, JSON.stringify(payload)),
     env.DB.prepare(
       `INSERT INTO ride_baseline_meta(ride_key,source_id,status,slot_count,refreshed_at,last_error)
        VALUES(?,?,?,?,?,NULL)
@@ -988,11 +991,8 @@ async function saveRideBaseline(env, ride, rows) {
          refreshed_at=excluded.refreshed_at,
          last_error=NULL`
     ).bind(String(ride.id), String(ride.sourceId || ""), "ok", rows.length, now)
-  );
-
-  await env.DB.batch(statements);
+  ]);
 }
-
 async function markBaselineError(env, ride, error) {
   const message = String(error?.message || error || "Unknown baseline error").slice(0, 300);
   await env.DB.prepare(
@@ -1220,29 +1220,75 @@ async function getRideInsights(env, rideKey) {
   };
 }
 
-async function writeRideHistory(env, ride) {
-  if (!ride || ride.sourceStale || ride.sourceMissing) return;
+async function writeCurrentRideSnapshot(env, rides) {
+  const now = Date.now();
+  const bucket = Math.floor(now / (5 * 60 * 1000)) * (5 * 60 * 1000);
 
-  const bucket = Math.floor(Date.now() / (5 * 60 * 1000)) * (5 * 60 * 1000);
+  const stateRows = (rides || []).map((ride) => ({
+    id: String(ride.id),
+    parkId: Number(ride.parkId),
+    sourceId: ride.sourceId || null,
+    name: ride.name,
+    land: ride.land || "Other",
+    isOpen: ride.isOpen ? 1 : 0,
+    waitTime: ride.waitTime == null ? null : Number(ride.waitTime),
+    source: ride.source || "unknown",
+    sourceUpdatedAt: ride.lastUpdated || null
+  }));
 
-  try {
-    await env.DB.prepare(
-      `INSERT INTO ride_history(ride_key,park_id,wait_time,is_open,source,observed_at)
-       VALUES(?,?,?,?,?,?)
-       ON CONFLICT(ride_key,observed_at) DO UPDATE SET
-         park_id=excluded.park_id,
-         wait_time=excluded.wait_time,
-         is_open=excluded.is_open,
-         source=excluded.source`
-    ).bind(
-      String(ride.id),
-      Number(ride.parkId),
-      ride.waitTime == null ? null : Number(ride.waitTime),
-      ride.isOpen ? 1 : 0,
-      String(ride.source || "unknown"),
-      bucket
-    ).run();
-  } catch {}
+  const historyRows = (rides || [])
+    .filter((ride) => !ride.sourceStale && !ride.sourceMissing)
+    .map((ride) => ({
+      id: String(ride.id),
+      parkId: Number(ride.parkId),
+      waitTime: ride.waitTime == null ? null : Number(ride.waitTime),
+      isOpen: ride.isOpen ? 1 : 0,
+      source: ride.source || "unknown"
+    }));
+
+  const statements = [];
+
+  if (stateRows.length) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT OR REPLACE INTO ride_state_v2(
+           ride_key,park_id,source_id,name,land,is_open,wait_time,source,source_updated_at,updated_at
+         )
+         SELECT
+           json_extract(value,'$.id'),
+           CAST(json_extract(value,'$.parkId') AS INTEGER),
+           json_extract(value,'$.sourceId'),
+           json_extract(value,'$.name'),
+           json_extract(value,'$.land'),
+           CAST(json_extract(value,'$.isOpen') AS INTEGER),
+           CAST(json_extract(value,'$.waitTime') AS INTEGER),
+           json_extract(value,'$.source'),
+           json_extract(value,'$.sourceUpdatedAt'),
+           ?1
+         FROM json_each(?2)`
+      ).bind(now, JSON.stringify(stateRows))
+    );
+  }
+
+  if (historyRows.length) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT OR REPLACE INTO ride_history(
+           ride_key,park_id,wait_time,is_open,source,observed_at
+         )
+         SELECT
+           json_extract(value,'$.id'),
+           CAST(json_extract(value,'$.parkId') AS INTEGER),
+           CAST(json_extract(value,'$.waitTime') AS INTEGER),
+           CAST(json_extract(value,'$.isOpen') AS INTEGER),
+           json_extract(value,'$.source'),
+           ?1
+         FROM json_each(?2)`
+      ).bind(bucket, JSON.stringify(historyRows))
+    );
+  }
+
+  if (statements.length) await env.DB.batch(statements);
 }
 
 async function readPriorRideState(env) {
@@ -1267,35 +1313,6 @@ async function readPriorRideState(env) {
   } catch {
     return [];
   }
-}
-
-async function writeRideState(env, ride) {
-  await env.DB.prepare(
-    `INSERT INTO ride_state_v2(
-       ride_key,park_id,source_id,name,land,is_open,wait_time,source,source_updated_at,updated_at
-     ) VALUES(?,?,?,?,?,?,?,?,?,?)
-     ON CONFLICT(ride_key) DO UPDATE SET
-       park_id=excluded.park_id,
-       source_id=excluded.source_id,
-       name=excluded.name,
-       land=excluded.land,
-       is_open=excluded.is_open,
-       wait_time=excluded.wait_time,
-       source=excluded.source,
-       source_updated_at=excluded.source_updated_at,
-       updated_at=excluded.updated_at`
-  ).bind(
-    String(ride.id),
-    Number(ride.parkId),
-    ride.sourceId || null,
-    ride.name,
-    ride.land || "Other",
-    ride.isOpen ? 1 : 0,
-    ride.waitTime == null ? null : Number(ride.waitTime),
-    ride.source || "unknown",
-    ride.lastUpdated || null,
-    Date.now()
-  ).run();
 }
 
 async function cooldownActive(env, endpoint, rideKey, kind) {

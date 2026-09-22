@@ -24,13 +24,32 @@ const SHOW_PATTERNS = [
   /festival of the lion king/i,
   /finding nemo.*big blue/i,
   /hall of presidents/i,
-  /country bear.*jamboree/i
+  /country bear.*jamboree/i,
+  /enchanted tiki room/i,
+  /carousel of progress/i,
+  /enchanted tales with belle/i
 ];
 
-const CLEAN_NAMES = new Map([
-  ['"it\'s a small world"', "It's a Small World"],
-  ["'it's a small world'", "It's a Small World"],
-  ["it's a small world", "It's a Small World"]
+const OTHER_ATTRACTION_PATTERNS = [
+  /^casey jr\. splash ['’]n['’] soak station$/i,
+  /^a pirate['’]s adventure/i,
+  /^swiss family treehouse$/i,
+  /^tom sawyer island$/i,
+  /^gorilla falls exploration trail$/i,
+  /^maharajah jungle trek$/i,
+  /^the boneyard$/i,
+  /^affection section$/i,
+  /^conservation station$/i,
+  /^walt disney presents$/i,
+  /^the animation experience/i,
+  /^meet\b/i,
+  /character greeting/i
+];
+
+const NAME_OVERRIDES = new Map([
+  ["it's a small world", "it's a small world"],
+  ["a pirate's adventure ~ treasures of the seven seas", "A Pirate's Adventure"],
+  ["expedition everest - legend of the forbidden mountain", "Expedition Everest"]
 ]);
 
 export function parkName(id) {
@@ -41,28 +60,33 @@ export function isSingleRiderName(name) {
   return /\bsingle[\s-]*rider\b/i.test(String(name || ""));
 }
 
-export function isShowName(name) {
-  const value = String(name || "");
-  return SHOW_PATTERNS.some((pattern) => pattern.test(value));
-}
-
 export function cleanAttractionName(name) {
   let value = String(name || "Attraction")
     .replace(/[®™]/g, "")
+    .replace(/[’‘]/g, "'")
     .replace(/\s+/g, " ")
     .replace(/^["“”]+|["“”]+$/g, "")
     .trim();
 
-  const known = CLEAN_NAMES.get(value.toLowerCase());
-  if (known) return known;
-
   value = value
-    .replace(/\s+[–—-]\s+single[\s-]*rider(?:\s+line)?$/i, "")
-    .replace(/\s*\(single[\s-]*rider\)$/i, "")
+    .replace(/\s+[–—-]\s+single[\s-]*rider(?:\s+line|\s+queue)?$/i, "")
+    .replace(/\s*\(single[\s-]*rider(?:\s+line|\s+queue)?\)$/i, "")
     .replace(/\s+\|\s+/g, " · ")
     .trim();
 
-  return value || "Attraction";
+  return NAME_OVERRIDES.get(value.toLowerCase()) || value || "Attraction";
+}
+
+export function isShowName(name) {
+  const value = cleanAttractionName(name);
+  return SHOW_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+export function attractionKind(name) {
+  const value = cleanAttractionName(name);
+  if (SHOW_PATTERNS.some((pattern) => pattern.test(value))) return "show";
+  if (OTHER_ATTRACTION_PATTERNS.some((pattern) => pattern.test(value))) return "other";
+  return "ride";
 }
 
 export function minutesLabel(wait, isOpen) {

@@ -1,6 +1,6 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 
-const VERSION = "1.3.1";
+const VERSION = "1.3.2";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
 const BASELINE_RETRY_MS = 30 * 60 * 1000;

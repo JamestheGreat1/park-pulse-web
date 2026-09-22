@@ -154,7 +154,7 @@ export function attractionKind(parkId, name, rideId = null) {
 }
 
 export function isRideStale(ride, now = Date.now()) {
-  if (!ride || ride.sourceMissing || !ride.lastUpdated) return true;
+  if (!ride || ride.sourceMissing || ride.sourceStale || !ride.lastUpdated) return true;
   const updated = new Date(ride.lastUpdated).getTime();
   return !Number.isFinite(updated) || now - updated > STALE_AFTER_MS;
 }

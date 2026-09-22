@@ -67,3 +67,20 @@ CREATE INDEX IF NOT EXISTS idx_ride_history_ride_time
 
 CREATE INDEX IF NOT EXISTS idx_ride_history_park_time
   ON ride_history(park_id, observed_at);
+
+
+CREATE TABLE IF NOT EXISTS ride_baseline (
+  ride_key TEXT NOT NULL,
+  slot_minute INTEGER NOT NULL,
+  median_wait INTEGER NOT NULL,
+  p25_wait INTEGER,
+  p75_wait INTEGER,
+  mean_wait INTEGER,
+  sample_minutes INTEGER NOT NULL,
+  sample_days INTEGER NOT NULL,
+  refreshed_at INTEGER NOT NULL,
+  PRIMARY KEY (ride_key, slot_minute)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ride_baseline_refresh
+  ON ride_baseline(refreshed_at);

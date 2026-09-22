@@ -294,18 +294,24 @@ async function runRideWatch(env){
 }
 
 async function cooldownActive(env,endpoint,rideId,kind){
-  const row=await env.DB.prepare(
-    "SELECT last_sent FROM notification_log WHERE endpoint=? AND ride_id=? AND kind=?"
-  ).bind(endpoint,rideId,kind).first();
-  return Boolean(row&&Date.now()-Number(row.last_sent)<NOTIFICATION_COOLDOWN_MS);
+  try{
+    const row=await env.DB.prepare(
+      "SELECT last_sent FROM notification_log WHERE endpoint=? AND ride_id=? AND kind=?"
+    ).bind(endpoint,rideId,kind).first();
+    return Boolean(row&&Date.now()-Number(row.last_sent)<NOTIFICATION_COOLDOWN_MS);
+  }catch{
+    return false;
+  }
 }
 
 async function markNotification(env,endpoint,rideId,kind){
-  await env.DB.prepare(
-    `INSERT INTO notification_log(endpoint,ride_id,kind,last_sent)
-     VALUES(?,?,?,?)
-     ON CONFLICT(endpoint,ride_id,kind) DO UPDATE SET last_sent=excluded.last_sent`
-  ).bind(endpoint,rideId,kind,Date.now()).run();
+  try{
+    await env.DB.prepare(
+      `INSERT INTO notification_log(endpoint,ride_id,kind,last_sent)
+       VALUES(?,?,?,?)
+       ON CONFLICT(endpoint,ride_id,kind) DO UPDATE SET last_sent=excluded.last_sent`
+    ).bind(endpoint,rideId,kind,Date.now()).run();
+  }catch{}
 }
 
 function groupByPark(rides){

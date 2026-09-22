@@ -1,4 +1,4 @@
-import { PARKS, cleanAttractionName, isSingleRiderName, attractionKind } from "./data.js?v=1.0.4";
+import { PARKS, cleanAttractionName, isSingleRiderName, attractionKind } from "./data.js?v=1.0.5";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");

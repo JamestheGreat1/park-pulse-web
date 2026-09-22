@@ -36,3 +36,52 @@ export function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+
+const SINGLE_RIDER_RE = /(?:^|[-–—:()\s])single\s*rider(?:\s*line|\s*queue)?(?:$|[-–—:()\s])/i;
+
+const SHOW_PATTERNS = [
+  /\bshow\b/i,
+  /\bmusical\b/i,
+  /\bsing[- ]along\b/i,
+  /\bconcert\b/i,
+  /\btheater\b/i,
+  /\btheatre\b/i,
+  /\bencanto\b/i,
+  /\bbeauty and the beast live on stage\b/i,
+  /\bfestival of the lion king\b/i,
+  /\bfinding nemo.*big blue/i,
+  /\bindiana jones.*stunt/i,
+  /\bfrozen.*sing/i,
+  /\bmonsters,? inc\..*laugh floor\b/i,
+  /\bmickey['’]s philharmagic\b/i,
+  /\bhall of presidents\b/i,
+  /\bcountry bear musical jamboree\b/i,
+  /\benchanted tiki room\b/i
+];
+
+const NAME_OVERRIDES = new Map([
+  ["A Pirate's Adventure ~ Treasures of the Seven Seas", "A Pirate's Adventure"],
+  ["Expedition Everest - Legend of the Forbidden Mountain", "Expedition Everest"]
+]);
+
+export function cleanAttractionName(value) {
+  let name = String(value || "Attraction").trim();
+  name = NAME_OVERRIDES.get(name) || name;
+  name = name
+    .replace(/[™®]/g, "")
+    .replace(/^["“](.+)["”]$/, "$1")
+    .replace(/\s*[~]\s*/g, " – ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return name;
+}
+
+export function isSingleRiderName(value) {
+  return SINGLE_RIDER_RE.test(String(value || ""));
+}
+
+export function attractionKind(value) {
+  const name = cleanAttractionName(value);
+  return SHOW_PATTERNS.some((pattern) => pattern.test(name)) ? "show" : "ride";
+}

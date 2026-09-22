@@ -1,4 +1,4 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale, normalizeRideName } from "./data.js?v=1.2.0";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.2.0";
 import { store } from "./store.js?v=1.2.0";
 import { rideData } from "./api.js?v=1.2.0";
 import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.2.0";
@@ -158,12 +158,12 @@ function render() {
 }
 function bindDynamic() {
   $$('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); render(); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
-  $$('[data-open-ride]').forEach((b) => b.onclick = () => openRide(Number(b.dataset.openRide)));
+  $('[data-open-ride]').forEach((b) => b.onclick = () => openRide(b.dataset.openRide));
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
   const search = $("#rideSearch"); if (search) search.oninput = () => store.update((s) => { s.query = search.value; }, "search");
   const sort = $("#sortSelect"); if (sort) sort.onchange = () => store.update((s) => { s.sort = sort.value; }, "sort");
-  $$('[data-delete-watch]').forEach((b) => b.onclick = async () => { store.removeRule(Number(b.dataset.deleteWatch)); await safeSync(); toast("Watch removed"); });
+  $('[data-delete-watch]').forEach((b) => b.onclick = async () => { store.removeRule(b.dataset.deleteWatch); await safeSync(); toast("Watch removed"); });
   $$('[data-enable-push]').forEach((b) => b.onclick = activatePush);
   $$('[data-toggle-push]').forEach((b) => b.onclick = pushOn ? deactivatePush : activatePush);
   $('[data-install]').forEach((b) => b.onclick = installApp);

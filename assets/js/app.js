@@ -78,9 +78,21 @@ function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
   let list = rides.filter((r) => (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) && (!state.openOnly || (r.isOpen && !isRideStale(r))));
   const staleRank = (ride) => isRideStale(ride) ? 1 : 0;
-  if (state.sort === "wait") list.sort((a,b) => staleRank(a) - staleRank(b) || (a.isOpen === b.isOpen ? a.waitTime - b.waitTime : a.isOpen ? -1 : 1));
+  if (state.sort === "wait") list.sort((a,b) => staleRank(a) - staleRank(b) || (a.isOpen === b.isOpen ? (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) : a.isOpen ? -1 : 1));
   else if (state.sort === "name") list.sort((a,b) => staleRank(a) - staleRank(b) || a.name.localeCompare(b.name));
-  else list.sort((a,b) => staleRank(a) - staleRank(b) || (Number(b.isOpen) - Number(a.isOpen)) || (a.waitTime - b.waitTime) || a.name.localeCompare(b.name));
+  else list.sort((a,b) => {
+    const freshness = staleRank(a) - staleRank(b);
+    if (freshness) return freshness;
+
+    const operating = Number(b.isOpen) - Number(a.isOpen);
+    if (operating) return operating;
+
+    const aRatio = Number.isFinite(a.valueRatio) ? a.valueRatio : Infinity;
+    const bRatio = Number.isFinite(b.valueRatio) ? b.valueRatio : Infinity;
+    if (aRatio !== bRatio) return aRatio - bRatio;
+
+    return (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) || a.name.localeCompare(b.name);
+  });
   return list;
 }
 function rideCard(ride) {

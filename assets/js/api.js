@@ -1,4 +1,4 @@
-import { PARKS } from "./data.js";
+import { PARKS } from "./data.js?v=1.0.0";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");

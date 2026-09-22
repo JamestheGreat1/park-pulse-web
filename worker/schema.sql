@@ -50,3 +50,20 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_updated_at ON subscriptions(updated
 CREATE INDEX IF NOT EXISTS idx_notification_log_last_sent ON notification_log(last_sent);
 CREATE INDEX IF NOT EXISTS idx_notification_log_v2_last_sent ON notification_log_v2(last_sent);
 CREATE INDEX IF NOT EXISTS idx_ride_state_v2_park ON ride_state_v2(park_id);
+
+
+CREATE TABLE IF NOT EXISTS ride_history (
+  ride_key TEXT NOT NULL,
+  park_id INTEGER NOT NULL,
+  wait_time INTEGER,
+  is_open INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  observed_at INTEGER NOT NULL,
+  PRIMARY KEY (ride_key, observed_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ride_history_ride_time
+  ON ride_history(ride_key, observed_at);
+
+CREATE INDEX IF NOT EXISTS idx_ride_history_park_time
+  ON ride_history(park_id, observed_at);

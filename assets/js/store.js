@@ -5,6 +5,7 @@ const defaults = {
   activeView: "explore",
   query: "",
   openOnly: false,
+  attractionFilter: "rides",
   sort: "recommended",
   theme: "system",
   rules: []

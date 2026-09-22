@@ -373,7 +373,7 @@ async function init() {
   setInterval(async () => {
     await rideData.refresh();
     analyticsState = await fetchAnalyticsStatus().catch(() => analyticsState);
-    render();
+    renderRideDataUpdate();
   }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
 }
 init();

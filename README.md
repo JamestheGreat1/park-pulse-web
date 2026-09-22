@@ -1,4 +1,4 @@
-# ParkPulse v1.3.2 — Ride Watcher
+# ParkPulse v1.3.5 — Ride Watcher
 
 ParkPulse is an installable PWA that watches Walt Disney World ride statuses and posted standby waits so you do not have to keep refreshing a park app all day.
 
@@ -7,6 +7,7 @@ ParkPulse is an installable PWA that watches Walt Disney World ride statuses and
 - Live standby data for Magic Kingdom, EPCOT, Hollywood Studios, and Animal Kingdom.
 - **ThemeParks.wiki is the primary live source**.
 - **Queue-Times is a per-ride fallback**, not the primary feed.
+- A fresh fallback record is treated as fully live. A ride is marked **stale only when neither provider has a fresh record**, at which point ParkPulse may show the last known D1 state.
 - A curated ParkPulse ride catalogue filters out shows, character experiences, and single-rider-only queue entries.
 - Provider-independent ParkPulse ride keys keep watches stable if a data provider changes.
 - Per-ride alerts for **reopening** and **wait at/below a chosen target**.
@@ -98,7 +99,7 @@ ThemeParks.wiki live + authenticated history
 
 The Worker polls live data on the existing five-minute schedule. D1 writes are grouped through JSON-expanded batch operations to keep database round-trips small.
 
-## Deploying v1.3.2
+## Deploying v1.3.5
 
 The frontend publishes through GitHub Pages. The Worker needs the new baseline tables before the new cron code is deployed:
 

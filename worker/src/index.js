@@ -1,7 +1,8 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 
-const VERSION = "1.3.2";
+const VERSION = "1.3.5";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
+const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
 const BASELINE_RETRY_MS = 30 * 60 * 1000;
 const BASELINE_BATCH_SIZE = 4;
@@ -104,6 +105,7 @@ export default {
           historyDays: 30,
           historyBackfillEnabled: Boolean(env.THEMEPARKS_API_KEY),
           historyBackfillBatchSize: BASELINE_BATCH_SIZE,
+          liveFreshnessMinutes: LIVE_FRESHNESS_MS / 60000,
           now: new Date().toISOString()
         }, 200, cors);
       }
@@ -278,8 +280,41 @@ function findCatalogRide(park, name) {
   return null;
 }
 
+function sourceTimestampMs(ride) {
+  const value = new Date(ride?.lastUpdated || 0).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
+function isFreshSourceRide(ride, now = Date.now()) {
+  if (!ride || ride.sourceMissing || ride.sourceStale) return false;
+  const updated = sourceTimestampMs(ride);
+  if (!updated) return false;
+  return now - updated <= LIVE_FRESHNESS_MS;
+}
+
+function chooseFreshRide(primaryRide, fallbackRide, now = Date.now()) {
+  const primaryFresh = isFreshSourceRide(primaryRide, now);
+  const fallbackFresh = isFreshSourceRide(fallbackRide, now);
+
+  if (!primaryFresh && !fallbackFresh) return null;
+  if (primaryFresh && !fallbackFresh) return primaryRide;
+  if (!primaryFresh && fallbackFresh) return fallbackRide;
+
+  const primaryHasWait = primaryRide?.isOpen && Number.isFinite(Number(primaryRide?.waitTime));
+  const fallbackHasWait = fallbackRide?.isOpen && Number.isFinite(Number(fallbackRide?.waitTime));
+
+  if (primaryHasWait !== fallbackHasWait) {
+    return primaryHasWait ? primaryRide : fallbackRide;
+  }
+
+  return sourceTimestampMs(fallbackRide) > sourceTimestampMs(primaryRide)
+    ? fallbackRide
+    : primaryRide;
+}
+
 async function fetchFreshParkRides(parkId, park, env) {
-  const merged = new Map();
+  const primaryByKey = new Map();
+  const fallbackByKey = new Map();
   let primaryAvailable = false;
   let fallbackAvailable = false;
   let fallbackUsed = false;
@@ -287,32 +322,42 @@ async function fetchFreshParkRides(parkId, park, env) {
   try {
     const primary = await fetchThemeParksRides(parkId, park, env);
     primaryAvailable = true;
-    for (const item of primary) merged.set(item.id, item);
+    for (const item of primary) primaryByKey.set(item.id, item);
   } catch (error) {
     console.warn("ThemeParks.wiki fetch failed", park.name, error);
   }
 
-  const missingKeys = new Set(
-    park.rides.filter((catalogRide) => !merged.has(catalogRide.key)).map((catalogRide) => catalogRide.key)
-  );
+  const needsFallback =
+    !primaryAvailable ||
+    park.rides.some((catalogRide) => !isFreshSourceRide(primaryByKey.get(catalogRide.key)));
 
-  if (!primaryAvailable || missingKeys.size) {
+  if (needsFallback) {
     try {
       const fallback = await fetchQueueTimesRides(parkId, park);
       fallbackAvailable = true;
-      for (const item of fallback) {
-        if (!merged.has(item.id)) {
-          merged.set(item.id, item);
-          fallbackUsed = true;
-        }
-      }
+      for (const item of fallback) fallbackByKey.set(item.id, item);
     } catch (error) {
       console.warn("Queue-Times fallback failed", park.name, error);
     }
   }
 
+  const rides = [];
+  const now = Date.now();
+
+  for (const catalogRide of park.rides) {
+    const chosen = chooseFreshRide(
+      primaryByKey.get(catalogRide.key),
+      fallbackByKey.get(catalogRide.key),
+      now
+    );
+
+    if (!chosen) continue;
+    if (chosen.source === "queue-times") fallbackUsed = true;
+    rides.push(chosen);
+  }
+
   return {
-    rides: [...merged.values()],
+    rides,
     primaryAvailable,
     fallbackAvailable,
     fallbackUsed
@@ -421,18 +466,13 @@ async function fetchQueueTimesRides(parkId, park) {
 
 async function addDisplayFallbacks(env, parkId, park, snapshot) {
   const byKey = new Map(snapshot.rides.map((item) => [item.id, item]));
-
-  if (!snapshot.primaryAvailable && !snapshot.fallbackAvailable && !snapshot.rides.length) {
-    const staleRows = await readStaleParkRows(env, parkId);
-    for (const row of staleRows) {
-      byKey.set(row.id, row);
-    }
-  }
+  const staleRows = await readStaleParkRows(env, parkId);
+  const staleByKey = new Map(staleRows.map((item) => [String(item.id), item]));
 
   for (const catalogRide of park.rides) {
-    if (byKey.has(catalogRide.key) || !catalogRide.keepWhenMissing) continue;
+    if (byKey.has(catalogRide.key)) continue;
 
-    const stale = await readStaleRide(env, catalogRide.key);
+    const stale = staleByKey.get(catalogRide.key);
     if (stale) {
       byKey.set(catalogRide.key, stale);
     } else {
@@ -454,7 +494,9 @@ async function addDisplayFallbacks(env, parkId, park, snapshot) {
     }
   }
 
-  return [...byKey.values()];
+  return park.rides
+    .map((catalogRide) => byKey.get(catalogRide.key))
+    .filter(Boolean);
 }
 
 async function attachCurrentBaselines(env, rides) {
@@ -651,12 +693,16 @@ async function runRideWatch(env) {
     if (before) {
       const pNow = currentByPark.get(ride.parkId) || [];
       const pBefore = priorByPark.get(ride.parkId) || [];
+      const beforeFresh = Date.now() - Number(before.updatedAt || 0) <= LIVE_FRESHNESS_MS;
       const nowOpen = pNow.filter((item) => item.isOpen).length;
-      const beforeOpen = pBefore.filter((item) => item.isOpen).length;
+      const beforeOpen = pBefore.filter(
+        (item) => item.isOpen && Date.now() - Number(item.updatedAt || 0) <= LIVE_FRESHNESS_MS
+      ).length;
       const operationalNow = nowOpen >= 3;
       const operationalBefore = beforeOpen >= 3;
       const openingRamp = easternHour < 11 && nowOpen - beforeOpen >= 3;
       const reopened =
+        beforeFresh &&
         !before.isOpen &&
         ride.isOpen &&
         operationalBefore &&
@@ -685,6 +731,7 @@ async function runRideWatch(env) {
           };
         } else if (
           rule.threshold != null &&
+          beforeFresh &&
           before.isOpen &&
           ride.isOpen &&
           Number.isFinite(Number(before.waitTime)) &&

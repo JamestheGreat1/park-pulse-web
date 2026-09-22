@@ -1,4 +1,4 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml } from "./data.js?v=1.0.0";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml } from "./data.js?v=1.0.1";
 import { store } from "./store.js?v=1.0.0";
 import { rideData } from "./api.js?v=1.0.0";
 import { currentSubscription, enablePush, syncRules, disablePush } from "./push.js?v=1.0.0";

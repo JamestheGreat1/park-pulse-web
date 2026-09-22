@@ -118,3 +118,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 
 .ride-card,.watch-card,.park-chip,.nav-item,.filter-button,.setting-action,.mini-toggle,.icon-button,.watch-button{transition:transform .12s ease,background-color .16s ease,border-color .16s ease,opacity .16s ease}
 @media(prefers-reduced-motion:reduce){.ride-card,.watch-card,.park-chip,.nav-item,.filter-button,.setting-action,.mini-toggle,.icon-button,.watch-button{transition:none!important}}
+
+.about-row a,.source-footer a{display:inline-block;min-height:36px;padding-block:8px}

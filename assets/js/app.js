@@ -167,7 +167,7 @@ function bindDynamic() {
   $$('[data-delete-watch]').forEach((b) => b.onclick = async () => { store.removeRule(Number(b.dataset.deleteWatch)); await safeSync(); toast("Watch removed"); });
   $$('[data-enable-push]').forEach((b) => b.onclick = activatePush);
   $$('[data-toggle-push]').forEach((b) => b.onclick = pushOn ? deactivatePush : activatePush);
-  $$('[data-install]').forEach((b) => b.onclick = installApp);
+  $('[data-install]').forEach((b) => b.onclick = installApp);\n  $("[data-test-push]").forEach((b) => b.onclick = testNotification);\n  $("[data-copy-diagnostics]").forEach((b) => b.onclick = copyDiagnostics);
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
 }
 function openRide(id) {

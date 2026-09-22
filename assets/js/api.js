@@ -1,4 +1,4 @@
-import { PARKS, cleanAttractionName, isSingleRiderName, attractionKind } from "./data.js?v=1.0.5";
+import { PARKS, cleanAttractionName, isSingleRiderName, attractionKind, catalogRide, catalogPlaceholders } from "./data.js?v=1.1.0";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");
@@ -19,10 +19,10 @@ function normalizeRide(parkId, ride, land) {
   return {
     id:Number(ride.id),
     parkId:Number(parkId),
-    name:cleanAttractionName(rawName),
+    name:(catalogRide(parkId, rawName, ride.id)?.name || cleanAttractionName(rawName)),
     rawName,
     land:String(land||"Other"),
-    kind:attractionKind(rawName),
+    kind:attractionKind(parkId, rawName, ride.id),
     isOpen:Boolean(ride.is_open),
     waitTime:Math.max(0,Number(ride.wait_time||0)),
     lastUpdated:ride.last_updated||null
@@ -35,7 +35,8 @@ export async function fetchPark(parkId) {
   const rides = [];
   for (const land of payload?.lands || []) for (const ride of land?.rides || []) if (!isSingleRiderName(ride?.name)) rides.push(normalizeRide(parkId, ride, land.name));
   for (const ride of payload?.rides || []) if (!isSingleRiderName(ride?.name)) rides.push(normalizeRide(parkId, ride, "Other"));
-  return [...new Map(rides.map((ride) => [ride.id, ride])).values()];
+  const live = [...new Map(rides.map((ride) => [ride.id, ride])).values()];
+  return [...live, ...catalogPlaceholders(parkId, live)];
 }
 
 export class RideData extends EventTarget {

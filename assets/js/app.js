@@ -106,9 +106,25 @@ function rideCard(ride) {
     <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button>
   </article>`;
 }
+function rideListMarkup(state = store.snapshot) {
+  const rides = sortedRides(rideData.ridesForPark(state.selectedParkId), state);
+  return rides.length
+    ? rides.map(rideCard).join("")
+    : `<div class="empty liquid-glass">${rideData.error || "No rides match that search."}</div>`;
+}
+function bindRideCards(root = views.explore) {
+  $('[data-open-ride]', root).forEach((button) => {
+    button.onclick = () => openRide(button.dataset.openRide);
+  });
+}
+function renderRideResults() {
+  const list = $(".ride-list", views.explore);
+  if (!list) return renderExplore();
+  list.innerHTML = rideListMarkup();
+  bindRideCards(list);
+}
 function renderExplore() {
   const state = store.snapshot;
-  const rides = sortedRides(rideData.ridesForPark(state.selectedParkId), state);
   const activeCount = state.rules.length;
   views.explore.innerHTML = `
     <section class="hero-card liquid-glass">
@@ -119,12 +135,12 @@ function renderExplore() {
       ${PARKS.map((p) => `<button type="button" class="park-chip ${p.id === state.selectedParkId ? "active" : ""}" data-park="${p.id}"><span>${p.emoji}</span>${p.short}</button>`).join("")}
     </div>
     <section class="toolbar liquid-glass">
-      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
     <div class="section-heading"><div><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
-    <div class="ride-list">${rides.length ? rides.map(rideCard).join("") : `<div class="empty liquid-glass">${rideData.error || "No rides match that search."}</div>`}</div>`;
+    <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderWatching() {
   const rules = store.snapshot.rules;
@@ -173,7 +189,7 @@ function render() {
 }
 function bindDynamic() {
   $$('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); render(); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
-  $$('[data-open-ride]').forEach((b) => b.onclick = () => openRide(b.dataset.openRide));
+  bindRideCards();
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
   const search = $("#rideSearch"); if (search) search.oninput = () => store.update((s) => { s.query = search.value; }, "search");
@@ -321,7 +337,7 @@ async function init() {
   window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; });
   window.addEventListener("online", () => rideData.refresh({ parkId: store.snapshot.selectedParkId }));
   rideData.addEventListener("update", render); rideData.addEventListener("status", render);
-  store.addEventListener("change", (e) => { if (e.detail.reason !== "search") render(); else renderExplore(), bindDynamic(); });
+  store.addEventListener("change", (e) => { if (e.detail.reason === "search") renderRideResults(); else render(); });
   const active = store.snapshot.activeView in views ? store.snapshot.activeView : "explore";
   selectView(active);
   await rideData.refresh();

@@ -11,10 +11,10 @@
   <meta name="format-detection" content="telephone=no">
   <meta name="description" content="ParkPulse watches Walt Disney World ride waits and re-openings, then lets you know when it's worth heading over.">
   <title>ParkPulse</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=1.1.2">
-  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png?v=1.1.2">
-  <link rel="icon" href="./assets/icons/icon-192.png?v=1.1.2" sizes="192x192">
-  <link rel="stylesheet" href="./assets/css/app.css?v=1.1.2">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.2.0">
+  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png?v=1.2.0">
+  <link rel="icon" href="./assets/icons/icon-192.png?v=1.2.0" sizes="192x192">
+  <link rel="stylesheet" href="./assets/css/app.css?v=1.2.0">
 </head>
 <body>
   <div class="ambient ambient-one" aria-hidden="true"></div>
@@ -23,7 +23,7 @@
   <div id="app" class="app-shell">
     <header class="topbar shell-width">
       <div class="brand-lockup">
-        <img class="brand-icon" src="./assets/icons/icon-192.png?v=1.1.2" alt="" width="44" height="44">
+        <img class="brand-icon" src="./assets/icons/icon-192.png?v=1.2.0" alt="" width="44" height="44">
         <div class="brand-copy"><span class="brand-kicker">Ride watcher</span><h1>ParkPulse</h1></div>
       </div>
       <button id="refreshButton" class="icon-button glass-control" type="button" aria-label="Refresh live ride data" title="Refresh live ride data">
@@ -36,7 +36,7 @@
       <section id="view-watching" class="view-panel" data-view="watching" aria-labelledby="nav-watching"></section>
       <section id="view-settings" class="view-panel" data-view="settings" aria-labelledby="nav-settings"></section>
     </main>
-    <footer class="source-footer shell-width"><a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Powered by Queue-Times.com</a></footer>
+    <footer class="source-footer shell-width">Wait data: <a href="https://www.themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki</a> · <a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times fallback</a></footer>
     <nav class="bottom-nav liquid-glass" aria-label="Primary">
       <button id="nav-explore" class="nav-item active" type="button" data-view-target="explore" aria-selected="true">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.3 6.7L21 12l-6.7 2.3L12 21l-2.3-6.7L3 12l6.7-2.3L12 3Z"/></svg><span>Explore</span>
@@ -53,7 +53,7 @@
   <section id="rideSheet" class="ride-sheet liquid-glass hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></section>
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <noscript><div class="noscript">ParkPulse needs JavaScript to load live ride data and alerts.</div></noscript>
-  <script src="./assets/js/config.js?v=1.1.2"></script>
-  <script type="module" src="./assets/js/app.js?v=1.1.2"></script>
+  <script src="./assets/js/config.js?v=1.2.0"></script>
+  <script type="module" src="./assets/js/app.js?v=1.2.0"></script>
 </body>
 </html>

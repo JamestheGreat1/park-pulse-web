@@ -1,14 +1,14 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.1";
-import { store } from "./store.js?v=1.3.1";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.1";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.1";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.2";
+import { store } from "./store.js?v=1.3.2";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.2";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.2";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.3.1";
+const APP_VERSION = "1.3.2";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };

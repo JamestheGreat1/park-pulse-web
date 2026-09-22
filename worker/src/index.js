@@ -300,8 +300,8 @@ function chooseFreshRide(primaryRide, fallbackRide, now = Date.now()) {
   if (primaryFresh && !fallbackFresh) return primaryRide;
   if (!primaryFresh && fallbackFresh) return fallbackRide;
 
-  const primaryHasWait = primaryRide?.isOpen && Number.isFinite(Number(primaryRide?.waitTime));
-  const fallbackHasWait = fallbackRide?.isOpen && Number.isFinite(Number(fallbackRide?.waitTime));
+  const primaryHasWait = primaryRide?.isOpen && primaryRide?.waitTime != null && Number.isFinite(Number(primaryRide.waitTime));
+  const fallbackHasWait = fallbackRide?.isOpen && fallbackRide?.waitTime != null && Number.isFinite(Number(fallbackRide.waitTime));
 
   if (primaryHasWait !== fallbackHasWait) {
     return primaryHasWait ? primaryRide : fallbackRide;

@@ -331,6 +331,7 @@ async function fetchThemeParksRides(parkId, park) {
       parkId,
       name: catalogRide.name,
       rawName: String(item?.name || catalogRide.name),
+      aliases: catalogRide.aliases || [],
       land: catalogRide.land,
       isOpen: String(item?.status || "").toUpperCase() === "OPERATING",
       waitTime,
@@ -375,6 +376,7 @@ async function fetchQueueTimesRides(parkId, park) {
       parkId,
       name: catalogRide.name,
       rawName: String(item?.name || catalogRide.name),
+      aliases: catalogRide.aliases || [],
       land: catalogRide.land,
       isOpen: Boolean(item?.is_open),
       waitTime: Number.isFinite(Number(item?.wait_time))
@@ -418,6 +420,7 @@ async function addDisplayFallbacks(env, parkId, park, snapshot) {
         parkId,
         name: catalogRide.name,
         rawName: catalogRide.name,
+        aliases: catalogRide.aliases || [],
         land: catalogRide.land,
         isOpen: false,
         waitTime: null,
@@ -534,6 +537,11 @@ function normalizeRules(raw) {
 function ruleMatchesRide(rule, ride) {
   if (String(rule.rideId) === String(ride.id)) return true;
   if (Number(rule.parkId) !== Number(ride.parkId)) return false;
+
+  const park = PARKS.get(Number(ride.parkId));
+  const catalogRide = park ? findCatalogRide(park, rule.rideName) : null;
+  if (catalogRide && catalogRide.key === ride.id) return true;
+
   return normalizeName(rule.rideName) === normalizeName(ride.name);
 }
 

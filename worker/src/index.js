@@ -119,7 +119,8 @@ export default {
         if (!park) return json({ error: "Unsupported park" }, 404, cors);
 
         const snapshot = await fetchFreshParkRides(parkId, park, env);
-        const rides = await addDisplayFallbacks(env, parkId, park, snapshot);
+        const displayRides = await addDisplayFallbacks(env, parkId, park, snapshot);
+        const rides = await attachCurrentBaselines(env, displayRides);
 
         return json({
           parkPulseFormat: 2,
@@ -454,6 +455,47 @@ async function addDisplayFallbacks(env, parkId, park, snapshot) {
   }
 
   return [...byKey.values()];
+}
+
+async function attachCurrentBaselines(env, rides) {
+  if (!rides?.length) return rides || [];
+
+  const slotMinute = Math.floor(easternMinutes(Date.now()) / 15) * 15;
+
+  try {
+    const rows = (await env.DB.prepare(
+      `SELECT ride_key,median_wait,p25_wait,p75_wait,sample_days,sample_minutes
+       FROM ride_baseline WHERE slot_minute=?`
+    ).bind(slotMinute).all()).results || [];
+
+    const byRide = new Map(rows.map((row) => [String(row.ride_key), row]));
+
+    return rides.map((ride) => {
+      const baseline = byRide.get(String(ride.id));
+      if (!baseline || Number(baseline.sample_days || 0) < 5) return ride;
+
+      const typicalWait = Number(baseline.median_wait);
+      const currentWait = ride.waitTime == null ? null : Number(ride.waitTime);
+      const valueRatio =
+        ride.isOpen &&
+        Number.isFinite(currentWait) &&
+        Number.isFinite(typicalWait) &&
+        typicalWait > 0
+          ? currentWait / typicalWait
+          : null;
+
+      return {
+        ...ride,
+        typicalWait,
+        typicalLow: baseline.p25_wait == null ? null : Number(baseline.p25_wait),
+        typicalHigh: baseline.p75_wait == null ? null : Number(baseline.p75_wait),
+        baselineDays: Number(baseline.sample_days || 0),
+        valueRatio: Number.isFinite(valueRatio) ? valueRatio : null
+      };
+    });
+  } catch {
+    return rides;
+  }
 }
 
 async function readStaleRide(env, rideKey) {

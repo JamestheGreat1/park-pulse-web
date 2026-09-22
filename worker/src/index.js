@@ -1,6 +1,6 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 
-const VERSION = "1.1.1";
+const VERSION = "1.1.2";
 const PARKS = new Map([[5,"EPCOT"],[6,"Magic Kingdom"],[7,"Hollywood Studios"],[8,"Animal Kingdom"]]);
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 

@@ -1,4 +1,4 @@
-# ParkPulse v1.3.1 — Ride Watcher
+# ParkPulse v1.3.2 — Ride Watcher
 
 ParkPulse is an installable PWA that watches Walt Disney World ride statuses and posted standby waits so you do not have to keep refreshing a park app all day.
 
@@ -19,6 +19,7 @@ ParkPulse is an installable PWA that watches Walt Disney World ride statuses and
 - Ride trend insights: typical wait now, usual range, today's observed range, and better/busier-than-typical labels.
 - **Best now** sorts operating rides by current wait relative to their historical baseline once a baseline is available.
 - Installable/offline-capable PWA shell with light/dark/system appearance.
+- Mobile touch polish: intentional pinch zoom remains enabled, accidental double-tap zoom is suppressed, iOS form focus avoids auto-zoom, modal scrolling respects safe areas, and search no longer re-mounts while typing.
 
 ParkPulse is independent and is not affiliated with Disney. ThemeParks.wiki attribution is required by its terms. Queue-Times attribution is retained because it remains the fallback source.
 
@@ -97,7 +98,7 @@ ThemeParks.wiki live + authenticated history
 
 The Worker polls live data on the existing five-minute schedule. D1 writes are grouped through JSON-expanded batch operations to keep database round-trips small.
 
-## Deploying v1.3.1
+## Deploying v1.3.2
 
 The frontend publishes through GitHub Pages. The Worker needs the new baseline tables before the new cron code is deployed:
 

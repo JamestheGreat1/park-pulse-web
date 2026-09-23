@@ -336,7 +336,7 @@ function rideComparison(ride) {
 
   return {
     ratio,
-    percentBetter: Math.floor((1 - ratio) * 100)
+    percentBetter: Math.min(99, Math.round((1 - ratio) * 100))
   };
 }
 

@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.0";
-import { store } from "./store.js?v=1.5.0";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.0";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.0";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.0-final";
+import { store } from "./store.js?v=1.5.0-final";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.0-final";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.0-final";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];

@@ -400,8 +400,8 @@ function bindDynamic() {
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
   $$('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
-  $("[data-accent]").forEach((button) => {
-    button.onclick = () => store.update((s) => { s.accent = button.dataset.accent; }, "accent");
+  $("button[data-accent-choice]").forEach((button) => {
+    button.onclick = () => store.update((s) => { s.accent = button.dataset.accentChoice; }, "accent");
   });
 }
 function openRide(id) {

@@ -8,7 +8,9 @@ const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.5.1";
+const pullRefresh = $("#pullRefresh");
+const pullRefreshLabel = $("#pullRefreshLabel");
+const APP_VERSION = "1.5.2";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -22,6 +24,132 @@ const ACCENTS = [
   { id:"orange", label:"Orange" },
   { id:"green", label:"Green" }
 ];
+
+const PULL_REFRESH_TRIGGER = 82;
+const PULL_REFRESH_MAX_OFFSET = 86;
+const pullRefreshMedia = window.matchMedia?.("(pointer: coarse) and (max-width: 1023px)");
+let pullStartX = 0;
+let pullStartY = 0;
+let pullRawDistance = 0;
+let pullTracking = false;
+let pullRefreshing = false;
+
+function pullRefreshAvailable() {
+  return Boolean(pullRefresh && pullRefreshMedia?.matches);
+}
+function resetPullRefresh({ immediate = false } = {}) {
+  pullTracking = false;
+  pullRawDistance = 0;
+  document.body.classList.remove("ptr-tracking");
+  if (!pullRefresh) return;
+  pullRefresh.classList.remove("pulling", "armed", "refreshing", "success", "error");
+  if (immediate) pullRefresh.classList.add("no-transition");
+  pullRefresh.style.setProperty("--pull-y", "0px");
+  pullRefreshLabel.textContent = "Pull to refresh";
+  requestAnimationFrame(() => pullRefresh.classList.remove("active", "no-transition"));
+}
+function setPullRefreshDistance(rawDistance) {
+  if (!pullRefresh) return;
+  const eased = Math.min(PULL_REFRESH_MAX_OFFSET, Math.max(0, rawDistance) * 0.56);
+  const armed = rawDistance >= PULL_REFRESH_TRIGGER;
+  pullRefresh.style.setProperty("--pull-y", `${eased}px`);
+  pullRefresh.classList.add("active", "pulling");
+  pullRefresh.classList.toggle("armed", armed);
+  pullRefreshLabel.textContent = armed ? "Release to refresh" : "Pull to refresh";
+}
+async function triggerPullRefresh() {
+  if (!pullRefreshAvailable() || pullRefreshing || rideData.refreshing) {
+    resetPullRefresh();
+    return;
+  }
+
+  pullRefreshing = true;
+  pullTracking = false;
+  document.body.classList.remove("ptr-tracking");
+  pullRefresh.classList.remove("pulling", "armed");
+  pullRefresh.classList.add("active", "refreshing");
+  pullRefresh.style.setProperty("--pull-y", "62px");
+  pullRefreshLabel.textContent = "Refreshing…";
+
+  const before = rideData.updatedAt;
+  await rideData.refresh();
+
+  const updated = Boolean(rideData.updatedAt && rideData.updatedAt !== before);
+  pullRefresh.classList.remove("refreshing");
+  pullRefresh.classList.add(updated ? "success" : "error");
+  pullRefreshLabel.textContent = updated ? "Updated" : "Couldn't refresh";
+
+  await new Promise((resolve) => setTimeout(resolve, updated ? 420 : 700));
+  pullRefreshing = false;
+  resetPullRefresh();
+}
+function setupPullToRefresh() {
+  if (!pullRefresh || !pullRefreshMedia) return;
+
+  const syncAvailability = () => {
+    pullRefresh.classList.toggle("enabled", pullRefreshMedia.matches);
+    if (!pullRefreshMedia.matches) resetPullRefresh({ immediate: true });
+  };
+  syncAvailability();
+  pullRefreshMedia.addEventListener?.("change", syncAvailability);
+
+  window.addEventListener("touchstart", (event) => {
+    if (
+      !pullRefreshAvailable() ||
+      pullRefreshing ||
+      rideData.refreshing ||
+      document.body.classList.contains("sheet-open") ||
+      window.scrollY > 0 ||
+      event.touches.length !== 1
+    ) {
+      pullTracking = false;
+      return;
+    }
+
+    const touch = event.touches[0];
+    pullStartX = touch.clientX;
+    pullStartY = touch.clientY;
+    pullRawDistance = 0;
+    pullTracking = true;
+  }, { passive: true });
+
+  window.addEventListener("touchmove", (event) => {
+    if (!pullTracking || event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - pullStartX;
+    const deltaY = touch.clientY - pullStartY;
+
+    if (deltaY <= 0 || Math.abs(deltaX) > Math.abs(deltaY) * 0.8) {
+      resetPullRefresh({ immediate: true });
+      return;
+    }
+
+    if (window.scrollY > 0) {
+      resetPullRefresh({ immediate: true });
+      return;
+    }
+
+    if (deltaY < 5) return;
+
+    event.preventDefault();
+    document.body.classList.add("ptr-tracking");
+    pullRawDistance = deltaY;
+    setPullRefreshDistance(deltaY);
+  }, { passive: false });
+
+  const finishPull = () => {
+    if (!pullTracking) return;
+    const shouldRefresh = pullRawDistance >= PULL_REFRESH_TRIGGER;
+    pullTracking = false;
+    document.body.classList.remove("ptr-tracking");
+    if (shouldRefresh) triggerPullRefresh();
+    else resetPullRefresh();
+  };
+
+  window.addEventListener("touchend", finishPull, { passive: true });
+  window.addEventListener("touchcancel", () => resetPullRefresh(), { passive: true });
+}
 
 function platformInfo() {
   const ua = navigator.userAgent || "";
@@ -537,6 +665,7 @@ async function installApp() {
 }
 async function init() {
   setTheme();
+  setupPullToRefresh();
   if ("serviceWorker" in navigator) {
     let reloading = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {

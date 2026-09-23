@@ -1,11 +1,14 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.5.0";
+const VERSION = "1.5.1";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
 const BASELINE_RETRY_MS = 30 * 60 * 1000;
 const BASELINE_BATCH_SIZE = 4;
+const BASELINE_MIN_DAYS = 5;
+const BASELINE_MIN_MINUTES = 60;
+const HISTORY_HEALTH_WINDOW_MS = 20 * 60 * 1000;
 const CROWD_MIN_SMALL_PARK = 4;
 const CROWD_MIN_LARGE_PARK = 6;
 
@@ -623,6 +626,29 @@ async function addDisplayFallbacks(env, parkId, park, snapshot) {
     .filter(Boolean);
 }
 
+function baselineRowIsReady(baseline) {
+  return Boolean(
+    baseline &&
+    Number(baseline.sample_days || 0) >= BASELINE_MIN_DAYS &&
+    Number(baseline.sample_minutes || 0) >= BASELINE_MIN_MINUTES
+  );
+}
+
+function rideHasUsableComparison(ride, now = Date.now()) {
+  const wait = Number(ride?.waitTime);
+  const typical = Number(ride?.typicalWait);
+  return Boolean(
+    isFreshSourceRide(ride, now) &&
+    ride?.isOpen &&
+    Number.isFinite(wait) &&
+    wait > 0 &&
+    Number.isFinite(typical) &&
+    typical > 0 &&
+    Number(ride?.baselineDays || 0) >= BASELINE_MIN_DAYS &&
+    Number(ride?.baselineMinutes || 0) >= BASELINE_MIN_MINUTES
+  );
+}
+
 async function attachCurrentBaselines(env, rides) {
   if (!rides?.length) return rides || [];
 
@@ -638,11 +664,7 @@ async function attachCurrentBaselines(env, rides) {
 
     return rides.map((ride) => {
       const baseline = byRide.get(String(ride.id));
-      if (
-        !baseline ||
-        Number(baseline.sample_days || 0) < 5 ||
-        Number(baseline.sample_minutes || 0) < 60
-      ) return ride;
+      if (!baselineRowIsReady(baseline)) return ride;
 
       const typicalWait = Number(baseline.median_wait);
       const currentWait = ride.waitTime == null ? null : Number(ride.waitTime);
@@ -660,6 +682,7 @@ async function attachCurrentBaselines(env, rides) {
         typicalWait,
         typicalLow: baseline.p25_wait == null ? null : Number(baseline.p25_wait),
         typicalHigh: baseline.p75_wait == null ? null : Number(baseline.p75_wait),
+        baselineReady: true,
         baselineDays: Number(baseline.sample_days || 0),
         baselineMinutes: Number(baseline.sample_minutes || 0),
         valueRatio: Number.isFinite(valueRatio) ? valueRatio : null
@@ -730,24 +753,11 @@ function calculateCrowdLevel(rides, totalCatalogRides, parkHours, now = Date.now
   }
 
   const ratios = (rides || [])
-    .filter((ride) =>
-      isFreshSourceRide(ride, now) &&
-      ride.isOpen &&
-      ride.waitTime != null &&
-      Number.isFinite(Number(ride.waitTime)) &&
-      Number(ride.waitTime) > 0 &&
-      ride.typicalWait != null &&
-      Number.isFinite(Number(ride.typicalWait)) &&
-      Number(ride.typicalWait) > 0 &&
-      Number(ride.baselineDays || 0) >= 5 &&
-      Number(ride.baselineMinutes || 0) >= 60
-    )
-    .map((ride) => {
-      const ratio = Number.isFinite(Number(ride.valueRatio))
-        ? Number(ride.valueRatio)
-        : Number(ride.waitTime) / Number(ride.typicalWait);
-      return Math.max(0.35, Math.min(2, ratio));
-    })
+    .filter((ride) => rideHasUsableComparison(ride, now))
+    .map((ride) => Math.max(
+      0.35,
+      Math.min(2, Number(ride.waitTime) / Number(ride.typicalWait))
+    ))
     .filter(Number.isFinite);
 
   if (ratios.length < requiredSamples) {
@@ -1485,14 +1495,37 @@ async function refreshRideBaselines(env, currentRides) {
 
 async function getAnalyticsStatus(env) {
   const totalRides = [...PARKS.values()].reduce((sum, park) => sum + park.rides.length, 0);
+  const now = Date.now();
 
   try {
-    const rows = (await env.DB.prepare(
-      "SELECT ride_key,status,slot_count,refreshed_at,last_error FROM ride_baseline_meta"
-    ).all()).results || [];
+    const [metaResult, history30d, historyRecent] = await Promise.all([
+      env.DB.prepare(
+        "SELECT ride_key,status,slot_count,refreshed_at,last_error FROM ride_baseline_meta"
+      ).all(),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS sample_count,
+                COUNT(DISTINCT ride_key) AS ride_count,
+                MAX(observed_at) AS latest_observation
+         FROM ride_history
+         WHERE observed_at >= ?`
+      ).bind(now - 31 * 24 * 60 * 60 * 1000).first(),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS sample_count,
+                COUNT(DISTINCT ride_key) AS ride_count,
+                MAX(observed_at) AS latest_observation
+         FROM ride_history
+         WHERE observed_at >= ?`
+      ).bind(now - HISTORY_HEALTH_WINDOW_MS).first()
+    ]);
 
+    const rows = metaResult.results || [];
     const ready = rows.filter((row) => row.status === "ok" && Number(row.slot_count) > 0);
     const errors = rows.filter((row) => row.status === "error");
+    const latestHistoryMs = Number(history30d?.latest_observation || 0);
+    const historyCollecting =
+      Number(historyRecent?.sample_count || 0) > 0 &&
+      latestHistoryMs > 0 &&
+      now - latestHistoryMs <= HISTORY_HEALTH_WINDOW_MS;
 
     return {
       ok: true,
@@ -1503,7 +1536,22 @@ async function getAnalyticsStatus(env) {
       latestRefresh: ready.length
         ? new Date(Math.max(...ready.map((row) => Number(row.refreshed_at || 0)))).toISOString()
         : null,
-      backfillComplete: ready.length >= totalRides
+      backfillComplete: ready.length >= totalRides,
+      themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),
+      historyCollecting,
+      historyStatus: historyCollecting
+        ? "collecting"
+        : latestHistoryMs > 0
+          ? "stale"
+          : "waiting",
+      historySamples: Number(history30d?.sample_count || 0),
+      historyRides: Number(history30d?.ride_count || 0),
+      recentHistorySamples: Number(historyRecent?.sample_count || 0),
+      recentHistoryRides: Number(historyRecent?.ride_count || 0),
+      latestHistorySample: latestHistoryMs
+        ? new Date(latestHistoryMs).toISOString()
+        : null,
+      historyHealthWindowMinutes: HISTORY_HEALTH_WINDOW_MS / 60000
     };
   } catch {
     return {
@@ -1514,6 +1562,15 @@ async function getAnalyticsStatus(env) {
       errorRides: 0,
       latestRefresh: null,
       backfillComplete: false,
+      themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),
+      historyCollecting: false,
+      historyStatus: "unavailable",
+      historySamples: 0,
+      historyRides: 0,
+      recentHistorySamples: 0,
+      recentHistoryRides: 0,
+      latestHistorySample: null,
+      historyHealthWindowMinutes: HISTORY_HEALTH_WINDOW_MS / 60000,
       reason: "schema-not-ready"
     };
   }

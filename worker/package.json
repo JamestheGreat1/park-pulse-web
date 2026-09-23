@@ -1,6 +1,6 @@
 {
   "name": "parkpulse-worker",
-  "version": "1.3.5",
+  "version": "1.3.6",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,10 @@
     "deploy": "wrangler deploy",
     "generate-vapid": "node ./scripts/generate-vapid.mjs"
   },
-  "dependencies": { "@block65/webcrypto-web-push": "^2.0.0" },
-  "devDependencies": { "wrangler": "^4.0.0" }
+  "dependencies": {
+    "web-push-neo": "^0.1.2"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
 }

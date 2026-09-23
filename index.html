@@ -11,10 +11,10 @@
   <meta name="format-detection" content="telephone=no">
   <meta name="description" content="ParkPulse keeps an eye on Walt Disney World ride waits, crowd pressure, and reopenings so you don’t have to.">
   <title>ParkPulse</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=1.5.7-watching-state">
-  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png?v=1.5.7-watching-state">
-  <link rel="icon" href="./assets/icons/icon-192.png?v=1.5.7-watching-state" sizes="192x192">
-  <link rel="stylesheet" href="./assets/css/app.css?v=1.5.7-watching-state">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.6.0-product-polish">
+  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png?v=1.6.0-product-polish">
+  <link rel="icon" href="./assets/icons/icon-192.png?v=1.6.0-product-polish" sizes="192x192">
+  <link rel="stylesheet" href="./assets/css/app.css?v=1.6.0-product-polish">
 </head>
 <body>
   <div id="pullRefresh" class="pull-refresh" aria-hidden="true">
@@ -31,14 +31,14 @@
   <div id="app" class="app-shell">
     <header class="topbar shell-width">
       <div class="brand-lockup">
-        <img class="brand-icon" src="./assets/icons/icon-192.png?v=1.5.7-watching-state" alt="" width="44" height="44">
+        <img class="brand-icon" src="./assets/icons/icon-192.png?v=1.6.0-product-polish" alt="" width="44" height="44">
         <div class="brand-copy"><span class="brand-kicker">Ride watcher</span><h1>ParkPulse</h1></div>
       </div>
       <button id="refreshButton" class="icon-button glass-control" type="button" aria-label="Refresh live ride data" title="Refresh live ride data">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>
       </button>
     </header>
-    <div id="networkBanner" class="network-banner hidden" role="status" aria-live="polite"></div>
+    <div id="networkBanner" class="network-banner shell-width hidden" role="status" aria-live="polite"></div>
     <main id="mainContent" class="main-content shell-width">
       <section id="view-explore" class="view-panel active" data-view="explore" aria-labelledby="nav-explore"></section>
       <section id="view-watching" class="view-panel" data-view="watching" aria-labelledby="nav-watching"></section>
@@ -46,22 +46,22 @@
     </main>
     <footer class="source-footer shell-width">Wait data: <a href="https://www.themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki</a> · <a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times fallback</a></footer>
     <nav class="bottom-nav liquid-glass" aria-label="Primary">
-      <button id="nav-explore" class="nav-item active" type="button" data-view-target="explore" aria-selected="true">
+      <button id="nav-explore" class="nav-item active" type="button" data-view-target="explore" aria-current="page">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.3 6.7L21 12l-6.7 2.3L12 21l-2.3-6.7L3 12l6.7-2.3L12 3Z"/></svg><span>Explore</span>
       </button>
-      <button id="nav-watching" class="nav-item" type="button" data-view-target="watching" aria-selected="false">
+      <button id="nav-watching" class="nav-item" type="button" data-view-target="watching">
         <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span id="watchingBadge" class="nav-badge hidden">0</span></span><span>Watching</span>
       </button>
-      <button id="nav-settings" class="nav-item" type="button" data-view-target="settings" aria-selected="false">
+      <button id="nav-settings" class="nav-item" type="button" data-view-target="settings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5ZM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg><span>Settings</span>
       </button>
     </nav>
   </div>
   <div id="sheetBackdrop" class="sheet-backdrop hidden" aria-hidden="true"></div>
-  <section id="rideSheet" class="ride-sheet liquid-glass hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></section>
+  <section id="rideSheet" class="ride-sheet liquid-glass hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" aria-hidden="true"></section>
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <noscript><div class="noscript">ParkPulse needs JavaScript to load live ride data and alerts.</div></noscript>
-  <script src="./assets/js/config.js?v=1.5.7-watching-state"></script>
-  <script type="module" src="./assets/js/app.js?v=1.5.7-watching-state"></script>
+  <script src="./assets/js/config.js?v=1.6.0-product-polish"></script>
+  <script type="module" src="./assets/js/app.js?v=1.6.0-product-polish"></script>
 </body>
 </html>

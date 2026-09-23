@@ -1,11 +1,11 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.5.1";
+const VERSION = "1.5.2";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
 const BASELINE_RETRY_MS = 30 * 60 * 1000;
-const BASELINE_BATCH_SIZE = 4;
+const BASELINE_BATCH_SIZE = 8;
 const BASELINE_MIN_DAYS = 5;
 const BASELINE_MIN_MINUTES = 60;
 const HISTORY_HEALTH_WINDOW_MS = 20 * 60 * 1000;
@@ -1318,13 +1318,7 @@ function buildTimeBaselines(historyPayload) {
     .sort((a, b) => a.slotMinute - b.slotMinute);
 }
 
-async function fetchThemeParksHistory(env, ride) {
-  if (!env.THEMEPARKS_API_KEY || !ride?.sourceId) {
-    throw new Error("ThemeParks history requires an authenticated attraction id");
-  }
-
-  const from = localDateOffset(-30);
-  const to = localDateOffset(-1);
+async function requestThemeParksHistory(env, ride, from, to) {
   const url = new URL(`https://api.themeparks.wiki/v1/entity/${encodeURIComponent(ride.sourceId)}/history`);
   url.searchParams.set("from", from);
   url.searchParams.set("to", to);
@@ -1338,6 +1332,35 @@ async function fetchThemeParksHistory(env, ride) {
   });
 
   const payload = await response.json().catch(() => null);
+  return { response, payload };
+}
+
+async function fetchThemeParksHistory(env, ride) {
+  if (!env.THEMEPARKS_API_KEY || !ride?.sourceId) {
+    throw new Error("ThemeParks history requires an authenticated attraction id");
+  }
+
+  // ThemeParks' 30-day credential window includes today. Because ParkPulse
+  // intentionally builds baselines from completed park days only, the widest
+  // default request is the previous 29 completed days.
+  let from = localDateOffset(-29);
+  const to = localDateOffset(-1);
+
+  let { response, payload } = await requestThemeParksHistory(env, ride, from, to);
+
+  // Future-proof the backfill against plan/window changes. ThemeParks returns
+  // the exact earliest date this credential may request.
+  if (
+    !response.ok &&
+    payload?.error?.type === "HISTORY_WINDOW_EXCEEDED" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(String(payload?.error?.earliestAllowedDate || ""))
+  ) {
+    const earliestAllowedDate = String(payload.error.earliestAllowedDate);
+    if (earliestAllowedDate <= to && earliestAllowedDate !== from) {
+      from = earliestAllowedDate;
+      ({ response, payload } = await requestThemeParksHistory(env, ride, from, to));
+    }
+  }
 
   if (!response.ok) {
     const type = payload?.error?.type || `HTTP_${response.status}`;
@@ -1440,6 +1463,11 @@ async function refreshRideBaselines(env, currentRides) {
       const row = meta.get(String(ride.id));
       if (!row) return true;
       if (String(row.source_id || "") !== String(ride.sourceId || "")) return true;
+      if (
+        row.status === "error" &&
+        String(row.last_error || "").startsWith("HISTORY_WINDOW_EXCEEDED:")
+      ) return true;
+
       const age = now - Number(row.refreshed_at || 0);
       return age >= (row.status === "ok" ? BASELINE_REFRESH_MS : BASELINE_RETRY_MS);
     })

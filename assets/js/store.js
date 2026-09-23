@@ -7,6 +7,7 @@ const defaults = {
   openOnly: false,
   sort: "recommended",
   theme: "system",
+  accent: "blue",
   rules: []
 };
 
@@ -34,6 +35,7 @@ export class Store extends EventTarget {
     const saved = parse(localStorage.getItem(KEY), {});
     this.state = { ...defaults, ...saved };
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
+    if (!["blue","cyan","violet","pink","orange","green"].includes(this.state.accent)) this.state.accent = "blue";
     this.pruneExpired(false);
   }
   get snapshot() { return structuredClone(this.state); }

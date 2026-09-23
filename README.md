@@ -1,181 +1,215 @@
-# ParkPulse v1.5.0 — Ride Watcher
+# ParkPulse
 
-ParkPulse is an installable PWA that watches Walt Disney World ride statuses and posted standby waits so you do not have to keep refreshing a park app all day.
+ParkPulse is basically the Walt Disney World app I wanted while actually in the parks: open it, see what's worth riding, set a watch, and get on with your day.
 
-## What it does
+No giant itinerary planner. No constantly refreshing wait times. Just the useful stuff.
 
-- Live standby data for Magic Kingdom, EPCOT, Hollywood Studios, and Animal Kingdom.
-- Today’s normal park operating hours appear beneath the selected park name, sourced from ThemeParks.wiki’s `OPERATING` schedule entry.
-- If the park’s **current local calendar day** contains a `TICKETED_EVENT` schedule entry, ParkPulse shows it directly beneath the normal hours with its event hours. The API description is used when available; otherwise the label is **Special Ticketed Event**. Events from other calendar days are never shown. Extra Hours and private events stay out of this display.
-- **ThemeParks.wiki is the primary live source**.
-- **Queue-Times is a per-ride fallback**, not the primary feed.
-- A fresh fallback record is treated as fully live. A ride is marked **stale only when neither provider has a fresh record**, at which point ParkPulse may show the last known D1 state.
-- A curated ParkPulse ride catalogue filters out shows, character experiences, and single-rider-only queue entries.
-- Provider-independent ParkPulse ride keys keep watches stable if a data provider changes.
-- Per-ride alerts for **reopening** and **wait at/below a chosen target**.
-- Watch durations: park day, three hours, or until disabled.
-- Web Push through Cloudflare Worker + D1, including while the PWA is closed.
-- Standards-based `aes128gcm` Web Push encryption for Safari/iOS and other modern browsers.
-- Safe push-test diagnostics report configuration/provider status without exposing VAPID secrets or subscription keys.
-- The PWA self-heals a stale browser PushSubscription when its stored application-server key no longer matches the Worker's current VAPID public key.
-- Push-service Topic headers are omitted; notification replacement is handled by the service worker's payload `tag`, avoiding provider Topic-length/format failures.
-- Anonymous device subscriptions; no account system required.
-- 30-minute alert cooldowns, stale-data labels, last-known-state fallback, notification testing, and diagnostics.
-- A rolling ParkPulse live-sample history for today's observed low/high.
-- Authenticated ThemeParks.wiki 30-day history backfill converted into 15-minute time-of-day baselines.
-- Ride trend insights: typical wait now, usual range, today's observed range, and better/busier-than-typical labels.
-- **Best now** sorts operating rides by current wait relative to their historical baseline once a baseline is available.
-- **Live crowd levels** estimate park pressure on a 1–10 scale from the median of fresh, operating ride waits normalized against their time-of-day baselines. ParkPulse requires a minimum number of mature ride baselines before publishing a score and pauses the estimate during an active ticketed event.
-- **Android PWA support** includes platform-aware install messaging, WebAPK-friendly manifest metadata, a maskable 512px icon declaration, unrestricted orientation, standalone launch behavior, and Android-safe notification presentation.
-- **Ride-card value context** shows a compact “↓ X% vs typical” badge only when a fresh operating ride is at least 10% below a mature time-of-day baseline.
-- **Downtime duration** is shown only when the primary live provider explicitly reports an attraction as `DOWN`; generic closed/refurbishment/fallback states are never guessed as downtime.
-- **Crowd trend** adds `↗ building`, `→ steady`, or `↘ easing` by comparing normalized park pressure with roughly 30 minutes earlier.
-- **Closing countdown** replaces the normal park-hours prefix during the final four hours of the regular operating day (for example, `Closes in 2h 18m · 9:00 AM–10:00 PM`).
-- **Accent customization** offers six vetted Liquid Glass palettes (Blue, Cyan, Violet, Pink, Orange, and Green) while keeping contrast/layout controlled.
-- Installable/offline-capable PWA shell with light/dark/system appearance.
-- Mobile touch polish: intentional pinch zoom remains enabled, accidental double-tap zoom is suppressed, iOS form focus avoids auto-zoom, modal scrolling respects safe areas, and search no longer re-mounts while typing.
+**Current version: 1.5.0**
 
-ParkPulse is independent and is not affiliated with Disney. ThemeParks.wiki attribution is required by its terms. Queue-Times attribution is retained because it remains the fallback source.
+[Open ParkPulse](https://jamesthegreat1.github.io/park-pulse-web/)
 
-## ThemeParks.wiki API key
+## What ParkPulse does
 
-The API key is stored only as a **Cloudflare Worker secret**. Never put the key in the PWA, GitHub, `wrangler.toml`, or a committed environment file.
+- **Live ride waits and statuses** for Magic Kingdom, EPCOT, Hollywood Studios, and Animal Kingdom.
+- **Best Now sorting** that looks at the current wait compared with what is normal for that ride at that time of day.
+- **Better-than-typical badges** like `↓ 24% vs typical` when a ride is genuinely a good deal right now.
+- **Crowd levels from 1–10** based on live wait pressure across the park instead of pretending we know exact attendance.
+- **Crowd trend** so you can see whether the park is `↗ building`, `→ steady`, or `↘ easing`.
+- **Park hours** directly under the park name.
+- **Closing countdowns** during the final few hours of the regular park day.
+- **Same-day ticketed events** when the park schedule actually lists one for today.
+- **Downtime duration** when a ride is explicitly reported as temporarily down.
+- **Ride watches** for reopenings and/or a wait-time target.
+- **Background push notifications** even when ParkPulse is closed.
+- **Temporary watches** for Today, 3 hours, or Until Disabled.
+- **Freshness protection** so old data is not quietly passed off as live.
+- **iPhone and Android installation** as a PWA.
+- **Light, dark, or system appearance** plus six accent colors: Blue, Cyan, Violet, Pink, Orange, and Green.
 
-```bash
-cd /workspaces/park-pulse-web/worker
-npx wrangler secret put THEMEPARKS_API_KEY
-```
+## How to use it
 
-The Worker sends the key in the `x-api-key` header to ThemeParks.wiki. The public health endpoint exposes only whether a key is configured and never returns the secret.
+### 1. Install ParkPulse
 
-## Historical baseline backfill
+You can use ParkPulse in a normal browser, but installing it gives you the best experience and makes background notifications much nicer.
 
-ThemeParks.wiki exposes authenticated entity history at:
+**iPhone / iPad**
 
-```text
-GET /v1/entity/{id}/history
-```
+1. Open ParkPulse in Safari.
+2. Tap **Share**.
+3. Tap **Add to Home Screen**.
+4. Open ParkPulse from the new Home Screen icon.
+5. Go to **Settings → Push notifications → Enable**.
 
-ParkPulse requests the previous 30 completed park-local calendar days for each curated attraction. Raw history is processed inside the Worker and is **not copied into ParkPulse as a mirror**.
+Web Push on iPhone works from the installed Home Screen app.
 
-For each ride, ParkPulse derives 15-minute time-of-day slots containing:
+**Android**
 
-- time-weighted median standby wait
-- 25th percentile standby wait
-- 75th percentile standby wait
-- time-weighted mean standby wait
-- number of observed operating minutes
-- number of represented days
+1. Open ParkPulse in Chrome or another supported browser.
+2. Use the **Install ParkPulse** option in Settings, or choose **Install app / Add to Home screen** from the browser menu.
+3. Open the installed app.
+4. Go to **Settings → Push notifications → Enable**.
 
-Only periods where the attraction is `OPERATING` with a numeric `STANDBY.waitTime` contribute.
+If your browser supports the native PWA install prompt, ParkPulse will use it automatically.
 
-The cron refreshes at most four missing/stale ride baselines per five-minute run. A fresh install should therefore fill the WDW catalogue in roughly an hour, subject to provider availability. Successful baselines refresh after 24 hours; failed backfills are eligible to retry after 30 minutes.
+### 2. Pick a park
 
-The PWA exposes progress in **Settings → Trend baselines**. The Worker also exposes:
+Use the four park buttons at the top:
 
-```text
-GET /api/analytics/status
-```
+- 🏰 **MK** — Magic Kingdom
+- 🌐 **EPCOT**
+- 🎬 **DHS** — Hollywood Studios
+- 🌿 **AK** — Animal Kingdom
 
-Example:
+The park header shows today's regular hours, crowd level when enough data is available, and any separately ticketed event that is actually scheduled for the current park day.
 
-```json
-{
-  "ok": true,
-  "totalRides": 47,
-  "baselineRides": 20,
-  "pendingRides": 27,
-  "errorRides": 0,
-  "backfillComplete": false
-}
-```
+Near closing, the hours line changes into something more useful, like:
 
-## Data flow
+> **Closes in 2h 18m · 9:00 AM–10:00 PM**
 
-```text
-ThemeParks.wiki live + authenticated history
-                  │
-                  ▼
-          Cloudflare Worker ── Queue-Times fallback
-                  │
-                  ├─ curated ride catalogue
-                  ├─ provider-independent ride IDs
-                  ├─ 15-minute historical baselines
-                  ├─ rolling same-day D1 samples
-                  ├─ ride trend/value calculations
-                  ├─ crowd pressure model (1–10)
-                  ├─ stale-state handling
-                  └─ push alert evaluation
-                  │
-                  ▼
-              ParkPulse PWA
-```
+### 3. Find what's worth riding
 
-The Worker polls live data on the existing five-minute schedule. D1 writes are grouped through JSON-expanded batch operations to keep database round-trips small.
+The default sort is **Best Now**.
 
-## Deploying v1.5.0
+Instead of only asking “what has the shortest wait?”, ParkPulse compares each ride with its own normal wait for that time of day.
 
-The frontend publishes through GitHub Pages. v1.5.0 does not add a new D1 migration; deploy the latest Worker after pulling the frontend release:
+So a 45-minute wait can still be a great option if that ride is usually 70 minutes right now.
 
-```bash
-cd /workspaces/park-pulse-web
-git pull origin main
+When the data is strong enough, you may see:
 
-cd worker
-npm install
-npm run deploy
-```
+> **↓ 24% vs typical**
 
-The ThemeParks API key secret already configured in Cloudflare persists through ordinary Worker deployments.
+That means the current posted wait is meaningfully better than the ride's historical baseline for this time of day.
 
-After deployment:
+You can also sort by:
 
-```bash
-curl -s https://parkpulse-api.jamesp5297.workers.dev/health | python -m json.tool
+- **Lowest wait**
+- **A–Z**
 
-curl -s https://parkpulse-api.jamesp5297.workers.dev/api/analytics/status | python -m json.tool
-```
+And **Open only** hides rides that are not currently operating.
 
-Existing subscriptions, VAPID keys, ride-state data, and saved watches remain in place.
+### 4. Read the crowd level
 
+ParkPulse crowd levels run from **1–10**:
 
-## Crowd level model
+| Level | What it means |
+| --- | --- |
+| 1–2 | Very Light |
+| 3–4 | Light |
+| 5–6 | Moderate |
+| 7–8 | Busy |
+| 9 | Very Busy |
+| 10 | Extremely Busy |
 
-ParkPulse does not claim to know park attendance. The crowd level is a derived wait-pressure estimate:
+You may also see:
 
-- only fresh, operating attractions with numeric standby waits count
-- each attraction must have a mature time-of-day baseline
-- current wait is divided by that attraction's typical wait for the current 15-minute slot
-- ratios are clipped to reduce outlier impact
-- the park score uses the median normalized ratio, not a simple average
-- Magic Kingdom requires at least 6 qualifying rides; smaller curated parks require at least 4
-- if coverage is insufficient, the UI says the estimate is still building
-- while a same-day ticketed event is actively running, the normal-day crowd estimate is paused
+- **↗ building** — waits are getting busier
+- **→ steady** — overall pressure is about the same
+- **↘ easing** — waits are trending down
 
-The 1–10 labels are:
-- 1–2 Very Light
-- 3–4 Light
-- 5–6 Moderate
-- 7–8 Busy
-- 9 Very Busy
-- 10 Extremely Busy
+The crowd level is a **ParkPulse wait-pressure estimate**, not an attendance count. It compares fresh operating rides with what is typical for those same rides at the current time of day.
 
-## Android
+If there is not enough reliable history yet, ParkPulse will simply say the crowd estimate is still building.
 
-ParkPulse remains one PWA codebase for iOS, Android, and desktop. On Android, Chromium-based browsers can install it as an app-like PWA/WebAPK when installation criteria are met. The Settings install row automatically uses Android-specific guidance, while iPhone keeps its Add to Home Screen guidance.
+During an active separately ticketed event, the normal-day crowd estimate pauses instead of comparing party waits with a normal park day.
 
+### 5. Watch a ride
 
-## Field-test reliability pass
+Tap any ride to open its details.
 
-v1.5.0 intentionally focuses on intelligence inside the existing UI instead of adding navigation.
+You can turn on either or both of these:
 
-- crowd/value baselines require at least 5 represented days and 60 observed operating minutes for the current 15-minute slot
-- crowd trend uses stored five-minute samples and the historical baseline for the earlier comparison slot
-- normal crowd scoring remains paused during active same-day ticketed events
-- downtime is only labeled when ThemeParks.wiki explicitly reports `DOWN`
-- stale/fallback semantics remain unchanged: a fresh fallback is live; only the no-fresh-provider case is stale
-- closing countdown uses park-local schedule timestamps and only appears after regular opening
-- accent choices persist in the existing local ParkPulse settings record
-- selector bindings were audited for single-element/collection mistakes
-- view navigation now uses standards-safe `scrollTo(... behavior: "auto")`
-- minute-level display refresh updates closing countdown and downtime labels without rebuilding the search field
+- **Notify when it reopens**
+- **Notify when the wait drops to or below your target**
+
+Then choose how long you want the watch to last:
+
+- **Today**
+- **3 hours**
+- **Until disabled**
+
+Tap **Start watching** and you're done.
+
+ParkPulse keeps checking from the backend, so you do **not** need to leave the app open.
+
+A good example:
+
+> Space Mountain is down, but I'd ride it at 40 minutes or less.
+
+Turn on **reopening**, set the wait target to **40 min**, choose **Today**, and close ParkPulse. It'll handle the rest.
+
+### 6. Check your watches
+
+The **Watching** tab shows everything you're currently monitoring.
+
+From there you can:
+
+- see the latest ride state
+- open a ride to change the alert
+- remove a watch
+- see how long a temporary watch has left
+
+Expired temporary watches clean themselves up automatically.
+
+### 7. Customize ParkPulse
+
+Go to **Settings → Customization**.
+
+You can choose:
+
+**Appearance**
+- System
+- Dark
+- Light
+
+**Accent color**
+- Blue
+- Cyan
+- Violet
+- Pink
+- Orange
+- Green
+
+The accent changes the highlights, controls, glow, and general Liquid Glass vibe without changing how the app works.
+
+## A few useful labels
+
+**Down 22m**  
+The ride is explicitly being reported as temporarily down, and ParkPulse has seen the current downtime for about 22 minutes.
+
+**Stale**  
+Neither live source currently has fresh enough data for that ride. ParkPulse may show the last known state, but it clearly marks it as stale instead of pretending it is current.
+
+**Open**  
+The ride is operating, but there is not a useful numeric standby wait to show.
+
+**↓ X% vs typical**  
+The current wait is lower than ParkPulse's historical expectation for that ride at this time.
+
+**Crowd estimate building**  
+There are not enough mature ride baselines available right now to give you a crowd number that ParkPulse actually trusts.
+
+## Notifications
+
+Once push notifications are enabled, ParkPulse can send alerts for your watches while the PWA is closed.
+
+There is a **Send test** button in Settings if you want to make sure everything is working before relying on it in the park.
+
+If you change phones or reinstall the PWA, enable notifications again on the new installation.
+
+## The basic idea
+
+If you only remember three things:
+
+1. Leave the ride list on **Best Now**.
+2. Watch anything you really want to ride.
+3. Let ParkPulse tell you when the timing gets better.
+
+That's pretty much the whole point.
+
+## Data
+
+ParkPulse uses [ThemeParks.wiki](https://www.themeparks.wiki/) as its primary live source and [Queue-Times](https://queue-times.com/) as a fallback.
+
+A fresh fallback result is treated as normal live data. ParkPulse only marks a ride stale when neither source can provide something fresh enough to trust.
+
+ParkPulse is an independent project and is not affiliated with or endorsed by Disney.

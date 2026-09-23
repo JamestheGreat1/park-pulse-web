@@ -1,14 +1,14 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.8";
-import { store } from "./store.js?v=1.3.8";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.8";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.8";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.9";
+import { store } from "./store.js?v=1.3.9";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.9";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.9";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.3.8";
+const APP_VERSION = "1.3.9";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -31,19 +31,33 @@ function dateKeyInZone(date, timeZone) {
   const parts = zoneParts(date, timeZone);
   return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
+function parkTimeFormatter(timeZone) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
 function formatParkHours(hours) {
   if (!hours?.timezone || !hours?.date) return "";
   if (hours.date !== dateKeyInZone(new Date(), hours.timezone)) return "";
   if (hours.closedToday) return "Closed today";
   if (!hours.openingTime || !hours.closingTime) return "";
 
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: hours.timezone,
-    hour: "numeric",
-    minute: "2-digit"
-  });
-
+  const formatter = parkTimeFormatter(hours.timezone);
   return `Today · ${formatter.format(new Date(hours.openingTime))}–${formatter.format(new Date(hours.closingTime))}`;
+}
+function formatTicketedEvents(hours) {
+  if (!hours?.timezone || !hours?.date) return [];
+  if (hours.date !== dateKeyInZone(new Date(), hours.timezone)) return [];
+
+  const formatter = parkTimeFormatter(hours.timezone);
+  return (Array.isArray(hours.ticketedEvents) ? hours.ticketedEvents : [])
+    .filter((event) => event?.openingTime && event?.closingTime)
+    .map((event) => ({
+      name: String(event.name || "Special Ticketed Event"),
+      hours: `${formatter.format(new Date(event.openingTime))}–${formatter.format(new Date(event.closingTime))}`
+    }));
 }
 function zonedDateToUtc(year, month, day, hour, timeZone) {
   let guess = Date.UTC(year, month - 1, day, hour, 0, 0);
@@ -144,7 +158,9 @@ function renderRideResults() {
 function renderExplore() {
   const state = store.snapshot;
   const activeCount = state.rules.length;
-  const parkHours = formatParkHours(rideData.hoursForPark(state.selectedParkId));
+  const parkSchedule = rideData.hoursForPark(state.selectedParkId);
+  const parkHours = formatParkHours(parkSchedule);
+  const ticketedEvents = formatTicketedEvents(parkSchedule);
   views.explore.innerHTML = `
     <section class="hero-card liquid-glass">
       <div><span class="eyebrow">Walt Disney World</span><h2>Stop refreshing wait times.</h2><p>Tell ParkPulse what “worth it” looks like. We’ll watch the ride and buzz you when it gets there.</p></div>
@@ -158,7 +174,7 @@ function renderExplore() {
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
-    <div class="section-heading"><div><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
+    <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderWatching() {
@@ -213,9 +229,17 @@ function renderRefreshCopy() {
       : "Loading…";
 }
 function renderParkHours() {
-  const el = $(".park-hours", views.explore);
-  if (!el) return;
-  el.textContent = formatParkHours(rideData.hoursForPark(store.snapshot.selectedParkId));
+  const schedule = rideData.hoursForPark(store.snapshot.selectedParkId);
+  const hoursEl = $(".park-hours", views.explore);
+  if (hoursEl) hoursEl.textContent = formatParkHours(schedule);
+
+  const eventsEl = $(".park-events", views.explore);
+  if (!eventsEl) return;
+
+  const events = formatTicketedEvents(schedule);
+  eventsEl.innerHTML = events.map((event) =>
+    `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`
+  ).join("");
 }
 function renderRideDataUpdate() {
   if (document.activeElement?.id !== "rideSearch") return render();

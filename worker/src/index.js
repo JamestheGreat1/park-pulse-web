@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.3.8";
+const VERSION = "1.3.9";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -435,10 +435,30 @@ async function fetchParkHours(park, env) {
       entry?.openingTime &&
       entry?.closingTime
   );
+  const ticketedEvents = todayEntries
+    .filter(
+      (entry) =>
+        String(entry?.type || "").toUpperCase() === "TICKETED_EVENT" &&
+        entry?.openingTime &&
+        entry?.closingTime
+    )
+    .map((entry) => ({
+      name: String(entry?.description || "").trim().slice(0, 160) || "Special Ticketed Event",
+      openingTime: entry.openingTime,
+      closingTime: entry.closingTime
+    }))
+    .sort((a, b) => new Date(a.openingTime).getTime() - new Date(b.openingTime).getTime());
 
   if (!operating.length) {
     return todayEntries.length
-      ? { date, timezone, openingTime: null, closingTime: null, closedToday: true }
+      ? {
+          date,
+          timezone,
+          openingTime: null,
+          closingTime: null,
+          closedToday: true,
+          ticketedEvents
+        }
       : null;
   }
 
@@ -454,7 +474,8 @@ async function fetchParkHours(park, env) {
     timezone,
     openingTime: sortedByOpen[0].openingTime,
     closingTime: sortedByClose[0].closingTime,
-    closedToday: false
+    closedToday: false,
+    ticketedEvents
   };
 }
 

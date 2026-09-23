@@ -649,6 +649,7 @@ async function attachCurrentBaselines(env, rides) {
       const valueRatio =
         ride.isOpen &&
         Number.isFinite(currentWait) &&
+        currentWait > 0 &&
         Number.isFinite(typicalWait) &&
         typicalWait > 0
           ? currentWait / typicalWait
@@ -734,6 +735,7 @@ function calculateCrowdLevel(rides, totalCatalogRides, parkHours, now = Date.now
       ride.isOpen &&
       ride.waitTime != null &&
       Number.isFinite(Number(ride.waitTime)) &&
+      Number(ride.waitTime) > 0 &&
       ride.typicalWait != null &&
       Number.isFinite(Number(ride.typicalWait)) &&
       Number(ride.typicalWait) > 0 &&

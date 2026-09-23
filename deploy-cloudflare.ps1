@@ -243,6 +243,31 @@ if (-not $Health.ok -or $Health.service -ne "parkpulse-api") {
     throw "The Worker health endpoint returned an unexpected response."
 }
 
+if (-not $Health.themeParksApiKeyConfigured) {
+    throw "The Worker is online, but THEMEPARKS_API_KEY is missing. Historical baselines and crowd estimates cannot finish building until that secret is configured."
+}
+
+Write-Step "Checking ParkPulse history collection"
+$Analytics = Invoke-RestMethod -Uri "$WorkerUrl/api/analytics/status" -Method Get -TimeoutSec 20
+if (-not $Analytics.ok) {
+    throw "The Worker is online, but the history diagnostics endpoint is not ready."
+}
+
+if ($Analytics.historyCollecting) {
+    Write-Host ("History sampler: Collecting ({0} rides in the last {1} minutes; latest sample {2})" -f $Analytics.recentHistoryRides, $Analytics.historyHealthWindowMinutes, $Analytics.latestHistorySample) -ForegroundColor Green
+}
+elseif ($Analytics.latestHistorySample) {
+    Write-Warning ("History sampler is not current. Last D1 sample: {0}. The five-minute cron may need attention." -f $Analytics.latestHistorySample)
+}
+else {
+    Write-Warning "No D1 history samples exist yet. The Worker cron runs every five minutes; check Settings again after the first cron run."
+}
+
+Write-Host ("Trend baselines: {0}/{1} rides ready" -f $Analytics.baselineRides, $Analytics.totalRides)
+if ($Analytics.errorRides -gt 0) {
+    Write-Warning ("{0} historical baseline backfill jobs are currently in an error state." -f $Analytics.errorRides)
+}
+
 if (-not $SkipGitPush) {
     Write-Step "Publishing the Worker configuration to GitHub Pages"
     Push-Location $RepoRoot

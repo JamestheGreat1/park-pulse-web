@@ -1,4 +1,4 @@
-import { workerBase } from "./api.js?v=1.3.7";
+import { workerBase } from "./api.js?v=1.3.8";
 
 function base64ToBytes(value) {
   const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, "=").replace(/-/g, "+").replace(/_/g, "/");

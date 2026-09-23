@@ -638,7 +638,11 @@ async function attachCurrentBaselines(env, rides) {
 
     return rides.map((ride) => {
       const baseline = byRide.get(String(ride.id));
-      if (!baseline || Number(baseline.sample_days || 0) < 5) return ride;
+      if (
+        !baseline ||
+        Number(baseline.sample_days || 0) < 5 ||
+        Number(baseline.sample_minutes || 0) < 60
+      ) return ride;
 
       const typicalWait = Number(baseline.median_wait);
       const currentWait = ride.waitTime == null ? null : Number(ride.waitTime);
@@ -656,6 +660,7 @@ async function attachCurrentBaselines(env, rides) {
         typicalLow: baseline.p25_wait == null ? null : Number(baseline.p25_wait),
         typicalHigh: baseline.p75_wait == null ? null : Number(baseline.p75_wait),
         baselineDays: Number(baseline.sample_days || 0),
+        baselineMinutes: Number(baseline.sample_minutes || 0),
         valueRatio: Number.isFinite(valueRatio) ? valueRatio : null
       };
     });

@@ -1,4 +1,4 @@
-# ParkPulse v1.3.9 — Ride Watcher
+# ParkPulse v1.4.0 — Ride Watcher
 
 ParkPulse is an installable PWA that watches Walt Disney World ride statuses and posted standby waits so you do not have to keep refreshing a park app all day.
 
@@ -25,6 +25,8 @@ ParkPulse is an installable PWA that watches Walt Disney World ride statuses and
 - Authenticated ThemeParks.wiki 30-day history backfill converted into 15-minute time-of-day baselines.
 - Ride trend insights: typical wait now, usual range, today's observed range, and better/busier-than-typical labels.
 - **Best now** sorts operating rides by current wait relative to their historical baseline once a baseline is available.
+- **Live crowd levels** estimate park pressure on a 1–10 scale from the median of fresh, operating ride waits normalized against their time-of-day baselines. ParkPulse requires a minimum number of mature ride baselines before publishing a score and pauses the estimate during an active ticketed event.
+- **Android PWA support** includes platform-aware install messaging, WebAPK-friendly manifest metadata, a maskable 512px icon declaration, unrestricted orientation, standalone launch behavior, and Android-safe notification presentation.
 - Installable/offline-capable PWA shell with light/dark/system appearance.
 - Mobile touch polish: intentional pinch zoom remains enabled, accidental double-tap zoom is suppressed, iOS form focus avoids auto-zoom, modal scrolling respects safe areas, and search no longer re-mounts while typing.
 
@@ -96,6 +98,7 @@ ThemeParks.wiki live + authenticated history
                   ├─ 15-minute historical baselines
                   ├─ rolling same-day D1 samples
                   ├─ ride trend/value calculations
+                  ├─ crowd pressure model (1–10)
                   ├─ stale-state handling
                   └─ push alert evaluation
                   │
@@ -105,9 +108,9 @@ ThemeParks.wiki live + authenticated history
 
 The Worker polls live data on the existing five-minute schedule. D1 writes are grouped through JSON-expanded batch operations to keep database round-trips small.
 
-## Deploying v1.3.9
+## Deploying v1.4.0
 
-The frontend publishes through GitHub Pages. The Worker needs the new baseline tables before the new cron code is deployed:
+The frontend publishes through GitHub Pages. v1.4.0 does not add a new D1 migration; deploy the latest Worker after pulling the frontend release:
 
 ```bash
 cd /workspaces/park-pulse-web
@@ -115,7 +118,6 @@ git pull origin main
 
 cd worker
 npm install
-npx wrangler d1 execute parkpulse --remote --file=./schema.sql
 npm run deploy
 ```
 
@@ -130,3 +132,29 @@ curl -s https://parkpulse-api.jamesp5297.workers.dev/api/analytics/status | pyth
 ```
 
 Existing subscriptions, VAPID keys, ride-state data, and saved watches remain in place.
+
+
+## Crowd level model
+
+ParkPulse does not claim to know park attendance. The crowd level is a derived wait-pressure estimate:
+
+- only fresh, operating attractions with numeric standby waits count
+- each attraction must have a mature time-of-day baseline
+- current wait is divided by that attraction's typical wait for the current 15-minute slot
+- ratios are clipped to reduce outlier impact
+- the park score uses the median normalized ratio, not a simple average
+- Magic Kingdom requires at least 6 qualifying rides; smaller curated parks require at least 4
+- if coverage is insufficient, the UI says the estimate is still building
+- while a same-day ticketed event is actively running, the normal-day crowd estimate is paused
+
+The 1–10 labels are:
+- 1–2 Very Light
+- 3–4 Light
+- 5–6 Moderate
+- 7–8 Busy
+- 9 Very Busy
+- 10 Extremely Busy
+
+## Android
+
+ParkPulse remains one PWA codebase for iOS, Android, and desktop. On Android, Chromium-based browsers can install it as an app-like PWA/WebAPK when installation criteria are met. The Settings install row automatically uses Android-specific guidance, while iPhone keeps its Add to Home Screen guidance.

@@ -2,6 +2,9 @@ name = "parkpulse-api"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 
+[secrets]
+required = ["VAPID_SERVER_PRIVATE_KEY", "PUSH_ADMIN_TOKEN", "THEMEPARKS_API_KEY"]
+
 [vars]
 APP_URL = "https://app.useparkpulse.com/"
 APP_ORIGIN = "https://app.useparkpulse.com"

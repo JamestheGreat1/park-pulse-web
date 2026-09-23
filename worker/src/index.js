@@ -259,29 +259,6 @@ export default {
         return json({ ok: true }, 200, cors);
       }
 
-      if (request.method === "POST" && url.pathname === "/send/test") {
-        if (!env.PUSH_ADMIN_TOKEN || request.headers.get("Authorization") !== `Bearer ${env.PUSH_ADMIN_TOKEN}`) {
-          return json({ error: "Unauthorized" }, 401, cors);
-        }
-
-        const rows = (await env.DB.prepare(
-          "SELECT endpoint,p256dh,auth FROM subscriptions ORDER BY updated_at DESC LIMIT 50"
-        ).all()).results || [];
-
-        const payload = {
-          title: "ParkPulse test",
-          body: "Push is wired up correctly.",
-          url: env.APP_URL || "/",
-          tag: "parkpulse-test"
-        };
-
-        const results = await Promise.allSettled(rows.map((row) => sendPush(row, payload, env)));
-        return json({
-          ok: true,
-          attempted: rows.length,
-          delivered: results.filter((result) => result.status === "fulfilled" && result.value).length
-        }, 200, cors);
-      }
 
       return json({ error: "Not found" }, 404, cors);
     } catch (error) {

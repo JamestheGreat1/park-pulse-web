@@ -183,7 +183,7 @@ function remaining(rule) {
   return "Today";
 }
 function betterThanTypicalBadge(ride) {
-  if (!ride || isRideStale(ride) || !ride.isOpen || !Number.isFinite(Number(ride.valueRatio))) return "";
+  if (!ride || isRideStale(ride) || !ride.isOpen || !Number.isFinite(Number(ride.waitTime)) || Number(ride.waitTime) <= 0 || !Number.isFinite(Number(ride.valueRatio))) return "";
   const percent = Math.round((1 - Number(ride.valueRatio)) * 100);
   if (percent < 10) return "";
   return `↓ ${percent}% vs typical`;

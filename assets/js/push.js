@@ -1,4 +1,4 @@
-import { workerBase } from "./api.js?v=1.5.4-copy-polish";
+import { workerBase } from "./api.js?v=1.6.0-product-polish";
 
 function base64ToBytes(value) {
   const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, "=").replace(/-/g, "+").replace(/_/g, "/");

@@ -82,10 +82,11 @@ function formatParkHours(hours, now = Date.now()) {
 
   const formatter = parkTimeFormatter(hours.timezone);
   const range = `${formatter.format(new Date(hours.openingTime))}–${formatter.format(new Date(hours.closingTime))}`;
+  const openMs = new Date(hours.openingTime).getTime();
   const closeMs = new Date(hours.closingTime).getTime();
   const remainingMinutes = Math.floor((closeMs - now) / 60000);
 
-  if (Number.isFinite(remainingMinutes) && remainingMinutes > 0 && remainingMinutes <= 240) {
+  if (Number.isFinite(openMs) && now >= openMs && Number.isFinite(remainingMinutes) && remainingMinutes > 0 && remainingMinutes <= 240) {
     return `Closes in ${compactDuration(remainingMinutes)} · ${range}`;
   }
 

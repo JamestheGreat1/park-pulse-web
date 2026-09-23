@@ -128,3 +128,21 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 @media(max-width:420px){
   .park-event{font-size:.74rem;gap:5px}
 }
+
+
+/* Park crowd intelligence */
+.park-crowd-wrap{margin-top:7px}
+.park-crowd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;line-height:1.25}
+.crowd-score{font-size:.8rem;font-weight:760;color:var(--text)}
+.crowd-score b{font-size:.88rem;margin-right:3px}
+.crowd-detail{font-size:.74rem;color:var(--muted);font-weight:620}
+.crowd-level-1 .crowd-score,.crowd-level-2 .crowd-score,.crowd-level-3 .crowd-score{color:var(--green)}
+.crowd-level-4 .crowd-score,.crowd-level-5 .crowd-score,.crowd-level-6 .crowd-score{color:var(--blue)}
+.crowd-level-7 .crowd-score,.crowd-level-8 .crowd-score{color:#f1c56f}
+.crowd-level-9 .crowd-score,.crowd-level-10 .crowd-score{color:var(--red)}
+.crowd-note .crowd-detail{font-style:italic}
+@media(max-width:420px){
+  .park-crowd{gap:5px}
+  .crowd-score{font-size:.76rem}
+  .crowd-detail{font-size:.7rem}
+}

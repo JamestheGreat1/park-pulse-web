@@ -1,4 +1,4 @@
-# ParkPulse v1.4.0 — Ride Watcher
+# ParkPulse v1.5.0 — Ride Watcher
 
 ParkPulse is an installable PWA that watches Walt Disney World ride statuses and posted standby waits so you do not have to keep refreshing a park app all day.
 
@@ -27,6 +27,11 @@ ParkPulse is an installable PWA that watches Walt Disney World ride statuses and
 - **Best now** sorts operating rides by current wait relative to their historical baseline once a baseline is available.
 - **Live crowd levels** estimate park pressure on a 1–10 scale from the median of fresh, operating ride waits normalized against their time-of-day baselines. ParkPulse requires a minimum number of mature ride baselines before publishing a score and pauses the estimate during an active ticketed event.
 - **Android PWA support** includes platform-aware install messaging, WebAPK-friendly manifest metadata, a maskable 512px icon declaration, unrestricted orientation, standalone launch behavior, and Android-safe notification presentation.
+- **Ride-card value context** shows a compact “↓ X% vs typical” badge only when a fresh operating ride is at least 10% below a mature time-of-day baseline.
+- **Downtime duration** is shown only when the primary live provider explicitly reports an attraction as `DOWN`; generic closed/refurbishment/fallback states are never guessed as downtime.
+- **Crowd trend** adds `↗ building`, `→ steady`, or `↘ easing` by comparing normalized park pressure with roughly 30 minutes earlier.
+- **Closing countdown** replaces the normal park-hours prefix during the final four hours of the regular operating day (for example, `Closes in 2h 18m · 9:00 AM–10:00 PM`).
+- **Accent customization** offers six vetted Liquid Glass palettes (Blue, Cyan, Violet, Pink, Orange, and Green) while keeping contrast/layout controlled.
 - Installable/offline-capable PWA shell with light/dark/system appearance.
 - Mobile touch polish: intentional pinch zoom remains enabled, accidental double-tap zoom is suppressed, iOS form focus avoids auto-zoom, modal scrolling respects safe areas, and search no longer re-mounts while typing.
 
@@ -108,9 +113,9 @@ ThemeParks.wiki live + authenticated history
 
 The Worker polls live data on the existing five-minute schedule. D1 writes are grouped through JSON-expanded batch operations to keep database round-trips small.
 
-## Deploying v1.4.0
+## Deploying v1.5.0
 
-The frontend publishes through GitHub Pages. v1.4.0 does not add a new D1 migration; deploy the latest Worker after pulling the frontend release:
+The frontend publishes through GitHub Pages. v1.5.0 does not add a new D1 migration; deploy the latest Worker after pulling the frontend release:
 
 ```bash
 cd /workspaces/park-pulse-web
@@ -158,3 +163,19 @@ The 1–10 labels are:
 ## Android
 
 ParkPulse remains one PWA codebase for iOS, Android, and desktop. On Android, Chromium-based browsers can install it as an app-like PWA/WebAPK when installation criteria are met. The Settings install row automatically uses Android-specific guidance, while iPhone keeps its Add to Home Screen guidance.
+
+
+## Field-test reliability pass
+
+v1.5.0 intentionally focuses on intelligence inside the existing UI instead of adding navigation.
+
+- crowd/value baselines require at least 5 represented days and 60 observed operating minutes for the current 15-minute slot
+- crowd trend uses stored five-minute samples and the historical baseline for the earlier comparison slot
+- normal crowd scoring remains paused during active same-day ticketed events
+- downtime is only labeled when ThemeParks.wiki explicitly reports `DOWN`
+- stale/fallback semantics remain unchanged: a fresh fallback is live; only the no-fresh-provider case is stale
+- closing countdown uses park-local schedule timestamps and only appears after regular opening
+- accent choices persist in the existing local ParkPulse settings record
+- selector bindings were audited for single-element/collection mistakes
+- view navigation now uses standards-safe `scrollTo(... behavior: "auto")`
+- minute-level display refresh updates closing countdown and downtime labels without rebuilding the search field

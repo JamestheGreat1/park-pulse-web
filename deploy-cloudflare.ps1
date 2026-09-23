@@ -30,19 +30,6 @@ function Require-Command([string]$Name) {
     }
 }
 
-function New-UrlSafeToken([int]$ByteCount = 32) {
-    $Bytes = New-Object byte[] $ByteCount
-    $Generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-    try {
-        $Generator.GetBytes($Bytes)
-    }
-    finally {
-        $Generator.Dispose()
-    }
-
-    return [Convert]::ToBase64String($Bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
-}
-
 function Read-ParkPulseDatabase {
     $Json = (& npx wrangler d1 list --json 2>$null | Out-String)
     Assert-LastCommand "Reading Cloudflare D1 databases"

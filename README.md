@@ -4,7 +4,7 @@ ParkPulse is basically the Walt Disney World app I wanted while actually in the 
 
 No giant itinerary planner. No constantly refreshing wait times. Just the useful stuff.
 
-**Current version: 1.5.1**
+**Current version: 1.5.2**
 
 [Open ParkPulse](https://jamesthegreat1.github.io/park-pulse-web/)
 
@@ -21,6 +21,7 @@ No giant itinerary planner. No constantly refreshing wait times. Just the useful
 - **Downtime duration** when a ride is explicitly reported as temporarily down.
 - **Ride watches** for reopenings and/or a wait-time target.
 - **Background push notifications** even when ParkPulse is closed.
+- **Pull-to-refresh on mobile** — drag down from the very top and release to refresh live park data without reloading the app.
 - **Temporary watches** for Today, 3 hours, or Until Disabled.
 - **Freshness protection** so old data is not quietly passed off as live.
 - **iPhone and Android installation** as a PWA.
@@ -53,6 +54,12 @@ Web Push on iPhone works from the installed Home Screen app.
 4. Go to **Settings → Push notifications → Enable**.
 
 If your browser supports the native PWA install prompt, ParkPulse will use it automatically.
+
+### Pull to refresh
+
+On iPhone and Android, when you're already at the top of the page, pull down until ParkPulse says **Release to refresh**, then let go.
+
+It refreshes the same live data as the refresh button — rides, park hours, crowd info, downtime, and ticketed-event schedule data — without reloading the whole PWA or touching your watches.
 
 ### 2. Pick a park
 

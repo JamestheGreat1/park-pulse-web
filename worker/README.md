@@ -14,6 +14,14 @@ npx wrangler d1 execute parkpulse --remote --file=./schema.sql
 npm run deploy
 ```
 
-The existing `parkpulse` D1 database and VAPID secrets can be reused. `wrangler.toml` keeps the current database ID and public VAPID key. The private VAPID key remains a Worker secret.
+The existing `parkpulse` D1 database and VAPID secrets can be reused. `wrangler.toml` keeps the current database ID and public VAPID key. The private VAPID key remains a Worker secret. ParkPulse also requires a `THEMEPARKS_API_KEY` Worker secret for 30-day historical backfill; Wrangler now refuses production deploys if that secret is missing.
+
+Set it once with:
+
+```bash
+npx wrangler secret put THEMEPARKS_API_KEY
+```
+
+The regular five-minute D1 ride-history sampler continues independently of the backfill key.
 
 Queue-Times updates its public real-time data about every five minutes, which matches the Worker cron cadence.

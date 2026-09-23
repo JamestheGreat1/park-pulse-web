@@ -1,4 +1,4 @@
-import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.4.0";
+import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.5.0";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");
@@ -31,7 +31,10 @@ function normalizedWorkerRide(parkId, ride) {
     land: String(ride.land || "Other"),
     kind: "ride",
     isOpen: Boolean(ride.isOpen),
+    operationalStatus: String(ride.operationalStatus || (ride.isOpen ? "OPERATING" : "UNKNOWN")),
     waitTime: ride.waitTime == null ? null : Number.isFinite(Number(ride.waitTime)) ? Math.max(0, Number(ride.waitTime)) : null,
+    downSince: ride.downSince || null,
+    downMinutes: ride.downMinutes == null ? null : Math.max(0, Number(ride.downMinutes)),
     lastUpdated: ride.lastUpdated || null,
     source: String(ride.source || "unknown"),
     sourceId: ride.sourceId ? String(ride.sourceId) : null,
@@ -57,7 +60,10 @@ function legacyQueueTimesRide(parkId, ride, land) {
     land: String(land || "Other"),
     kind: "ride",
     isOpen: Boolean(ride.is_open),
+    operationalStatus: Boolean(ride.is_open) ? "OPERATING" : "CLOSED",
     waitTime: Math.max(0, Number(ride.wait_time || 0)),
+    downSince: null,
+    downMinutes: null,
     lastUpdated: ride.last_updated || null,
     source: "queue-times",
     sourceId: String(ride.id),

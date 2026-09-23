@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.5-history-fix";
-import { store } from "./store.js?v=1.5.5-history-fix";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.5-history-fix";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.5-history-fix";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.6-value-badges";
+import { store } from "./store.js?v=1.5.6-value-badges";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.6-value-badges";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.6-value-badges";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.5.5";
+const APP_VERSION = "1.5.6";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -336,14 +336,38 @@ function rideComparison(ride) {
 
   return {
     ratio,
-    percentBetter: Math.min(99, Math.round((1 - ratio) * 100))
+    percentDelta: Math.max(-99, Math.min(199, Math.round((ratio - 1) * 100)))
   };
 }
 
-function betterThanTypicalBadge(ride) {
+function typicalComparisonBadge(ride) {
   const comparison = rideComparison(ride);
-  if (!comparison || comparison.percentBetter < 10) return "";
-  return `↓ ${comparison.percentBetter}% vs typical`;
+  if (!comparison) return null;
+
+  const delta = comparison.percentDelta;
+
+  if (delta <= -10) {
+    return {
+      text: `↓ ${Math.abs(delta)}% vs typical`,
+      tone: "good"
+    };
+  }
+
+  if (delta >= 30) {
+    return {
+      text: `↑ ${delta}% vs typical`,
+      tone: "very-high"
+    };
+  }
+
+  if (delta >= 15) {
+    return {
+      text: `↑ ${delta}% vs typical`,
+      tone: "high"
+    };
+  }
+
+  return null;
 }
 function rideStatus(ride) {
   if (!ride) return { stale:true, wait:"—", label:"No live data", updated:"Unavailable" };
@@ -403,10 +427,10 @@ function sortedRides(rides, state) {
 function rideCard(ride) {
   const rule = store.ruleForRide(ride.id);
   const status = rideStatus(ride);
-  const valueBadge = betterThanTypicalBadge(ride);
+  const valueBadge = typicalComparisonBadge(ride);
   return `<article class="ride-card liquid-glass ${rule ? "watching" : ""} ${status.stale ? "stale" : ""}" data-ride-id="${ride.id}">
     <button class="ride-main" type="button" data-open-ride="${ride.id}">
-      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${valueBadge ? `<span class="value-badge">${escapeHtml(valueBadge)}</span>` : ""}</div></div>
+      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${valueBadge ? `<span class="value-badge ${valueBadge.tone}">${escapeHtml(valueBadge.text)}</span>` : ""}</div></div>
       <div class="ride-status"><span class="wait ${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><span class="status-label">${escapeHtml(status.label)}</span></div>
     </button>
     <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button>

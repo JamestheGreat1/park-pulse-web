@@ -1,18 +1,27 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.4.0";
-import { store } from "./store.js?v=1.4.0";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.4.0";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.4.0";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.0";
+import { store } from "./store.js?v=1.5.0";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.0";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.0";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
 let analyticsState = null;
+
+const ACCENTS = [
+  { id:"blue", label:"Blue" },
+  { id:"cyan", label:"Cyan" },
+  { id:"violet", label:"Violet" },
+  { id:"pink", label:"Pink" },
+  { id:"orange", label:"Orange" },
+  { id:"green", label:"Green" }
+];
 
 function platformInfo() {
   const ua = navigator.userAgent || "";
@@ -58,14 +67,29 @@ function parkTimeFormatter(timeZone) {
     minute: "2-digit"
   });
 }
-function formatParkHours(hours) {
+function compactDuration(minutes) {
+  const mins = Math.max(0, Math.floor(Number(minutes) || 0));
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  const remainder = mins % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+function formatParkHours(hours, now = Date.now()) {
   if (!hours?.timezone || !hours?.date) return "";
-  if (hours.date !== dateKeyInZone(new Date(), hours.timezone)) return "";
+  if (hours.date !== dateKeyInZone(new Date(now), hours.timezone)) return "";
   if (hours.closedToday) return "Closed today";
   if (!hours.openingTime || !hours.closingTime) return "";
 
   const formatter = parkTimeFormatter(hours.timezone);
-  return `Today · ${formatter.format(new Date(hours.openingTime))}–${formatter.format(new Date(hours.closingTime))}`;
+  const range = `${formatter.format(new Date(hours.openingTime))}–${formatter.format(new Date(hours.closingTime))}`;
+  const closeMs = new Date(hours.closingTime).getTime();
+  const remainingMinutes = Math.floor((closeMs - now) / 60000);
+
+  if (Number.isFinite(remainingMinutes) && remainingMinutes > 0 && remainingMinutes <= 240) {
+    return `Closes in ${compactDuration(remainingMinutes)} · ${range}`;
+  }
+
+  return `Today · ${range}`;
 }
 function formatTicketedEvents(hours) {
   if (!hours?.timezone || !hours?.date) return [];
@@ -90,12 +114,21 @@ function crowdPresentation(crowd) {
         ? `Waits are ${Math.abs(delta)}% below typical`
         : `Waits are ${delta}% above typical`;
 
+    const trend = crowd.trend?.direction === "up"
+      ? { symbol:"↗", label:"building", direction:"up" }
+      : crowd.trend?.direction === "down"
+        ? { symbol:"↘", label:"easing", direction:"down" }
+        : crowd.trend?.direction === "steady"
+          ? { symbol:"→", label:"steady", direction:"steady" }
+          : null;
+
     return {
       kind: "level",
       level: Number(crowd.level || 0),
       label: String(crowd.label || ""),
       text: pressureText,
-      samples: Number(crowd.samples || 0)
+      samples: Number(crowd.samples || 0),
+      trend
     };
   }
 
@@ -115,7 +148,7 @@ function crowdPresentation(crowd) {
 function crowdMarkup(crowd) {
   const view = crowdPresentation(crowd);
   if (view.kind === "level") {
-    return `<div class="park-crowd crowd-level-${view.level}"><span class="crowd-score"><b>${view.level}/10</b> ${escapeHtml(view.label)}</span><span class="crowd-detail">${escapeHtml(view.text)} · ${view.samples} rides</span></div>`;
+    return `<div class="park-crowd crowd-level-${view.level}"><span class="crowd-score"><b>${view.level}/10</b> ${escapeHtml(view.label)}</span>${view.trend ? `<span class="crowd-trend trend-${view.trend.direction}">${view.trend.symbol} ${escapeHtml(view.trend.label)}</span>` : ""}<span class="crowd-detail">${escapeHtml(view.text)} · ${view.samples} rides</span></div>`;
   }
   if (view.kind === "note") {
     return `<div class="park-crowd crowd-note"><span class="crowd-detail">${escapeHtml(view.text)}</span></div>`;
@@ -148,12 +181,27 @@ function remaining(rule) {
   if (mins < 24 * 60) return `${Math.round(mins / 60)} hr left`;
   return "Today";
 }
+function betterThanTypicalBadge(ride) {
+  if (!ride || isRideStale(ride) || !ride.isOpen || !Number.isFinite(Number(ride.valueRatio))) return "";
+  const percent = Math.round((1 - Number(ride.valueRatio)) * 100);
+  if (percent < 10) return "";
+  return `↓ ${percent}% vs typical`;
+}
 function rideStatus(ride) {
   if (!ride) return { stale:true, wait:"—", label:"No live data", updated:"Unavailable" };
   const stale = isRideStale(ride);
   if (ride.sourceMissing) return { stale:true, wait:"No data", label:"Standby feed unavailable", updated:"Waiting for live standby data" };
   const wait = minutesLabel(ride.waitTime, ride.isOpen);
   if (stale) return { stale:true, wait, label:`Stale · last seen ${relativeTime(ride.lastUpdated)}`, updated:`Last seen ${relativeTime(ride.lastUpdated)}` };
+  if (ride.operationalStatus === "DOWN") {
+    const downtime = Number.isFinite(Number(ride.downMinutes)) ? compactDuration(Number(ride.downMinutes)) : null;
+    return {
+      stale:false,
+      wait:"Down",
+      label:downtime ? `Down ${downtime}` : "Temporarily down",
+      updated:`Updated ${relativeTime(ride.lastUpdated)}`
+    };
+  }
   return { stale:false, wait, label:ride.isOpen ? "Operating" : "Unavailable", updated:`Updated ${relativeTime(ride.lastUpdated)}` };
 }
 function toast(message) {
@@ -162,12 +210,16 @@ function toast(message) {
   requestAnimationFrame(() => el.classList.add("show"));
   setTimeout(() => { el.classList.remove("show"); setTimeout(() => el.remove(), 250); }, 2600);
 }
-function setTheme() { document.documentElement.dataset.theme = store.snapshot.theme; }
+function setTheme() {
+  const state = store.snapshot;
+  document.documentElement.dataset.theme = state.theme;
+  document.documentElement.dataset.accent = state.accent || "blue";
+}
 function selectView(name) {
   store.update((s) => { s.activeView = name; }, "view");
   for (const [key, el] of Object.entries(views)) el.classList.toggle("active", key === name);
   $$(".nav-item").forEach((button) => { const active = button.dataset.viewTarget === name; button.classList.toggle("active", active); button.setAttribute("aria-selected", String(active)); });
-  window.scrollTo({ top: 0, behavior: "instant" }); render();
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" }); render();
 }
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
@@ -195,7 +247,7 @@ function rideCard(ride) {
   const status = rideStatus(ride);
   return `<article class="ride-card liquid-glass ${rule ? "watching" : ""} ${status.stale ? "stale" : ""}" data-ride-id="${ride.id}">
     <button class="ride-main" type="button" data-open-ride="${ride.id}">
-      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><span class="updated">${escapeHtml(status.updated)}</span></div>
+      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${betterThanTypicalBadge(ride) ? `<span class="value-badge">${escapeHtml(betterThanTypicalBadge(ride))}</span>` : ""}</div></div>
       <div class="ride-status"><span class="wait ${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><span class="status-label">${escapeHtml(status.label)}</span></div>
     </button>
     <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button>
@@ -265,8 +317,13 @@ function renderSettings() {
       <div class="setting-row"><div><strong>Push notifications</strong><small>${pushOn ? "Connected to this device" : permission === "denied" ? "Blocked in browser settings" : "Not enabled"}</small></div><button type="button" data-toggle-push class="setting-action">${pushOn ? "Disable" : "Enable"}</button></div>
       ${pushOn ? `<div class="setting-row"><div><strong>Test notification</strong><small>Send a real Web Push to this device.</small></div><button type="button" data-test-push class="setting-action">Send test</button></div>` : ""}
       <div class="setting-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>
-      <label class="setting-row"><div><strong>Appearance</strong><small>Liquid Glass adapts to light or dark mode.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
     </section>
+    <div class="settings-section-title">Customization</div>
+    <section class="settings-group liquid-glass">
+      <label class="setting-row"><div><strong>Appearance</strong><small>Liquid Glass adapts to light or dark mode.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
+      <div class="setting-row accent-setting"><div><strong>Accent color</strong><small>Changes ParkPulse highlights and glow.</small></div><div class="accent-picker" role="group" aria-label="Accent color">${ACCENTS.map((accent) => `<button type="button" class="accent-swatch accent-${accent.id} ${state.accent === accent.id ? "active" : ""}" data-accent="${accent.id}" aria-label="${accent.label}" aria-pressed="${state.accent === accent.id}"><span></span></button>`).join("")}</div></div>
+    </section>
+    <div class="settings-section-title">Diagnostics</div>
     <section class="settings-group liquid-glass">
       <div class="setting-row"><div><strong>Worker</strong><small>Backend and notification monitor</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
       <div class="setting-row"><div><strong>Ride data</strong><small>Last successful app refresh</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
@@ -341,6 +398,9 @@ function bindDynamic() {
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
   $$('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
+  $("[data-accent]").forEach((button) => {
+    button.onclick = () => store.update((s) => { s.accent = button.dataset.accent; }, "accent");
+  });
 }
 function openRide(id) {
   const ride = rideData.rideById(id);
@@ -450,7 +510,8 @@ async function copyDiagnostics() {
     `Ride sources: ${rideData.sourceSummary || "none"}`,
     `ThemeParks API key: ${backendState?.themeParksApiKeyConfigured ? "configured" : "anonymous"}`,
     `VAPID push server: ${backendState?.vapidConfigured ? "configured" : "missing"}`,
-    `Trend baselines: ${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides}` : "unknown"}`
+    `Trend baselines: ${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides}` : "unknown"}`,
+    `Accent: ${store.snapshot.accent || "blue"}`
   ];
   try { await navigator.clipboard.writeText(lines.join("\n")); toast("Diagnostics copied"); }
   catch { toast(lines.join(" · ")); }
@@ -517,7 +578,9 @@ async function init() {
   setInterval(async () => {
     await rideData.refresh();
     analyticsState = await fetchAnalyticsStatus().catch(() => analyticsState);
-    renderRideDataUpdate();
+    renderSettings();
+    bindDynamic();
   }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
+  setInterval(() => renderParkHours(), 60 * 1000);
 }
 init();

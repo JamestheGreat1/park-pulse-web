@@ -1,4 +1,4 @@
-import { workerBase } from "./api.js?v=1.3.5";
+import { workerBase } from "./api.js?v=1.3.6";
 
 function base64ToBytes(value) {
   const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, "=").replace(/-/g, "+").replace(/_/g, "/");
@@ -47,14 +47,27 @@ export async function backendHealth(){
 export async function sendTestPush(){
   const sub=await currentSubscription();
   if(!sub) throw new Error("Enable notifications first.");
+
   const response=await fetch(`${workerBase}/subscriptions/test`,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({subscription:sub.toJSON()})
   });
+
+  const result=await response.json().catch(()=>({}));
+
   if(!response.ok){
-    if(response.status===410) throw new Error("This notification subscription expired. Disable and re-enable notifications.");
-    throw new Error("Couldn't send a test notification.");
+    if(response.status===410||result.code==="SUBSCRIPTION_EXPIRED"){
+      throw new Error("This notification subscription expired. Disable and re-enable notifications.");
+    }
+    if(result.code==="PUSH_CONFIG_MISSING"){
+      throw new Error("ParkPulse push keys are missing on the Worker.");
+    }
+    if(result.code==="PUSH_PROVIDER_REJECTED"){
+      throw new Error(`Push service rejected the request${result.pushStatus?` (${result.pushStatus})`:""}.`);
+    }
+    throw new Error(`Push test failed${response.status?` (${response.status})`:""}.`);
   }
-  return response.json();
+
+  return result;
 }

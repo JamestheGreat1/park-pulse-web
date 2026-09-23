@@ -737,7 +737,8 @@ function calculateCrowdLevel(rides, totalCatalogRides, parkHours, now = Date.now
       ride.typicalWait != null &&
       Number.isFinite(Number(ride.typicalWait)) &&
       Number(ride.typicalWait) > 0 &&
-      Number(ride.baselineDays || 0) >= 5
+      Number(ride.baselineDays || 0) >= 5 &&
+      Number(ride.baselineMinutes || 0) >= 60
     )
     .map((ride) => {
       const ratio = Number.isFinite(Number(ride.valueRatio))

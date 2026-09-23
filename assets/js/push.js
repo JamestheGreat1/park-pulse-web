@@ -1,4 +1,4 @@
-import { workerBase } from "./api.js?v=1.5.3-install-push";
+import { workerBase } from "./api.js?v=1.5.4-copy-polish";
 
 function base64ToBytes(value) {
   const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, "=").replace(/-/g, "+").replace(/_/g, "/");
@@ -49,7 +49,7 @@ export async function enablePush(){
   if(!pushSupported())throw new Error("Push notifications aren't supported on this device.");
   if(Notification.permission==="denied")throw new Error("Notifications are blocked in browser or system settings.");
   const permission=Notification.permission==="granted"?"granted":await Notification.requestPermission();
-  if(permission!=="granted")throw new Error("Notification permission wasn't granted. Try again from the installed ParkPulse app.");
+  if(permission!=="granted")throw new Error("Notifications weren’t allowed. If you’re on iPhone or iPad, open the installed ParkPulse app and try again.");
 
   const reg=await registration();
   const currentKey=await vapidPublicKey();

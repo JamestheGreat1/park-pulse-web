@@ -1,14 +1,14 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.5";
-import { store } from "./store.js?v=1.3.5";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.5";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.5";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.6";
+import { store } from "./store.js?v=1.3.6";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.6";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.6";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.3.5";
+const APP_VERSION = "1.3.6";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -172,6 +172,7 @@ function renderSettings() {
       <div class="setting-row"><div><strong>Ride data</strong><small>Last successful app refresh</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
       <div class="setting-row"><div><strong>Data source</strong><small>ThemeParks.wiki primary · Queue-Times fallback</small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
       <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Stored only as a Cloudflare Worker secret.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
+      <div class="setting-row"><div><strong>Push server</strong><small>VAPID keys used for background notifications</small></div><span class="health-pill ${backendState?.vapidConfigured ? "good" : "bad"}">${backendState?.vapidConfigured ? "Ready" : "Needs setup"}</span></div>
       <div class="setting-row"><div><strong>Trend baselines</strong><small>30-day time-of-day history backfill</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : "Building…"}</span></div>
       <div class="setting-row"><div><strong>App version</strong><small>Installed ParkPulse frontend</small></div><span class="setting-value">v${APP_VERSION}</span></div>
       <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status only — no push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
@@ -329,6 +330,7 @@ async function copyDiagnostics() {
     `Active watches: ${store.snapshot.rules.length}`,
     `Ride sources: ${rideData.sourceSummary || "none"}`,
     `ThemeParks API key: ${backendState?.themeParksApiKeyConfigured ? "configured" : "anonymous"}`,
+    `VAPID push server: ${backendState?.vapidConfigured ? "configured" : "missing"}`,
     `Trend baselines: ${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides}` : "unknown"}`
   ];
   try { await navigator.clipboard.writeText(lines.join("\n")); toast("Diagnostics copied"); }

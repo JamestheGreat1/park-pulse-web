@@ -177,7 +177,13 @@ if (a.historyCollecting) {
 }
 
 console.log(`Trend baselines: ${ready}/${total} rides ready`);
-if (errors > 0) console.warn(`Baseline backfill errors: ${errors}`);
+if (errors > 0) {
+  console.warn(`Baseline backfill errors: ${errors}`);
+  for (const group of a.baselineErrors || []) {
+    const rides = Array.isArray(group.rides) && group.rides.length ? ` [${group.rides.join(", ")}]` : "";
+    console.warn(`  ${group.count}× ${group.message}${rides}`);
+  }
+}
 
 if (a.themeParksApiKeyConfigured === false) {
   throw new Error("Historical backfill is disabled because THEMEPARKS_API_KEY is missing.");

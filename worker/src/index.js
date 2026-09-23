@@ -1,11 +1,13 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.3.9";
+const VERSION = "1.4.0";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
 const BASELINE_RETRY_MS = 30 * 60 * 1000;
 const BASELINE_BATCH_SIZE = 4;
+const CROWD_MIN_SMALL_PARK = 4;
+const CROWD_MIN_LARGE_PARK = 6;
 
 const PARKS = new Map([
   [5, {
@@ -130,6 +132,7 @@ export default {
         ]);
         const displayRides = await addDisplayFallbacks(env, parkId, park, snapshot);
         const rides = await attachCurrentBaselines(env, displayRides);
+        const crowdLevel = calculateCrowdLevel(rides, park.rides.length, parkHours);
 
         return json({
           parkPulseFormat: 2,
@@ -140,6 +143,7 @@ export default {
           primaryAvailable: snapshot.primaryAvailable,
           fallbackUsed: snapshot.fallbackUsed,
           parkHours,
+          crowdLevel,
           generatedAt: new Date().toISOString(),
           rides
         }, 200, { ...cors, "Cache-Control": "public, max-age=120" });
@@ -653,6 +657,100 @@ async function attachCurrentBaselines(env, rides) {
   } catch {
     return rides;
   }
+}
+
+function activeTicketedEvent(parkHours, now = Date.now()) {
+  if (!parkHours?.ticketedEvents?.length) return null;
+
+  for (const event of parkHours.ticketedEvents) {
+    const start = new Date(event?.openingTime || 0).getTime();
+    const end = new Date(event?.closingTime || 0).getTime();
+    if (Number.isFinite(start) && Number.isFinite(end) && now >= start && now < end) {
+      return event;
+    }
+  }
+
+  return null;
+}
+
+function crowdLevelFromPressure(pressure) {
+  if (pressure <= 0.55) return 1;
+  if (pressure <= 0.65) return 2;
+  if (pressure <= 0.75) return 3;
+  if (pressure <= 0.85) return 4;
+  if (pressure <= 0.95) return 5;
+  if (pressure <= 1.05) return 6;
+  if (pressure <= 1.15) return 7;
+  if (pressure <= 1.30) return 8;
+  if (pressure <= 1.50) return 9;
+  return 10;
+}
+
+function crowdLabel(level) {
+  if (level <= 2) return "Very Light";
+  if (level <= 4) return "Light";
+  if (level <= 6) return "Moderate";
+  if (level <= 8) return "Busy";
+  if (level === 9) return "Very Busy";
+  return "Extremely Busy";
+}
+
+function calculateCrowdLevel(rides, totalCatalogRides, parkHours, now = Date.now()) {
+  const requiredSamples = totalCatalogRides >= 10
+    ? CROWD_MIN_LARGE_PARK
+    : CROWD_MIN_SMALL_PARK;
+
+  if (activeTicketedEvent(parkHours, now)) {
+    return {
+      available: false,
+      reason: "ticketed-event",
+      samples: 0,
+      requiredSamples
+    };
+  }
+
+  const ratios = (rides || [])
+    .filter((ride) =>
+      isFreshSourceRide(ride, now) &&
+      ride.isOpen &&
+      ride.waitTime != null &&
+      Number.isFinite(Number(ride.waitTime)) &&
+      ride.typicalWait != null &&
+      Number.isFinite(Number(ride.typicalWait)) &&
+      Number(ride.typicalWait) > 0 &&
+      Number(ride.baselineDays || 0) >= 5
+    )
+    .map((ride) => {
+      const ratio = Number.isFinite(Number(ride.valueRatio))
+        ? Number(ride.valueRatio)
+        : Number(ride.waitTime) / Number(ride.typicalWait);
+      return Math.max(0.35, Math.min(2, ratio));
+    })
+    .filter(Number.isFinite);
+
+  if (ratios.length < requiredSamples) {
+    return {
+      available: false,
+      reason: "building",
+      samples: ratios.length,
+      requiredSamples
+    };
+  }
+
+  const pressure = median(ratios);
+  const level = crowdLevelFromPressure(pressure);
+  const deltaPercent = Math.round((pressure - 1) * 100);
+
+  return {
+    available: true,
+    level,
+    label: crowdLabel(level),
+    pressure: Math.round(pressure * 100) / 100,
+    deltaPercent,
+    samples: ratios.length,
+    requiredSamples,
+    method: "median-normalized-wait-pressure"
+  };
 }
 
 async function readStaleRide(env, rideKey) {

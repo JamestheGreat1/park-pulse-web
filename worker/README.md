@@ -25,3 +25,24 @@ npx wrangler secret put THEMEPARKS_API_KEY
 The regular five-minute D1 ride-history sampler continues independently of the backfill key.
 
 Queue-Times updates its public real-time data about every five minutes, which matches the Worker cron cadence.
+
+## Manual refresh
+
+ParkPulse exposes a protected manual refresh endpoint at `POST /api/admin/refresh`. It fetches current ride data, writes the current D1 snapshot, and advances one baseline/backfill batch without evaluating or sending ride notifications.
+
+Create the required Worker secret before deploying:
+
+```bash
+npx wrangler secret put REFRESH_ADMIN_TOKEN
+```
+
+Send the secret as a bearer token:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $PARKPULSE_REFRESH_TOKEN" \
+  https://parkpulse-api.jamesp5297.workers.dev/api/admin/refresh | jq
+```
+
+The response includes the number of rides updated, primary/fallback source usage, baseline batch results, and the current analytics status.
+

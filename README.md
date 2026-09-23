@@ -1,4 +1,4 @@
-# ParkPulse v1.3.5 — Ride Watcher
+# ParkPulse v1.3.6 — Ride Watcher
 
 ParkPulse is an installable PWA that watches Walt Disney World ride statuses and posted standby waits so you do not have to keep refreshing a park app all day.
 
@@ -13,6 +13,8 @@ ParkPulse is an installable PWA that watches Walt Disney World ride statuses and
 - Per-ride alerts for **reopening** and **wait at/below a chosen target**.
 - Watch durations: park day, three hours, or until disabled.
 - Web Push through Cloudflare Worker + D1, including while the PWA is closed.
+- Standards-based `aes128gcm` Web Push encryption for Safari/iOS and other modern browsers.
+- Safe push-test diagnostics report configuration/provider status without exposing VAPID secrets or subscription keys.
 - Anonymous device subscriptions; no account system required.
 - 30-minute alert cooldowns, stale-data labels, last-known-state fallback, notification testing, and diagnostics.
 - A rolling ParkPulse live-sample history for today's observed low/high.
@@ -99,7 +101,7 @@ ThemeParks.wiki live + authenticated history
 
 The Worker polls live data on the existing five-minute schedule. D1 writes are grouped through JSON-expanded batch operations to keep database round-trips small.
 
-## Deploying v1.3.5
+## Deploying v1.3.6
 
 The frontend publishes through GitHub Pages. The Worker needs the new baseline tables before the new cron code is deployed:
 

@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.6-value-badges";
-import { store } from "./store.js?v=1.5.6-value-badges";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.6-value-badges";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.6-value-badges";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.0-product-polish";
+import { store } from "./store.js?v=1.6.0-product-polish";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.0-product-polish";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.0-product-polish";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,11 +10,16 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.5.7";
+const APP_VERSION = "1.6.0";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
 let analyticsState = null;
+let serviceWorkerRegistration = null;
+let pendingServiceWorker = null;
+let sheetReturnFocus = null;
+
+const FIRST_RUN_KEY = "parkpulse.quickStart.v1";
 
 const ACCENTS = [
   { id:"blue", label:"Blue" },
@@ -149,6 +154,16 @@ function setupPullToRefresh() {
 
   window.addEventListener("touchend", finishPull, { passive: true });
   window.addEventListener("touchcancel", () => resetPullRefresh(), { passive: true });
+}
+
+function firstRunVisible() {
+  try { return localStorage.getItem(FIRST_RUN_KEY) !== "seen"; }
+  catch { return false; }
+}
+function dismissFirstRun() {
+  try { localStorage.setItem(FIRST_RUN_KEY, "seen"); } catch {}
+  renderExplore();
+  bindDynamic();
 }
 
 function platformInfo() {
@@ -392,6 +407,74 @@ function toast(message) {
   requestAnimationFrame(() => el.classList.add("show"));
   setTimeout(() => { el.classList.remove("show"); setTimeout(() => el.remove(), 250); }, 2600);
 }
+function renderStatusBanner() {
+  const banner = $("#networkBanner");
+  if (!banner) return;
+
+  let tone = "";
+  let message = "";
+  let action = "";
+  let actionLabel = "";
+
+  if (pendingServiceWorker) {
+    tone = "update";
+    message = "A ParkPulse update is ready.";
+    action = "update-app";
+    actionLabel = "Update";
+  } else if (!navigator.onLine) {
+    tone = "offline";
+    message = "You’re offline — showing the last data ParkPulse has.";
+  } else if (rideData.error) {
+    tone = "error";
+    message = "Live data couldn’t refresh. The last good data is still here.";
+    action = "retry-data";
+    actionLabel = "Try again";
+  }
+
+  if (!message) {
+    banner.className = "network-banner shell-width hidden";
+    banner.innerHTML = "";
+    return;
+  }
+
+  banner.className = `network-banner shell-width ${tone}`;
+  banner.innerHTML = `<span>${escapeHtml(message)}</span>${action ? `<button type="button" data-banner-action="${action}">${escapeHtml(actionLabel)}</button>` : ""}`;
+
+  const button = $("[data-banner-action]", banner);
+  if (!button) return;
+  if (action === "update-app") button.onclick = applyPendingUpdate;
+  if (action === "retry-data") button.onclick = async () => {
+    button.disabled = true;
+    button.textContent = "Trying…";
+    await rideData.refresh();
+    renderStatusBanner();
+  };
+}
+function applyPendingUpdate() {
+  if (!pendingServiceWorker) return;
+  pendingServiceWorker.postMessage({ type: "SKIP_WAITING" });
+}
+function watchForServiceWorkerUpdate(registration) {
+  serviceWorkerRegistration = registration;
+
+  const markReady = (worker) => {
+    if (!worker || !navigator.serviceWorker.controller) return;
+    pendingServiceWorker = worker;
+    renderStatusBanner();
+  };
+
+  if (registration.waiting) markReady(registration.waiting);
+
+  registration.addEventListener("updatefound", () => {
+    const worker = registration.installing;
+    if (!worker) return;
+    worker.addEventListener("statechange", () => {
+      if (worker.state === "installed") markReady(worker);
+    });
+  });
+
+  setInterval(() => registration.update().catch(() => {}), 30 * 60 * 1000);
+}
 function setTheme() {
   const state = store.snapshot;
   document.documentElement.dataset.theme = state.theme;
@@ -400,7 +483,12 @@ function setTheme() {
 function selectView(name) {
   store.update((s) => { s.activeView = name; }, "view");
   for (const [key, el] of Object.entries(views)) el.classList.toggle("active", key === name);
-  $$(".nav-item").forEach((button) => { const active = button.dataset.viewTarget === name; button.classList.toggle("active", active); button.setAttribute("aria-selected", String(active)); });
+  $(".nav-item").forEach((button) => {
+    const active = button.dataset.viewTarget === name;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
   window.scrollTo({ top: 0, left: 0, behavior: "auto" }); render();
 }
 function sortedRides(rides, state) {
@@ -463,13 +551,14 @@ function renderExplore() {
   views.explore.innerHTML = `
     <section class="hero-card liquid-glass">
       <div><span class="eyebrow">Walt Disney World</span><h2>Stop refreshing wait times.</h2><p>Pick a wait you’d actually take. ParkPulse will keep an eye on it and buzz you when it gets there.</p></div>
-      <button class="hero-watch" type="button" data-view-jump="watching"><strong>${activeCount}</strong><span>${activeCount === 1 ? "active watch" : "active watches"}</span></button>
+      <button class="hero-watch" type="button" data-view-jump="watching" aria-label="View ${activeCount} active ${activeCount === 1 ? "watch" : "watches"}"><strong>${activeCount}</strong><span>${activeCount === 1 ? "active watch" : "active watches"}</span></button>
     </section>
-    <div class="park-strip" role="tablist" aria-label="Park">
-      ${PARKS.map((p) => `<button type="button" class="park-chip ${p.id === state.selectedParkId ? "active" : ""}" data-park="${p.id}"><span>${p.emoji}</span>${p.short}</button>`).join("")}
+    ${firstRunVisible() ? `<section class="first-run-card liquid-glass" aria-label="ParkPulse quick start"><div class="first-run-mark" aria-hidden="true">✦</div><div class="first-run-copy"><span class="eyebrow">Quick start</span><h3>Best Now does the useful part for you.</h3><p>It compares each ride with what’s normal right now. Tap a ride to watch it, then let ParkPulse keep checking. That’s basically it.</p></div><button type="button" class="first-run-dismiss" data-dismiss-first-run>Got it</button></section>` : ""}
+    <div class="park-strip" aria-label="Choose a park">
+      ${PARKS.map((p) => `<button type="button" class="park-chip ${p.id === state.selectedParkId ? "active" : ""}" data-park="${p.id}" aria-pressed="${p.id === state.selectedParkId}"><span aria-hidden="true">${p.emoji}</span>${p.short}</button>`).join("")}
     </div>
     <section class="toolbar liquid-glass">
-      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="Search rides in ${escapeHtml(parkName(state.selectedParkId))}" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
@@ -592,7 +681,8 @@ function render() {
 function bindDynamic() {
   $$('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
   bindRideCards();
-  $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
+  $('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
+  $('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
   const search = $("#rideSearch"); if (search) search.oninput = () => store.update((s) => { s.query = search.value; }, "search");
   const sort = $("#sortSelect"); if (sort) sort.onchange = () => store.update((s) => { s.sort = sort.value; }, "sort");
@@ -607,12 +697,84 @@ function bindDynamic() {
     button.onclick = () => store.update((s) => { s.accent = button.dataset.accentChoice; }, "accent");
   });
 }
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const area = document.createElement("textarea");
+  area.value = value;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.append(area);
+  area.select();
+  document.execCommand("copy");
+  area.remove();
+}
+async function shareRide(id) {
+  const ride = rideData.rideById(id) || store.ruleForRide(id);
+  if (!ride) return;
+
+  const name = ride.name || ride.rideName || "this ride";
+  const url = new URL(location.origin + location.pathname);
+  url.searchParams.set("ride", String(id));
+  const payload = {
+    title: `${name} · ParkPulse`,
+    text: `Check ${name} on ParkPulse.`,
+    url: url.href
+  };
+
+  if (navigator.share) {
+    try {
+      await navigator.share(payload);
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+
+  try {
+    await copyText(url.href);
+    toast("Ride link copied");
+  } catch {
+    toast("Couldn’t share this ride.");
+  }
+}
+function focusableInSheet() {
+  return $('button:not([disabled]), select:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])', sheet)
+    .filter((el) => !el.classList.contains("hidden") && el.offsetParent !== null);
+}
+function handleDialogKeydown(event) {
+  if (sheet.classList.contains("hidden")) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeSheet();
+    return;
+  }
+  if (event.key !== "Tab") return;
+
+  const focusable = focusableInSheet();
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 function openRide(id) {
   const ride = rideData.rideById(id);
   const existing = store.ruleForRide(id);
   if (!ride && !existing) return;
   const model = ride || existing;
-  sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(model.name || model.rideName)}</h2></div><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div>
+  sheetReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(model.name || model.rideName)}</h2></div><div class="sheet-actions"><button class="sheet-action" type="button" data-share-ride="${id}" aria-label="Share ${escapeHtml(model.name || model.rideName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div></div>
     <div class="sheet-status"><span class="wait ${rideStatus(ride).stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(rideStatus(ride).wait)}</span><small>${escapeHtml(rideStatus(ride).label)}</small></div>
     <div id="rideInsights" class="ride-insights"><span class="insight-loading">Checking the trend data…</span></div>
     <form id="watchForm">
@@ -622,7 +784,13 @@ function openRide(id) {
       <button class="primary-button" type="submit">${existing ? "Save watch" : "Start watching"}</button>
       ${existing ? `<button class="danger-text" type="button" data-remove-current>Stop watching this ride</button>` : ""}
     </form>`;
-  sheet.classList.remove("hidden"); backdrop.classList.remove("hidden"); document.body.classList.add("sheet-open");
+  sheet.classList.remove("hidden");
+  sheet.setAttribute("aria-hidden", "false");
+  backdrop.classList.remove("hidden");
+  backdrop.setAttribute("aria-hidden", "false");
+  document.body.classList.add("sheet-open");
+  $('[data-share-ride]', sheet)?.addEventListener("click", () => shareRide(id));
+  requestAnimationFrame(() => $('[data-close-sheet]', sheet)?.focus({ preventScroll: true }));
   loadRideInsights(id);
   let thresholdEnabled = Boolean(existing?.threshold), threshold = Number(existing?.threshold || 30);
   const refreshThreshold = () => { $("#thresholdValue").textContent = threshold; $("#thresholdControls").classList.toggle("disabled", !thresholdEnabled); $("#thresholdToggle").classList.toggle("active", thresholdEnabled); $("#thresholdToggle").textContent = thresholdEnabled ? "On" : "Off"; };
@@ -674,7 +842,17 @@ async function loadRideInsights(id) {
   `;
 }
 
-function closeSheet() { sheet.classList.add("hidden"); backdrop.classList.add("hidden"); document.body.classList.remove("sheet-open"); }
+function closeSheet() {
+  if (sheet.classList.contains("hidden")) return;
+  sheet.classList.add("hidden");
+  sheet.setAttribute("aria-hidden", "true");
+  backdrop.classList.add("hidden");
+  backdrop.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("sheet-open");
+  const returnTo = sheetReturnFocus;
+  sheetReturnFocus = null;
+  if (returnTo?.isConnected) requestAnimationFrame(() => returnTo.focus({ preventScroll: true }));
+}
 function migrateLegacyRules() {
   const current = store.snapshot.rules;
   let changed = false;
@@ -768,7 +946,8 @@ async function init() {
       reloading = true;
       location.reload();
     });
-    await navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+    const registration = await navigator.serviceWorker.register("./service-worker.js").catch(() => null);
+    if (registration) watchForServiceWorkerUpdate(registration);
   }
   backendState = await backendHealth().catch(() => ({ok:false}));
   analyticsState = await fetchAnalyticsStatus().catch(() => null);
@@ -787,15 +966,28 @@ async function init() {
     bindDynamic();
     toast("ParkPulse installed");
   });
-  window.addEventListener("online", () => rideData.refresh({ parkId: store.snapshot.selectedParkId }));
-  rideData.addEventListener("update", renderRideDataUpdate);
-  rideData.addEventListener("status", renderRefreshCopy);
+  window.addEventListener("online", async () => {
+    renderStatusBanner();
+    await rideData.refresh({ parkId: store.snapshot.selectedParkId });
+    renderStatusBanner();
+  });
+  window.addEventListener("offline", renderStatusBanner);
+  window.addEventListener("keydown", handleDialogKeydown);
+  rideData.addEventListener("update", () => {
+    renderRideDataUpdate();
+    renderStatusBanner();
+  });
+  rideData.addEventListener("status", () => {
+    renderRefreshCopy();
+    renderStatusBanner();
+  });
   store.addEventListener("change", (e) => {
     if (e.detail.reason === "search") renderRideResults();
     else if (e.detail.reason !== "view") render();
   });
   const active = store.snapshot.activeView in views ? store.snapshot.activeView : "explore";
   selectView(active);
+  renderStatusBanner();
   await rideData.refresh();
   migrateLegacyRules();
   if (pushOn) await safeSync();

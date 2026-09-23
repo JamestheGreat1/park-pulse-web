@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.5 — 2026-09-23
+
+- Fixed the bogus `↓ 100% vs typical` badge when a ride did not actually have a historical baseline.
+- Best Now and crowd estimates now use the same baseline eligibility rules.
+- Added live history-collection diagnostics so Settings shows whether five-minute ride samples are still arriving.
+- Added baseline/backfill health details and a deploy-time check for the ThemeParks API key.
+
+
 ## 1.0.0 — 2026-09-22
 
 ParkPulse was rebuilt around one job: watch rides for you.

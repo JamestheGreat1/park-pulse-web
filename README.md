@@ -4,13 +4,16 @@ ParkPulse is basically the Walt Disney World app I wanted while actually in the 
 
 No giant itinerary planner. No constantly refreshing wait times. Just the useful stuff.
 
-**Current version: 1.5.5**
+**Current version: 1.6.0**
 
 [Open ParkPulse](https://app.useparkpulse.com/)
 
 ## What ParkPulse does
 
 - **History health diagnostics** in Settings so you can see whether five-minute samples are still coming in and how many ride baselines are ready.
+- **First-run quick start** that explains Best Now and ride watches once, then gets out of the way.
+- **Shareable ride links** that open the exact attraction in ParkPulse.
+- **Cleaner update and recovery UX** for app updates, offline use, and failed live-data refreshes.
 - **Live ride waits and statuses** for Magic Kingdom, EPCOT, Hollywood Studios, and Animal Kingdom.
 - **Best Now sorting** that looks at the current wait compared with what is normal for that ride at that time of day.
 - **Better-than-typical badges** like `↓ 24% vs typical` when a ride is genuinely a good deal right now.

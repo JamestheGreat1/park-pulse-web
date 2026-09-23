@@ -1,19 +1,39 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.9";
-import { store } from "./store.js?v=1.3.9";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.9";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.9";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.4.0";
+import { store } from "./store.js?v=1.4.0";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.4.0";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.4.0";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.3.9";
+const APP_VERSION = "1.4.0";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
 let analyticsState = null;
 
+function platformInfo() {
+  const ua = navigator.userAgent || "";
+  const ios = /iphone|ipad|ipod/i.test(ua);
+  const android = /android/i.test(ua);
+  const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone === true;
+  return { ios, android, standalone };
+}
+function installSetting() {
+  const platform = platformInfo();
+  if (platform.standalone) {
+    return { installed: true, copy: "Installed on this device", action: "Installed" };
+  }
+  if (platform.ios) {
+    return { installed: false, copy: "Add to Home Screen to use Web Push on iPhone.", action: "Add" };
+  }
+  if (platform.android) {
+    return { installed: false, copy: "Install for app-like launch and background ride alerts.", action: "Install" };
+  }
+  return { installed: false, copy: "Install ParkPulse for app-like launch and notifications.", action: "Install" };
+}
 function iconBell(active = false) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>${active ? '<circle cx="18" cy="5" r="3" class="bell-dot"/>' : ""}</svg>`;
 }
@@ -58,6 +78,49 @@ function formatTicketedEvents(hours) {
       name: String(event.name || "Special Ticketed Event"),
       hours: `${formatter.format(new Date(event.openingTime))}–${formatter.format(new Date(event.closingTime))}`
     }));
+}
+function crowdPresentation(crowd) {
+  if (!crowd) return { kind: "none", text: "" };
+
+  if (crowd.available) {
+    const delta = Number(crowd.deltaPercent || 0);
+    const pressureText = Math.abs(delta) < 5
+      ? "Waits are near typical"
+      : delta < 0
+        ? `Waits are ${Math.abs(delta)}% below typical`
+        : `Waits are ${delta}% above typical`;
+
+    return {
+      kind: "level",
+      level: Number(crowd.level || 0),
+      label: String(crowd.label || ""),
+      text: pressureText,
+      samples: Number(crowd.samples || 0)
+    };
+  }
+
+  if (crowd.reason === "ticketed-event") {
+    return { kind: "note", text: "Crowd estimate paused during ticketed event" };
+  }
+
+  if (crowd.reason === "building") {
+    return {
+      kind: "note",
+      text: `Crowd estimate building · ${Number(crowd.samples || 0)}/${Number(crowd.requiredSamples || 0)} rides`
+    };
+  }
+
+  return { kind: "none", text: "" };
+}
+function crowdMarkup(crowd) {
+  const view = crowdPresentation(crowd);
+  if (view.kind === "level") {
+    return `<div class="park-crowd crowd-level-${view.level}"><span class="crowd-score"><b>${view.level}/10</b> ${escapeHtml(view.label)}</span><span class="crowd-detail">${escapeHtml(view.text)} · ${view.samples} rides</span></div>`;
+  }
+  if (view.kind === "note") {
+    return `<div class="park-crowd crowd-note"><span class="crowd-detail">${escapeHtml(view.text)}</span></div>`;
+  }
+  return "";
 }
 function zonedDateToUtc(year, month, day, hour, timeZone) {
   let guess = Date.UTC(year, month - 1, day, hour, 0, 0);
@@ -161,6 +224,7 @@ function renderExplore() {
   const parkSchedule = rideData.hoursForPark(state.selectedParkId);
   const parkHours = formatParkHours(parkSchedule);
   const ticketedEvents = formatTicketedEvents(parkSchedule);
+  const crowd = rideData.crowdForPark(state.selectedParkId);
   views.explore.innerHTML = `
     <section class="hero-card liquid-glass">
       <div><span class="eyebrow">Walt Disney World</span><h2>Stop refreshing wait times.</h2><p>Tell ParkPulse what “worth it” looks like. We’ll watch the ride and buzz you when it gets there.</p></div>
@@ -174,7 +238,7 @@ function renderExplore() {
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
-    <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
+    <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderWatching() {
@@ -192,6 +256,7 @@ function renderWatching() {
 function renderSettings() {
   const state = store.snapshot;
   const permission = "Notification" in window ? Notification.permission : "unsupported";
+  const install = installSetting();
   const backendCopy = backendState?.ok === true ? `Online · Worker ${backendState.version || ""}`.trim() : backendState?.ok === false ? "Unavailable" : "Checking…";
   const refreshCopy = rideData.updatedAt ? relativeTime(rideData.updatedAt) : "Not yet";
   views.settings.innerHTML = `
@@ -199,7 +264,7 @@ function renderSettings() {
     <section class="settings-group liquid-glass">
       <div class="setting-row"><div><strong>Push notifications</strong><small>${pushOn ? "Connected to this device" : permission === "denied" ? "Blocked in browser settings" : "Not enabled"}</small></div><button type="button" data-toggle-push class="setting-action">${pushOn ? "Disable" : "Enable"}</button></div>
       ${pushOn ? `<div class="setting-row"><div><strong>Test notification</strong><small>Send a real Web Push to this device.</small></div><button type="button" data-test-push class="setting-action">Send test</button></div>` : ""}
-      <div class="setting-row"><div><strong>Install ParkPulse</strong><small>Home Screen install is required for Web Push on iPhone.</small></div><button type="button" data-install class="setting-action">Install</button></div>
+      <div class="setting-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>
       <label class="setting-row"><div><strong>Appearance</strong><small>Liquid Glass adapts to light or dark mode.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
     </section>
     <section class="settings-group liquid-glass">
@@ -229,17 +294,21 @@ function renderRefreshCopy() {
       : "Loading…";
 }
 function renderParkHours() {
-  const schedule = rideData.hoursForPark(store.snapshot.selectedParkId);
+  const parkId = store.snapshot.selectedParkId;
+  const schedule = rideData.hoursForPark(parkId);
   const hoursEl = $(".park-hours", views.explore);
   if (hoursEl) hoursEl.textContent = formatParkHours(schedule);
 
   const eventsEl = $(".park-events", views.explore);
-  if (!eventsEl) return;
+  if (eventsEl) {
+    const events = formatTicketedEvents(schedule);
+    eventsEl.innerHTML = events.map((event) =>
+      `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`
+    ).join("");
+  }
 
-  const events = formatTicketedEvents(schedule);
-  eventsEl.innerHTML = events.map((event) =>
-    `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`
-  ).join("");
+  const crowdEl = $(".park-crowd-wrap", views.explore);
+  if (crowdEl) crowdEl.innerHTML = crowdMarkup(rideData.crowdForPark(parkId));
 }
 function renderRideDataUpdate() {
   if (document.activeElement?.id !== "rideSearch") return render();
@@ -375,6 +444,7 @@ async function copyDiagnostics() {
     `Worker: ${backendState?.ok === true ? "online" : backendState?.ok === false ? "unavailable" : "unknown"}`,
     `Push: ${pushOn ? "connected" : "not connected"}`,
     `Notification permission: ${"Notification" in window ? Notification.permission : "unsupported"}`,
+    `Platform: ${platformInfo().android ? "Android" : platformInfo().ios ? "iOS" : "browser"}${platformInfo().standalone ? " standalone" : ""}`,
     `Last app refresh: ${rideData.updatedAt || "none"}`,
     `Active watches: ${store.snapshot.rules.length}`,
     `Ride sources: ${rideData.sourceSummary || "none"}`,
@@ -386,9 +456,21 @@ async function copyDiagnostics() {
   catch { toast(lines.join(" · ")); }
 }
 async function installApp() {
-  if (installPrompt) { installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; return; }
-  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  toast(ios ? "On iPhone: Share → Add to Home Screen." : "Use your browser menu → Install ParkPulse.");
+  const platform = platformInfo();
+  if (platform.standalone) return toast("ParkPulse is already installed.");
+
+  if (installPrompt) {
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+    renderSettings();
+    bindDynamic();
+    return;
+  }
+
+  if (platform.ios) return toast("On iPhone/iPad: Share → Add to Home Screen.");
+  if (platform.android) return toast("On Android: browser menu → Install app / Add to Home screen.");
+  toast("Use your browser menu → Install ParkPulse.");
 }
 async function init() {
   setTheme();
@@ -406,7 +488,18 @@ async function init() {
   pushOn = Boolean(await currentSubscription().catch(() => null));
   $$('[data-view-target]').forEach((button) => button.onclick = () => selectView(button.dataset.viewTarget));
   $("#refreshButton").onclick = () => rideData.refresh();
-  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; });
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    installPrompt = e;
+    renderSettings();
+    bindDynamic();
+  });
+  window.addEventListener("appinstalled", () => {
+    installPrompt = null;
+    renderSettings();
+    bindDynamic();
+    toast("ParkPulse installed");
+  });
   window.addEventListener("online", () => rideData.refresh({ parkId: store.snapshot.selectedParkId }));
   rideData.addEventListener("update", renderRideDataUpdate);
   rideData.addEventListener("status", renderRefreshCopy);

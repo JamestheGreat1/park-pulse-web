@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.4-copy-polish";
-import { store } from "./store.js?v=1.5.4-copy-polish";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.4-copy-polish";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.4-copy-polish";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.5-history-fix";
+import { store } from "./store.js?v=1.5.5-history-fix";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.5-history-fix";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.5-history-fix";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.5.4";
+const APP_VERSION = "1.5.5";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -314,11 +314,36 @@ function remaining(rule) {
   if (mins < 24 * 60) return `${Math.round(mins / 60)} hr left`;
   return "Today";
 }
+function rideComparison(ride) {
+  if (!ride || isRideStale(ride) || !ride.isOpen || !ride.baselineReady) return null;
+
+  const wait = Number(ride.waitTime);
+  const typical = Number(ride.typicalWait);
+  const baselineDays = Number(ride.baselineDays || 0);
+  const baselineMinutes = Number(ride.baselineMinutes || 0);
+
+  if (
+    !Number.isFinite(wait) ||
+    wait <= 0 ||
+    !Number.isFinite(typical) ||
+    typical <= 0 ||
+    baselineDays < 5 ||
+    baselineMinutes < 60
+  ) return null;
+
+  const ratio = wait / typical;
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+
+  return {
+    ratio,
+    percentBetter: Math.floor((1 - ratio) * 100)
+  };
+}
+
 function betterThanTypicalBadge(ride) {
-  if (!ride || isRideStale(ride) || !ride.isOpen || !Number.isFinite(Number(ride.waitTime)) || Number(ride.waitTime) <= 0 || !Number.isFinite(Number(ride.valueRatio))) return "";
-  const percent = Math.round((1 - Number(ride.valueRatio)) * 100);
-  if (percent < 10) return "";
-  return `↓ ${percent}% vs typical`;
+  const comparison = rideComparison(ride);
+  if (!comparison || comparison.percentBetter < 10) return "";
+  return `↓ ${comparison.percentBetter}% vs typical`;
 }
 function rideStatus(ride) {
   if (!ride) return { stale:true, wait:"—", label:"No live data", updated:"Unavailable" };
@@ -367,8 +392,8 @@ function sortedRides(rides, state) {
     const operating = Number(b.isOpen) - Number(a.isOpen);
     if (operating) return operating;
 
-    const aRatio = Number.isFinite(a.valueRatio) ? a.valueRatio : Infinity;
-    const bRatio = Number.isFinite(b.valueRatio) ? b.valueRatio : Infinity;
+    const aRatio = rideComparison(a)?.ratio ?? Infinity;
+    const bRatio = rideComparison(b)?.ratio ?? Infinity;
     if (aRatio !== bRatio) return aRatio - bRatio;
 
     return (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) || a.name.localeCompare(b.name);
@@ -484,7 +509,8 @@ function renderSettings() {
       <div class="setting-row"><div><strong>Data source</strong><small>ThemeParks.wiki primary · Queue-Times fallback</small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
       <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Used by the Worker — never stored in the app.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
       <div class="setting-row"><div><strong>Push server</strong><small>Background notification setup</small></div><span class="health-pill ${backendState?.vapidConfigured ? "good" : "bad"}">${backendState?.vapidConfigured ? "Ready" : "Needs setup"}</span></div>
-      <div class="setting-row"><div><strong>Trend baselines</strong><small>History used for Best Now + crowd estimates</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : "Building…"}</span></div>
+      <div class="setting-row"><div><strong>History collection</strong><small>${analyticsState?.historyCollecting ? "Five-minute ride samples are coming in normally." : analyticsState?.latestHistorySample ? `Last sample ${relativeTime(analyticsState.latestHistorySample)} — this may need attention.` : "Waiting for the first history sample."}</small></div><span class="health-pill ${analyticsState?.historyCollecting ? "good" : analyticsState?.ok ? "bad" : ""}">${analyticsState?.historyCollecting ? "Collecting" : analyticsState?.ok ? "Not current" : "Checking…"}</span></div>
+      <div class="setting-row"><div><strong>Trend baselines</strong><small>${analyticsState?.themeParksApiKeyConfigured === false ? "Historical backfill is paused because the ThemeParks API key is missing." : "History used for Best Now + crowd estimates"}</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : "Building…"}</span></div>
       <div class="setting-row"><div><strong>App version</strong><small>What you’re currently running</small></div><span class="setting-value">v${APP_VERSION}</span></div>
       <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status. No secrets or push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
     </section>
@@ -680,6 +706,10 @@ async function copyDiagnostics() {
     `Ride sources: ${rideData.sourceSummary || "none"}`,
     `ThemeParks API key: ${backendState?.themeParksApiKeyConfigured ? "configured" : "anonymous"}`,
     `VAPID push server: ${backendState?.vapidConfigured ? "configured" : "missing"}`,
+    `History collection: ${analyticsState?.historyCollecting ? "collecting" : analyticsState?.historyStatus || "unknown"}`,
+    `History rides (31d): ${analyticsState?.ok ? analyticsState.historyRides : "unknown"}`,
+    `Recent history samples: ${analyticsState?.ok ? analyticsState.recentHistorySamples : "unknown"}`,
+    `Latest history sample: ${analyticsState?.latestHistorySample || "none"}`,
     `Trend baselines: ${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides}` : "unknown"}`,
     `Accent: ${store.snapshot.accent || "blue"}`
   ];

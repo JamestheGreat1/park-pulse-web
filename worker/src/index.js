@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.5.3";
+const VERSION = "1.5.4";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -164,6 +164,26 @@ export default {
 
       if (request.method === "GET" && url.pathname === "/api/analytics/status") {
         return json(await getAnalyticsStatus(env), 200, { ...cors, "Cache-Control": "no-store" });
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/admin/refresh") {
+        if (!env.REFRESH_ADMIN_TOKEN) {
+          return json({
+            error: "Manual refresh is not configured",
+            code: "REFRESH_NOT_CONFIGURED"
+          }, 503, { ...cors, "Cache-Control": "no-store" });
+        }
+
+        const authorization = request.headers.get("Authorization") || "";
+        if (authorization !== `Bearer ${env.REFRESH_ADMIN_TOKEN}`) {
+          return json({
+            error: "Unauthorized",
+            code: "UNAUTHORIZED"
+          }, 401, { ...cors, "Cache-Control": "no-store" });
+        }
+
+        const result = await runManualRefresh(env);
+        return json(result, 200, { ...cors, "Cache-Control": "no-store" });
       }
 
       if (request.method === "POST" && url.pathname === "/subscriptions") {
@@ -1031,15 +1051,55 @@ function ruleMatchesRide(rule, ride) {
   return normalizeName(rule.rideName) === normalizeName(ride.name);
 }
 
+async function fetchCurrentRideSnapshot(env) {
+  const rides = [];
+  let primaryParks = 0;
+  let fallbackParks = 0;
+
+  for (const [parkId, park] of PARKS) {
+    const snapshot = await fetchFreshParkRides(parkId, park, env);
+    rides.push(...snapshot.rides);
+    if (snapshot.primaryAvailable) primaryParks++;
+    if (snapshot.fallbackUsed) fallbackParks++;
+  }
+
+  return { rides, primaryParks, fallbackParks };
+}
+
+async function runManualRefresh(env) {
+  const snapshot = await fetchCurrentRideSnapshot(env);
+
+  await writeCurrentRideSnapshot(env, snapshot.rides);
+
+  const baseline = env.THEMEPARKS_API_KEY
+    ? await refreshRideBaselines(env, snapshot.rides)
+    : {
+        processed: 0,
+        refreshed: 0,
+        failed: 0,
+        reason: "themeparks-api-key-not-configured"
+      };
+
+  const analytics = await getAnalyticsStatus(env);
+
+  return {
+    ok: true,
+    notificationsEvaluated: false,
+    parksChecked: PARKS.size,
+    ridesUpdated: snapshot.rides.length,
+    primaryParks: snapshot.primaryParks,
+    fallbackParks: snapshot.fallbackParks,
+    baseline,
+    analytics,
+    refreshedAt: new Date().toISOString()
+  };
+}
+
 async function runRideWatch(env) {
   const priorRows = await readPriorRideState(env);
   const prior = new Map(priorRows.map((row) => [row.id, row]));
 
-  const current = [];
-  for (const [parkId, park] of PARKS) {
-    const snapshot = await fetchFreshParkRides(parkId, park, env);
-    current.push(...snapshot.rides);
-  }
+  const { rides: current } = await fetchCurrentRideSnapshot(env);
 
   const currentByPark = groupByPark(current);
   const priorByPark = groupByPark([...prior.values()]);

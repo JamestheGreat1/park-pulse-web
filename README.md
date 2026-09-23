@@ -4,7 +4,7 @@ ParkPulse is basically the Walt Disney World app I wanted while actually in the 
 
 No giant itinerary planner. No constantly refreshing wait times. Just the useful stuff.
 
-**Current version: 1.5.0**
+**Current version: 1.5.1**
 
 [Open ParkPulse](https://jamesthegreat1.github.io/park-pulse-web/)
 
@@ -24,6 +24,7 @@ No giant itinerary planner. No constantly refreshing wait times. Just the useful
 - **Temporary watches** for Today, 3 hours, or Until Disabled.
 - **Freshness protection** so old data is not quietly passed off as live.
 - **iPhone and Android installation** as a PWA.
+- **Desktop layout** that automatically uses a wider two-column ride view, desktop navigation, and centered ride dialogs without changing the phone layout.
 - **Light, dark, or system appearance** plus six accent colors: Blue, Cyan, Violet, Pink, Orange, and Green.
 
 ## How to use it
@@ -31,6 +32,8 @@ No giant itinerary planner. No constantly refreshing wait times. Just the useful
 ### 1. Install ParkPulse
 
 You can use ParkPulse in a normal browser, but installing it gives you the best experience and makes background notifications much nicer.
+
+On desktop, just open ParkPulse in your browser. The layout automatically expands for larger screens; there is nothing separate to install unless you want the PWA as a desktop app.
 
 **iPhone / iPad**
 

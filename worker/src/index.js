@@ -1498,6 +1498,18 @@ async function getAnalyticsStatus(env) {
     const rows = metaResult.results || [];
     const ready = rows.filter((row) => row.status === "ok" && Number(row.slot_count) > 0);
     const errors = rows.filter((row) => row.status === "error");
+    const errorGroups = new Map();
+    for (const row of errors) {
+      const message = String(row.last_error || "Unknown baseline error").slice(0, 300);
+      const current = errorGroups.get(message) || { message, count: 0, rides: [] };
+      current.count += 1;
+      if (current.rides.length < 5) current.rides.push(String(row.ride_key || ""));
+      errorGroups.set(message, current);
+    }
+    const baselineErrors = [...errorGroups.values()]
+      .sort((a, b) => b.count - a.count || a.message.localeCompare(b.message))
+      .slice(0, 5);
+
     const latestHistoryMs = Number(history30d?.latest_observation || 0);
     const historyCollecting =
       Number(historyRecent?.sample_count || 0) > 0 &&
@@ -1510,6 +1522,7 @@ async function getAnalyticsStatus(env) {
       baselineRides: ready.length,
       pendingRides: Math.max(0, totalRides - ready.length),
       errorRides: errors.length,
+      baselineErrors,
       latestRefresh: ready.length
         ? new Date(Math.max(...ready.map((row) => Number(row.refreshed_at || 0)))).toISOString()
         : null,
@@ -1537,6 +1550,7 @@ async function getAnalyticsStatus(env) {
       baselineRides: 0,
       pendingRides: totalRides,
       errorRides: 0,
+      baselineErrors: [],
       latestRefresh: null,
       backfillComplete: false,
       themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),

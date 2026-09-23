@@ -673,6 +673,15 @@ function activeTicketedEvent(parkHours, now = Date.now()) {
   return null;
 }
 
+function crowdMedian(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 function crowdLevelFromPressure(pressure) {
   if (pressure <= 0.55) return 1;
   if (pressure <= 0.65) return 2;
@@ -737,7 +746,7 @@ function calculateCrowdLevel(rides, totalCatalogRides, parkHours, now = Date.now
     };
   }
 
-  const pressure = median(ratios);
+  const pressure = crowdMedian(ratios);
   const level = crowdLevelFromPressure(pressure);
   const deltaPercent = Math.round((pressure - 1) * 100);
 

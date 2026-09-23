@@ -4,9 +4,9 @@ ParkPulse is basically the Walt Disney World app I wanted while actually in the 
 
 No giant itinerary planner. No constantly refreshing wait times. Just the useful stuff.
 
-**Current version: 1.5.2**
+**Current version: 1.5.3**
 
-[Open ParkPulse](https://jamesthegreat1.github.io/park-pulse-web/)
+[Open ParkPulse](https://app.useparkpulse.com/)
 
 ## What ParkPulse does
 

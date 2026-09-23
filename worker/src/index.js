@@ -1483,8 +1483,7 @@ async function sendPush(row, data, env) {
       {
         vapidDetails,
         TTL: 300,
-        urgency: "high",
-        topic: String(data.tag || "parkpulse")
+        urgency: "high"
       }
     );
     return true;

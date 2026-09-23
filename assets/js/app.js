@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.2-pull-refresh";
-import { store } from "./store.js?v=1.5.2-pull-refresh";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.2-pull-refresh";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.2-pull-refresh";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.3-install-push";
+import { store } from "./store.js?v=1.5.3-install-push";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.3-install-push";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.3-install-push";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.5.2";
+const APP_VERSION = "1.5.3";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -153,23 +153,27 @@ function setupPullToRefresh() {
 
 function platformInfo() {
   const ua = navigator.userAgent || "";
-  const ios = /iphone|ipad|ipod/i.test(ua);
+  const ipadDesktopMode = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  const ios = /iphone|ipad|ipod/i.test(ua) || ipadDesktopMode;
   const android = /android/i.test(ua);
   const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone === true;
-  return { ios, android, standalone };
+  return { ios, android, standalone, mobile: ios || android };
 }
 function installSetting() {
   const platform = platformInfo();
   if (platform.standalone) {
-    return { installed: true, copy: "Installed on this device", action: "Installed" };
+    return { visible: true, installed: true, copy: "Installed on this device", action: "Installed" };
   }
   if (platform.ios) {
-    return { installed: false, copy: "Add to Home Screen to use Web Push on iPhone.", action: "Add" };
+    return { visible: true, installed: false, copy: "Add to Home Screen, then open ParkPulse there to use Web Push.", action: "Add" };
   }
   if (platform.android) {
-    return { installed: false, copy: "Install for app-like launch and background ride alerts.", action: "Install" };
+    return { visible: true, installed: false, copy: "Install for app-like launch and background ride alerts.", action: "Install" };
   }
-  return { installed: false, copy: "Install ParkPulse for app-like launch and notifications.", action: "Install" };
+  if (installPrompt) {
+    return { visible: true, installed: false, copy: "Install ParkPulse as a desktop app.", action: "Install" };
+  }
+  return { visible: false, installed: false, copy: "", action: "" };
 }
 function iconBell(active = false) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>${active ? '<circle cx="18" cy="5" r="3" class="bell-dot"/>' : ""}</svg>`;
@@ -438,15 +442,35 @@ function renderWatching() {
 function renderSettings() {
   const state = store.snapshot;
   const permission = "Notification" in window ? Notification.permission : "unsupported";
+  const platform = platformInfo();
   const install = installSetting();
+  const iosNeedsInstall = platform.ios && !platform.standalone;
+  const pushBlocked = permission === "denied";
+  const pushCopy = pushOn
+    ? "Connected to this device"
+    : iosNeedsInstall
+      ? "Install ParkPulse to your Home Screen and open it there before enabling notifications."
+      : pushBlocked
+        ? "Blocked in browser or system notification settings."
+        : "Not enabled";
+  const pushAction = pushOn
+    ? `<button type="button" data-toggle-push class="setting-action">Disable</button>`
+    : iosNeedsInstall
+      ? `<button type="button" data-install class="setting-action">Install first</button>`
+      : pushBlocked
+        ? `<span class="health-pill bad">Blocked</span>`
+        : `<button type="button" data-toggle-push class="setting-action">Enable</button>`;
+  const installRow = install.visible
+    ? `<div class="setting-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>`
+    : "";
   const backendCopy = backendState?.ok === true ? `Online · Worker ${backendState.version || ""}`.trim() : backendState?.ok === false ? "Unavailable" : "Checking…";
   const refreshCopy = rideData.updatedAt ? relativeTime(rideData.updatedAt) : "Not yet";
   views.settings.innerHTML = `
     <div class="page-heading"><span class="eyebrow">ParkPulse</span><h2>Settings</h2><p>A tiny ride watcher, not another giant park-planning app.</p></div>
     <section class="settings-group liquid-glass">
-      <div class="setting-row"><div><strong>Push notifications</strong><small>${pushOn ? "Connected to this device" : permission === "denied" ? "Blocked in browser settings" : "Not enabled"}</small></div><button type="button" data-toggle-push class="setting-action">${pushOn ? "Disable" : "Enable"}</button></div>
+      <div class="setting-row"><div><strong>Push notifications</strong><small>${escapeHtml(pushCopy)}</small></div>${pushAction}</div>
       ${pushOn ? `<div class="setting-row"><div><strong>Test notification</strong><small>Send a real Web Push to this device.</small></div><button type="button" data-test-push class="setting-action">Send test</button></div>` : ""}
-      <div class="setting-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>
+      ${installRow}
     </section>
     <div class="settings-section-title">Customization</div>
     <section class="settings-group liquid-glass">
@@ -620,8 +644,24 @@ function migrateLegacyRules() {
 }
 async function safeSync() { try { await syncRules(store.snapshot.rules); } catch { toast("Saved locally; notification sync failed."); } }
 async function activatePush() {
-  try { await enablePush(); pushOn = true; await syncRules(store.snapshot.rules); render(); toast("Notifications are on"); }
-  catch (error) { toast(error.message || "Couldn't enable notifications."); }
+  const platform = platformInfo();
+  if (platform.ios && !platform.standalone) {
+    return toast("On iPhone/iPad, add app.useparkpulse.com to your Home Screen, open that icon, then enable notifications.");
+  }
+  if ("Notification" in window && Notification.permission === "denied") {
+    return toast(platform.ios
+      ? "Notifications are blocked. Allow ParkPulse in iOS Settings → Notifications, then try again."
+      : "Notifications are blocked in your browser or system settings.");
+  }
+  try {
+    await enablePush();
+    pushOn = true;
+    await syncRules(store.snapshot.rules);
+    render();
+    toast("Notifications are on");
+  } catch (error) {
+    toast(error.message || "Couldn't enable notifications.");
+  }
 }
 async function deactivatePush() { await disablePush().catch(() => {}); pushOn = false; render(); toast("Notifications disabled"); }
 async function testNotification() {

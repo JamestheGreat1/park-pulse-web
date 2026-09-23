@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.3.7";
+const VERSION = "1.3.8";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -121,7 +121,13 @@ export default {
         const park = PARKS.get(parkId);
         if (!park) return json({ error: "Unsupported park" }, 404, cors);
 
-        const snapshot = await fetchFreshParkRides(parkId, park, env);
+        const [snapshot, parkHours] = await Promise.all([
+          fetchFreshParkRides(parkId, park, env),
+          fetchParkHours(park, env).catch((error) => {
+            console.warn("ThemeParks.wiki schedule fetch failed", park.name, error);
+            return null;
+          })
+        ]);
         const displayRides = await addDisplayFallbacks(env, parkId, park, snapshot);
         const rides = await attachCurrentBaselines(env, displayRides);
 
@@ -133,6 +139,7 @@ export default {
           fallbackDataSource: "Queue-Times",
           primaryAvailable: snapshot.primaryAvailable,
           fallbackUsed: snapshot.fallbackUsed,
+          parkHours,
           generatedAt: new Date().toISOString(),
           rides
         }, 200, { ...cors, "Cache-Control": "public, max-age=120" });
@@ -393,6 +400,61 @@ async function fetchFreshParkRides(parkId, park, env) {
     primaryAvailable,
     fallbackAvailable,
     fallbackUsed
+  };
+}
+
+function dateKeyInZone(date = new Date(), timeZone = "America/New_York") {
+  const parts = zoneParts(date, timeZone);
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+async function fetchParkHours(park, env) {
+  const response = await fetch(
+    `https://api.themeparks.wiki/v1/entity/${park.themeParksId}/schedule`,
+    {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": `ParkPulse/${VERSION}`,
+        ...(env.THEMEPARKS_API_KEY ? { "x-api-key": env.THEMEPARKS_API_KEY } : {})
+      },
+      cf: { cacheEverything: true, cacheTtl: 300 }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`ThemeParks.wiki schedule returned ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const timezone = String(payload?.timezone || "America/New_York");
+  const date = dateKeyInZone(new Date(), timezone);
+  const todayEntries = (payload?.schedule || []).filter((entry) => entry?.date === date);
+  const operating = todayEntries.filter(
+    (entry) =>
+      String(entry?.type || "").toUpperCase() === "OPERATING" &&
+      entry?.openingTime &&
+      entry?.closingTime
+  );
+
+  if (!operating.length) {
+    return todayEntries.length
+      ? { date, timezone, openingTime: null, closingTime: null, closedToday: true }
+      : null;
+  }
+
+  const sortedByOpen = [...operating].sort(
+    (a, b) => new Date(a.openingTime).getTime() - new Date(b.openingTime).getTime()
+  );
+  const sortedByClose = [...operating].sort(
+    (a, b) => new Date(b.closingTime).getTime() - new Date(a.closingTime).getTime()
+  );
+
+  return {
+    date,
+    timezone,
+    openingTime: sortedByOpen[0].openingTime,
+    closingTime: sortedByClose[0].closingTime,
+    closedToday: false
   };
 }
 

@@ -1,4 +1,4 @@
-import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.5.4-copy-polish";
+import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.5.5-history-fix";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");
@@ -43,7 +43,9 @@ function normalizedWorkerRide(parkId, ride) {
     typicalWait: ride.typicalWait == null ? null : Number(ride.typicalWait),
     typicalLow: ride.typicalLow == null ? null : Number(ride.typicalLow),
     typicalHigh: ride.typicalHigh == null ? null : Number(ride.typicalHigh),
+    baselineReady: Boolean(ride.baselineReady),
     baselineDays: Number(ride.baselineDays || 0),
+    baselineMinutes: Number(ride.baselineMinutes || 0),
     valueRatio: ride.valueRatio == null ? null : Number(ride.valueRatio)
   };
 }

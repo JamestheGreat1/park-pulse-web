@@ -58,7 +58,7 @@ step "Checking the existing ParkPulse Worker secrets"
 SECRETS_JSON="$(npx wrangler secret list --format json)"
 
 missing=()
-for name in VAPID_SERVER_PRIVATE_KEY PUSH_ADMIN_TOKEN THEMEPARKS_API_KEY; do
+for name in VAPID_SERVER_PRIVATE_KEY THEMEPARKS_API_KEY; do
   if ! grep -Eq "\"name\"[[:space:]]*:[[:space:]]*\"$name\"" <<<"$SECRETS_JSON"; then
     missing+=("$name")
   fi
@@ -76,9 +76,9 @@ if (("${#missing[@]}" > 0)); then
     echo "  ./deploy-cloudflare.sh"
     echo
   fi
-  if printf '%s\n' "${missing[@]}" | grep -Eq '^(VAPID_SERVER_PRIVATE_KEY|PUSH_ADMIN_TOKEN)$'; then
-    echo "Do NOT generate replacement push secrets in this Codespace unless you intend to invalidate existing push setup."
-    echo "Restore the existing secret value(s) first, then rerun this script."
+  if printf '%s\n' "${missing[@]}" | grep -qx 'VAPID_SERVER_PRIVATE_KEY'; then
+    echo "Do NOT generate a replacement VAPID private key unless you intend to invalidate existing push subscriptions."
+    echo "Restore the existing VAPID secret first, then rerun this script."
     echo
   fi
   exit 1

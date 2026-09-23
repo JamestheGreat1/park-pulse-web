@@ -1,4 +1,4 @@
-import { workerBase } from "./api.js?v=1.6.0-product-polish";
+import { workerBase } from "./api.js?v=1.6.1-runtime-fix";
 
 function base64ToBytes(value) {
   const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, "=").replace(/-/g, "+").replace(/_/g, "/");
@@ -26,10 +26,10 @@ export function pushSupported(){return Boolean(workerBase&&"serviceWorker" in na
 export async function registration(){if(!("serviceWorker" in navigator))return null;return navigator.serviceWorker.ready;}
 export async function currentSubscription(){
   const reg=await registration();
-  if(!reg) return null;
+  if(!reg||Notification.permission!=="granted") return null;
 
   let sub=await reg.pushManager.getSubscription();
-  if(!sub||Notification.permission!=="granted") return sub;
+  if(!sub) return null;
 
   try{
     const currentKey=await vapidPublicKey();

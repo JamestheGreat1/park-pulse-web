@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.0-product-polish";
-import { store } from "./store.js?v=1.6.0-product-polish";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.0-product-polish";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.0-product-polish";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.1-runtime-fix";
+import { store } from "./store.js?v=1.6.1-runtime-fix";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.1-runtime-fix";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.1-runtime-fix";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.6.1";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -871,7 +871,36 @@ function migrateLegacyRules() {
   if (changed) store.update((state) => { state.rules = next; }, "rule-migration");
   return changed;
 }
-async function safeSync() { try { await syncRules(store.snapshot.rules); } catch { toast("Saved here, but notification sync failed."); } }
+async function safeSync({ quiet = false } = {}) {
+  try {
+    const result = await syncRules(store.snapshot.rules);
+    if (result?.synced === false && result.reason === "subscription") {
+      pushOn = false;
+      renderWatching();
+      renderSettings();
+      bindDynamic();
+      if (!quiet) toast("Notifications need to be turned on again.");
+      return false;
+    }
+    return result?.synced !== false;
+  } catch {
+    if (!quiet) toast("Saved here, but notification sync failed.");
+    return false;
+  }
+}
+async function refreshPushState({ sync = false } = {}) {
+  const next = Boolean(await currentSubscription().catch(() => null));
+  const changed = next !== pushOn;
+  pushOn = next;
+
+  if (sync && pushOn) await safeSync({ quiet: true });
+
+  if (changed) {
+    renderWatching();
+    renderSettings();
+    bindDynamic();
+  }
+}
 async function activatePush() {
   const platform = platformInfo();
   if (platform.ios && !platform.standalone) {
@@ -969,9 +998,13 @@ async function init() {
   window.addEventListener("online", async () => {
     renderStatusBanner();
     await rideData.refresh({ parkId: store.snapshot.selectedParkId });
+    await refreshPushState({ sync: true });
     renderStatusBanner();
   });
   window.addEventListener("offline", renderStatusBanner);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshPushState({ sync: true });
+  });
   window.addEventListener("keydown", handleDialogKeydown);
   rideData.addEventListener("update", () => {
     renderRideDataUpdate();
@@ -990,7 +1023,7 @@ async function init() {
   renderStatusBanner();
   await rideData.refresh();
   migrateLegacyRules();
-  if (pushOn) await safeSync();
+  if (pushOn) await safeSync({ quiet: true });
   const deepLinkRide = new URL(location.href).searchParams.get("ride");
   if (deepLinkRide && rideData.rideById(deepLinkRide)) openRide(deepLinkRide);
   setInterval(async () => {

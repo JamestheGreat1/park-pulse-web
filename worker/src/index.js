@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.3.6";
+const VERSION = "1.3.7";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -218,7 +218,8 @@ export default {
             return json({
               error: "Push provider rejected the notification",
               code: "PUSH_PROVIDER_REJECTED",
-              pushStatus: Number(error.pushStatus)
+              pushStatus: Number(error.pushStatus),
+              pushReason: error.pushReason || null
             }, 502, cors);
           }
 
@@ -1491,9 +1492,20 @@ async function sendPush(row, data, env) {
     const status = Number(cause?.statusCode || cause?.status || 0);
     if (status === 404 || status === 410) return false;
 
+    let reason = null;
+    try {
+      const body = typeof cause?.body === "string"
+        ? JSON.parse(cause.body)
+        : cause?.body;
+      if (body && typeof body.reason === "string") {
+        reason = body.reason.slice(0, 80);
+      }
+    } catch {}
+
     const error = new Error(status ? `Push service returned ${status}` : "Push send failed");
     error.code = "PUSH_SEND_FAILED";
     if (status) error.pushStatus = status;
+    if (reason) error.pushReason = reason;
     throw error;
   }
 }

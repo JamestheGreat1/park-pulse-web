@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -131,8 +131,10 @@ export default {
           })
         ]);
         const displayRides = await addDisplayFallbacks(env, parkId, park, snapshot);
-        const rides = await attachCurrentBaselines(env, displayRides);
-        const crowdLevel = calculateCrowdLevel(rides, park.rides.length, parkHours);
+        let rides = await attachCurrentBaselines(env, displayRides);
+        rides = await attachDowntimeContext(env, rides);
+        let crowdLevel = calculateCrowdLevel(rides, park.rides.length, parkHours);
+        crowdLevel = await attachCrowdTrend(env, parkId, crowdLevel, parkHours);
 
         return json({
           parkPulseFormat: 2,
@@ -519,6 +521,7 @@ async function fetchThemeParksRides(parkId, park, env) {
       aliases: catalogRide.aliases || [],
       land: catalogRide.land,
       isOpen: String(item?.status || "").toUpperCase() === "OPERATING",
+      operationalStatus: String(item?.status || "UNKNOWN").toUpperCase(),
       waitTime,
       lastUpdated: item?.lastUpdated || null,
       source: "themeparks.wiki",
@@ -564,6 +567,7 @@ async function fetchQueueTimesRides(parkId, park) {
       aliases: catalogRide.aliases || [],
       land: catalogRide.land,
       isOpen: Boolean(item?.is_open),
+      operationalStatus: Boolean(item?.is_open) ? "OPERATING" : "CLOSED",
       waitTime: Number.isFinite(Number(item?.wait_time))
         ? Math.max(0, Number(item.wait_time))
         : null,
@@ -603,6 +607,7 @@ async function addDisplayFallbacks(env, parkId, park, snapshot) {
         aliases: catalogRide.aliases || [],
         land: catalogRide.land,
         isOpen: false,
+        operationalStatus: "UNKNOWN",
         waitTime: null,
         lastUpdated: null,
         source: "unavailable",
@@ -762,6 +767,142 @@ function calculateCrowdLevel(rides, totalCatalogRides, parkHours, now = Date.now
   };
 }
 
+function durationMinutesSince(startMs, now = Date.now()) {
+  if (!Number.isFinite(startMs) || startMs <= 0 || startMs > now) return null;
+  return Math.max(0, Math.floor((now - startMs) / 60000));
+}
+
+async function attachDowntimeContext(env, rides, now = Date.now()) {
+  const downRides = (rides || []).filter(
+    (ride) => isFreshSourceRide(ride, now) && ride.operationalStatus === "DOWN"
+  );
+  if (!downRides.length) return rides || [];
+
+  const rideKeys = downRides.map((ride) => String(ride.id));
+  const start = parkDayStartMs(new Date(now));
+  let rows = [];
+
+  try {
+    rows = (await env.DB.prepare(
+      `SELECT ride_key,is_open,observed_at
+       FROM ride_history
+       WHERE ride_key IN (SELECT value FROM json_each(?))
+         AND observed_at>=?
+       ORDER BY ride_key ASC, observed_at DESC`
+    ).bind(JSON.stringify(rideKeys), start).all()).results || [];
+  } catch {
+    rows = [];
+  }
+
+  const rowsByRide = new Map();
+  for (const row of rows) {
+    const key = String(row.ride_key);
+    if (!rowsByRide.has(key)) rowsByRide.set(key, []);
+    rowsByRide.get(key).push(row);
+  }
+
+  const downSinceByRide = new Map();
+
+  for (const ride of downRides) {
+    const history = rowsByRide.get(String(ride.id)) || [];
+    let earliestClosed = null;
+
+    for (const row of history) {
+      if (Boolean(row.is_open)) break;
+      const observed = Number(row.observed_at);
+      if (Number.isFinite(observed)) earliestClosed = observed;
+    }
+
+    if (earliestClosed == null) {
+      const sourceUpdated = sourceTimestampMs(ride);
+      if (sourceUpdated >= start && sourceUpdated <= now) earliestClosed = sourceUpdated;
+    }
+
+    if (earliestClosed != null) downSinceByRide.set(String(ride.id), earliestClosed);
+  }
+
+  return (rides || []).map((ride) => {
+    const downSince = downSinceByRide.get(String(ride.id));
+    if (downSince == null) return ride;
+    return {
+      ...ride,
+      downSince: new Date(downSince).toISOString(),
+      downMinutes: durationMinutesSince(downSince, now)
+    };
+  });
+}
+
+async function attachCrowdTrend(env, parkId, crowdLevel, parkHours, now = Date.now()) {
+  if (!crowdLevel?.available || activeTicketedEvent(parkHours, now)) return crowdLevel;
+
+  const target = now - 30 * 60 * 1000;
+  const windowStart = target - 10 * 60 * 1000;
+  const windowEnd = target + 10 * 60 * 1000;
+  const slotMinute = Math.floor(easternMinutes(target) / 15) * 15;
+
+  let rows = [];
+  try {
+    rows = (await env.DB.prepare(
+      `SELECT
+         h.ride_key,h.wait_time,h.observed_at,
+         b.median_wait,b.sample_days,b.sample_minutes
+       FROM ride_history h
+       JOIN ride_baseline b
+         ON b.ride_key=h.ride_key AND b.slot_minute=?
+       WHERE h.park_id=?
+         AND h.observed_at>=?
+         AND h.observed_at<=?
+         AND h.is_open=1
+         AND h.wait_time IS NOT NULL
+         AND b.sample_days>=5
+         AND b.sample_minutes>=60
+       ORDER BY h.ride_key ASC, h.observed_at ASC`
+    ).bind(slotMinute, parkId, windowStart, windowEnd).all()).results || [];
+  } catch {
+    return crowdLevel;
+  }
+
+  const closestByRide = new Map();
+  for (const row of rows) {
+    const key = String(row.ride_key);
+    const observed = Number(row.observed_at);
+    const distance = Math.abs(observed - target);
+    const previous = closestByRide.get(key);
+    if (!previous || distance < previous.distance) {
+      closestByRide.set(key, { row, distance });
+    }
+  }
+
+  const ratios = [...closestByRide.values()]
+    .map(({ row }) => {
+      const wait = Number(row.wait_time);
+      const typical = Number(row.median_wait);
+      if (!Number.isFinite(wait) || !Number.isFinite(typical) || typical <= 0) return null;
+      return Math.max(0.35, Math.min(2, wait / typical));
+    })
+    .filter(Number.isFinite);
+
+  if (ratios.length < Number(crowdLevel.requiredSamples || 0)) {
+    return { ...crowdLevel, trend: null };
+  }
+
+  const previousPressure = crowdMedian(ratios);
+  const delta = Number(crowdLevel.pressure) - previousPressure;
+  const direction = delta >= 0.08 ? "up" : delta <= -0.08 ? "down" : "steady";
+
+  return {
+    ...crowdLevel,
+    trend: {
+      direction,
+      label: direction === "up" ? "building" : direction === "down" ? "easing" : "steady",
+      previousPressure: Math.round(previousPressure * 100) / 100,
+      delta: Math.round(delta * 100) / 100,
+      minutes: 30,
+      samples: ratios.length
+    }
+  };
+}
+
 async function readStaleRide(env, rideKey) {
   try {
     const row = await env.DB.prepare(
@@ -796,6 +937,7 @@ function staleRowToRide(row) {
     rawName: String(row.name || "Attraction"),
     land: String(row.land || "Other"),
     isOpen: Boolean(row.is_open),
+    operationalStatus: Boolean(row.is_open) ? "OPERATING" : "UNKNOWN",
     waitTime: row.wait_time == null ? null : Number(row.wait_time),
     lastUpdated: row.source_updated_at || (row.updated_at ? new Date(Number(row.updated_at)).toISOString() : null),
     source: String(row.source || "cached"),

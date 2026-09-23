@@ -246,9 +246,10 @@ function sortedRides(rides, state) {
 function rideCard(ride) {
   const rule = store.ruleForRide(ride.id);
   const status = rideStatus(ride);
+  const valueBadge = betterThanTypicalBadge(ride);
   return `<article class="ride-card liquid-glass ${rule ? "watching" : ""} ${status.stale ? "stale" : ""}" data-ride-id="${ride.id}">
     <button class="ride-main" type="button" data-open-ride="${ride.id}">
-      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${betterThanTypicalBadge(ride) ? `<span class="value-badge">${escapeHtml(betterThanTypicalBadge(ride))}</span>` : ""}</div></div>
+      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${valueBadge ? `<span class="value-badge">${escapeHtml(valueBadge)}</span>` : ""}</div></div>
       <div class="ride-status"><span class="wait ${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><span class="status-label">${escapeHtml(status.label)}</span></div>
     </button>
     <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button>
@@ -322,9 +323,9 @@ function renderSettings() {
     <div class="settings-section-title">Customization</div>
     <section class="settings-group liquid-glass">
       <label class="setting-row"><div><strong>Appearance</strong><small>Liquid Glass adapts to light or dark mode.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
-      <div class="setting-row accent-setting"><div><strong>Accent color</strong><small>Changes ParkPulse highlights and glow.</small></div><div class="accent-picker" role="group" aria-label="Accent color">${ACCENTS.map((accent) => `<button type="button" class="accent-swatch accent-${accent.id} ${state.accent === accent.id ? "active" : ""}" data-accent="${accent.id}" aria-label="${accent.label}" aria-pressed="${state.accent === accent.id}"><span></span></button>`).join("")}</div></div>
+      <div class="setting-row accent-setting"><div><strong>Accent color</strong><small>Changes ParkPulse highlights and glow.</small></div><div class="accent-picker" role="group" aria-label="Accent color">${ACCENTS.map((accent) => `<button type="button" class="accent-swatch accent-${accent.id} ${state.accent === accent.id ? "active" : ""}" data-accent-choice="${accent.id}" aria-label="${accent.label}" aria-pressed="${state.accent === accent.id}"><span></span></button>`).join("")}</div></div>
     </section>
-    <div class="settings-section-title">Diagnostics</div>
+    <div class="settings-section-title">Status & diagnostics</div>
     <section class="settings-group liquid-glass">
       <div class="setting-row"><div><strong>Worker</strong><small>Backend and notification monitor</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
       <div class="setting-row"><div><strong>Ride data</strong><small>Last successful app refresh</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
@@ -582,6 +583,9 @@ async function init() {
     renderSettings();
     bindDynamic();
   }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
-  setInterval(() => renderParkHours(), 60 * 1000);
+  setInterval(() => {
+    renderParkHours();
+    renderRideResults();
+  }, 60 * 1000);
 }
 init();

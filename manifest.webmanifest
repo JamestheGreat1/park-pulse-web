@@ -25,13 +25,13 @@
   },
   "icons": [
     {
-      "src": "./assets/icons/icon-192.png?v=1.5.1-desktop",
+      "src": "./assets/icons/icon-192.png?v=1.5.2-pull-refresh",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./assets/icons/icon-512.png?v=1.5.1-desktop",
+      "src": "./assets/icons/icon-512.png?v=1.5.2-pull-refresh",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

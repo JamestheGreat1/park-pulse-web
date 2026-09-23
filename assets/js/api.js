@@ -1,4 +1,4 @@
-import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.3.8";
+import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.3.9";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");
@@ -166,7 +166,7 @@ export class RideData extends EventTarget {
         if (result.status === "fulfilled") {
           const [id, data] = result.value;
           this.byPark.set(id, data.rides || []);
-          if (data.parkHours) this.hoursByPark.set(id, data.parkHours);
+          this.hoursByPark.set(id, data.parkHours || null);
           ok++;
         }
       }

@@ -1,4 +1,4 @@
-import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.5.2-pull-refresh";
+import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.5.3-install-push";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");

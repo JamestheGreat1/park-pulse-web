@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.1-runtime-fix";
-import { store } from "./store.js?v=1.6.1-runtime-fix";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.1-runtime-fix";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.1-runtime-fix";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.2-runtime-fix";
+import { store } from "./store.js?v=1.6.2-runtime-fix";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.2-runtime-fix";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.2-runtime-fix";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.6.2";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -483,7 +483,7 @@ function setTheme() {
 function selectView(name) {
   store.update((s) => { s.activeView = name; }, "view");
   for (const [key, el] of Object.entries(views)) el.classList.toggle("active", key === name);
-  $(".nav-item").forEach((button) => {
+  $$(".nav-item").forEach((button) => {
     const active = button.dataset.viewTarget === name;
     button.classList.toggle("active", active);
     if (active) button.setAttribute("aria-current", "page");
@@ -681,8 +681,8 @@ function render() {
 function bindDynamic() {
   $$('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
   bindRideCards();
-  $('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
-  $('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
+  $$('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
+  $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
   const search = $("#rideSearch"); if (search) search.oninput = () => store.update((s) => { s.query = search.value; }, "search");
   const sort = $("#sortSelect"); if (sort) sort.onchange = () => store.update((s) => { s.sort = sort.value; }, "sort");

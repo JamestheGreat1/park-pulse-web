@@ -1,4 +1,4 @@
-import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.3.7";
+import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.3.8";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");
@@ -88,10 +88,16 @@ export async function fetchPark(parkId) {
   const payload = await fetchJson(url);
 
   if (Array.isArray(payload?.rides) && payload?.parkPulseFormat === 2) {
-    return payload.rides.map((ride) => normalizedWorkerRide(parkId, ride));
+    return {
+      rides: payload.rides.map((ride) => normalizedWorkerRide(parkId, ride)),
+      parkHours: payload.parkHours || null
+    };
   }
 
-  return parseLegacyQueueTimes(parkId, payload);
+  return {
+    rides: parseLegacyQueueTimes(parkId, payload),
+    parkHours: null
+  };
 }
 
 export async function fetchRideInsights(rideId) {
@@ -116,6 +122,7 @@ export class RideData extends EventTarget {
   constructor() {
     super();
     this.byPark = new Map();
+    this.hoursByPark = new Map();
     this.updatedAt = null;
     this.refreshing = false;
     this.error = null;
@@ -128,6 +135,10 @@ export class RideData extends EventTarget {
 
   allRides() {
     return [...this.byPark.values()].flat();
+  }
+
+  hoursForPark(id) {
+    return this.hoursByPark.get(Number(id)) || null;
   }
 
   rideById(id) {
@@ -153,7 +164,9 @@ export class RideData extends EventTarget {
       let ok = 0;
       for (const result of results) {
         if (result.status === "fulfilled") {
-          this.byPark.set(result.value[0], result.value[1]);
+          const [id, data] = result.value;
+          this.byPark.set(id, data.rides || []);
+          if (data.parkHours) this.hoursByPark.set(id, data.parkHours);
           ok++;
         }
       }

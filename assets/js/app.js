@@ -1,14 +1,14 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.7";
-import { store } from "./store.js?v=1.3.7";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.7";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.7";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.3.8";
+import { store } from "./store.js?v=1.3.8";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.3.8";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.3.8";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
-const APP_VERSION = "1.3.7";
+const APP_VERSION = "1.3.8";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -26,6 +26,24 @@ function zoneParts(date, timeZone) {
     if (part.type !== "literal") values[part.type] = Number(part.value);
   }
   return values;
+}
+function dateKeyInZone(date, timeZone) {
+  const parts = zoneParts(date, timeZone);
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+function formatParkHours(hours) {
+  if (!hours?.timezone || !hours?.date) return "";
+  if (hours.date !== dateKeyInZone(new Date(), hours.timezone)) return "";
+  if (hours.closedToday) return "Closed today";
+  if (!hours.openingTime || !hours.closingTime) return "";
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: hours.timezone,
+    hour: "numeric",
+    minute: "2-digit"
+  });
+
+  return `Today · ${formatter.format(new Date(hours.openingTime))}–${formatter.format(new Date(hours.closingTime))}`;
 }
 function zonedDateToUtc(year, month, day, hour, timeZone) {
   let guess = Date.UTC(year, month - 1, day, hour, 0, 0);
@@ -126,6 +144,7 @@ function renderRideResults() {
 function renderExplore() {
   const state = store.snapshot;
   const activeCount = state.rules.length;
+  const parkHours = formatParkHours(rideData.hoursForPark(state.selectedParkId));
   views.explore.innerHTML = `
     <section class="hero-card liquid-glass">
       <div><span class="eyebrow">Walt Disney World</span><h2>Stop refreshing wait times.</h2><p>Tell ParkPulse what “worth it” looks like. We’ll watch the ride and buzz you when it gets there.</p></div>
@@ -139,7 +158,7 @@ function renderExplore() {
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
-    <div class="section-heading"><div><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
+    <div class="section-heading"><div><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderWatching() {
@@ -193,10 +212,16 @@ function renderRefreshCopy() {
       ? `Updated ${relativeTime(rideData.updatedAt)}`
       : "Loading…";
 }
+function renderParkHours() {
+  const el = $(".park-hours", views.explore);
+  if (!el) return;
+  el.textContent = formatParkHours(rideData.hoursForPark(store.snapshot.selectedParkId));
+}
 function renderRideDataUpdate() {
   if (document.activeElement?.id !== "rideSearch") return render();
   renderRideResults();
   renderRefreshCopy();
+  renderParkHours();
   renderWatching();
   renderSettings();
   updateWatchBadge();

@@ -3,9 +3,9 @@ main = "src/index.js"
 compatibility_date = "2026-09-01"
 
 [vars]
-APP_URL = "https://jamesthegreat1.github.io/park-pulse-web/"
-APP_ORIGIN = "https://jamesthegreat1.github.io"
-VAPID_SUBJECT = "https://jamesthegreat1.github.io/park-pulse-web/"
+APP_URL = "https://app.useparkpulse.com/"
+APP_ORIGIN = "https://app.useparkpulse.com"
+VAPID_SUBJECT = "https://useparkpulse.com/"
 VAPID_SERVER_PUBLIC_KEY = "BHtuKXYgGJV5cKKyxBecL9DkMp7l86ehRoF3fkTFp2l1G9HkrGlz3GLVlBuYrGf7FXx3zSJUO7GCb-xIYligQ5w"
 
 [[d1_databases]]

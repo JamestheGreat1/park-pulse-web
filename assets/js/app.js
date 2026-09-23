@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.3-install-push";
-import { store } from "./store.js?v=1.5.3-install-push";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.3-install-push";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.3-install-push";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.5.4-copy-polish";
+import { store } from "./store.js?v=1.5.4-copy-polish";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.5.4-copy-polish";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.5.4-copy-polish";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.5.3";
+const APP_VERSION = "1.5.4";
 let installPrompt = null;
 let pushOn = false;
 let backendState = { ok: null };
@@ -162,16 +162,16 @@ function platformInfo() {
 function installSetting() {
   const platform = platformInfo();
   if (platform.standalone) {
-    return { visible: true, installed: true, copy: "Installed on this device", action: "Installed" };
+    return { visible: true, installed: true, copy: "Installed and ready to go.", action: "Installed" };
   }
   if (platform.ios) {
-    return { visible: true, installed: false, copy: "Add to Home Screen, then open ParkPulse there to use Web Push.", action: "Add" };
+    return { visible: true, installed: false, copy: "Add ParkPulse to your Home Screen first — that’s how push works on iPhone and iPad.", action: "Add" };
   }
   if (platform.android) {
-    return { visible: true, installed: false, copy: "Install for app-like launch and background ride alerts.", action: "Install" };
+    return { visible: true, installed: false, copy: "Install it for app-style launch and background ride alerts.", action: "Install" };
   }
   if (installPrompt) {
-    return { visible: true, installed: false, copy: "Install ParkPulse as a desktop app.", action: "Install" };
+    return { visible: true, installed: false, copy: "Install ParkPulse as its own desktop app.", action: "Install" };
   }
   return { visible: false, installed: false, copy: "", action: "" };
 }
@@ -242,7 +242,7 @@ function crowdPresentation(crowd) {
   if (crowd.available) {
     const delta = Number(crowd.deltaPercent || 0);
     const pressureText = Math.abs(delta) < 5
-      ? "Waits are near typical"
+      ? "Waits are about normal"
       : delta < 0
         ? `Waits are ${Math.abs(delta)}% below typical`
         : `Waits are ${delta}% above typical`;
@@ -266,13 +266,13 @@ function crowdPresentation(crowd) {
   }
 
   if (crowd.reason === "ticketed-event") {
-    return { kind: "note", text: "Crowd estimate paused during ticketed event" };
+    return { kind: "note", text: "Crowd estimate paused for the ticketed event" };
   }
 
   if (crowd.reason === "building") {
     return {
       kind: "note",
-      text: `Crowd estimate building · ${Number(crowd.samples || 0)}/${Number(crowd.requiredSamples || 0)} rides`
+      text: `Still building the crowd estimate · ${Number(crowd.samples || 0)}/${Number(crowd.requiredSamples || 0)} rides`
     };
   }
 
@@ -413,7 +413,7 @@ function renderExplore() {
   const crowd = rideData.crowdForPark(state.selectedParkId);
   views.explore.innerHTML = `
     <section class="hero-card liquid-glass">
-      <div><span class="eyebrow">Walt Disney World</span><h2>Stop refreshing wait times.</h2><p>Tell ParkPulse what “worth it” looks like. We’ll watch the ride and buzz you when it gets there.</p></div>
+      <div><span class="eyebrow">Walt Disney World</span><h2>Stop refreshing wait times.</h2><p>Pick a wait you’d actually take. ParkPulse will keep an eye on it and buzz you when it gets there.</p></div>
       <button class="hero-watch" type="button" data-view-jump="watching"><strong>${activeCount}</strong><span>${activeCount === 1 ? "active watch" : "active watches"}</span></button>
     </section>
     <div class="park-strip" role="tablist" aria-label="Park">
@@ -430,14 +430,14 @@ function renderExplore() {
 function renderWatching() {
   const rules = store.snapshot.rules;
   views.watching.innerHTML = `
-    <div class="page-heading"><span class="eyebrow">Your alerts</span><h2>Watching</h2><p>These watches keep running through the backend even when the PWA is closed.</p></div>
-    ${!pushOn ? `<button class="notification-callout liquid-glass" type="button" data-enable-push><span>🔔</span><div><strong>Turn on notifications</strong><small>Your watches are saved, but your phone can’t buzz you yet.</small></div><b>Enable</b></button>` : ""}
+    <div class="page-heading"><span class="eyebrow">Your alerts</span><h2>Watching</h2><p>Your watches keep running after you close ParkPulse. No need to babysit the app.</p></div>
+    ${!pushOn ? `<button class="notification-callout liquid-glass" type="button" data-enable-push><span>🔔</span><div><strong>Turn on notifications</strong><small>Your watches are saved, but notifications are off.</small></div><b>Enable</b></button>` : ""}
     <div class="watch-list">${rules.length ? rules.map((rule) => {
       const ride = rideData.rideById(rule.rideId);
       const detail = [rule.reopen ? "Reopening" : null, rule.threshold ? `≤ ${rule.threshold} min` : null].filter(Boolean).join(" · ");
       const status = rideStatus(ride);
       return `<article class="watch-card liquid-glass ${status.stale ? "stale" : ""}"><button class="watch-card-main" type="button" data-open-ride="${rule.rideId}"><span class="ride-land">${escapeHtml(parkName(rule.parkId))}</span><h3>${escapeHtml(rule.rideName)}</h3><p>${escapeHtml(detail || "Status watch")} · ${remaining(rule)}</p></button><div class="watch-live"><span class="wait ${status.stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><button class="delete-watch" type="button" data-delete-watch="${rule.rideId}" aria-label="Stop watching ${escapeHtml(rule.rideName)}">×</button></div></article>`;
-    }).join("") : `<div class="empty liquid-glass"><span class="empty-icon">🔔</span><h3>Nothing’s being watched yet</h3><p>Pick a ride and set a wait target or reopening alert.</p><button type="button" data-view-jump="explore">Find a ride</button></div>`}</div>`;
+    }).join("") : `<div class="empty liquid-glass"><span class="empty-icon">🔔</span><h3>Nothing here yet</h3><p>Pick a ride, set a target, and ParkPulse will keep an eye on it.</p><button type="button" data-view-jump="explore">Find a ride</button></div>`}</div>`;
 }
 function renderSettings() {
   const state = store.snapshot;
@@ -449,9 +449,9 @@ function renderSettings() {
   const pushCopy = pushOn
     ? "Connected to this device"
     : iosNeedsInstall
-      ? "Install ParkPulse to your Home Screen and open it there before enabling notifications."
+      ? "Add ParkPulse to your Home Screen and open it there first."
       : pushBlocked
-        ? "Blocked in browser or system notification settings."
+        ? "Blocked in your browser or device settings."
         : "Not enabled";
   const pushAction = pushOn
     ? `<button type="button" data-toggle-push class="setting-action">Disable</button>`
@@ -466,29 +466,29 @@ function renderSettings() {
   const backendCopy = backendState?.ok === true ? `Online · Worker ${backendState.version || ""}`.trim() : backendState?.ok === false ? "Unavailable" : "Checking…";
   const refreshCopy = rideData.updatedAt ? relativeTime(rideData.updatedAt) : "Not yet";
   views.settings.innerHTML = `
-    <div class="page-heading"><span class="eyebrow">ParkPulse</span><h2>Settings</h2><p>A tiny ride watcher, not another giant park-planning app.</p></div>
+    <div class="page-heading"><span class="eyebrow">ParkPulse</span><h2>Settings</h2><p>The useful stuff, plus a few ways to make ParkPulse yours.</p></div>
     <section class="settings-group liquid-glass">
       <div class="setting-row"><div><strong>Push notifications</strong><small>${escapeHtml(pushCopy)}</small></div>${pushAction}</div>
-      ${pushOn ? `<div class="setting-row"><div><strong>Test notification</strong><small>Send a real Web Push to this device.</small></div><button type="button" data-test-push class="setting-action">Send test</button></div>` : ""}
+      ${pushOn ? `<div class="setting-row"><div><strong>Test notification</strong><small>Make sure push is actually working on this device.</small></div><button type="button" data-test-push class="setting-action">Send test</button></div>` : ""}
       ${installRow}
     </section>
     <div class="settings-section-title">Customization</div>
     <section class="settings-group liquid-glass">
-      <label class="setting-row"><div><strong>Appearance</strong><small>Liquid Glass adapts to light or dark mode.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
-      <div class="setting-row accent-setting"><div><strong>Accent color</strong><small>Changes ParkPulse highlights and glow.</small></div><div class="accent-picker" role="group" aria-label="Accent color">${ACCENTS.map((accent) => `<button type="button" class="accent-swatch accent-${accent.id} ${state.accent === accent.id ? "active" : ""}" data-accent-choice="${accent.id}" aria-label="${accent.label}" aria-pressed="${state.accent === accent.id}"><span></span></button>`).join("")}</div></div>
+      <label class="setting-row"><div><strong>Appearance</strong><small>Follow your system, or pick light or dark yourself.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
+      <div class="setting-row accent-setting"><div><strong>Accent color</strong><small>Changes the highlights and glow. Purely vibes.</small></div><div class="accent-picker" role="group" aria-label="Accent color">${ACCENTS.map((accent) => `<button type="button" class="accent-swatch accent-${accent.id} ${state.accent === accent.id ? "active" : ""}" data-accent-choice="${accent.id}" aria-label="${accent.label}" aria-pressed="${state.accent === accent.id}"><span></span></button>`).join("")}</div></div>
     </section>
     <div class="settings-section-title">Status & diagnostics</div>
     <section class="settings-group liquid-glass">
-      <div class="setting-row"><div><strong>Worker</strong><small>Backend and notification monitor</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
-      <div class="setting-row"><div><strong>Ride data</strong><small>Last successful app refresh</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
+      <div class="setting-row"><div><strong>Worker</strong><small>Backend + notification status</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
+      <div class="setting-row"><div><strong>Ride data</strong><small>Last time ParkPulse got fresh ride data</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
       <div class="setting-row"><div><strong>Data source</strong><small>ThemeParks.wiki primary · Queue-Times fallback</small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
-      <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Stored only as a Cloudflare Worker secret.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
-      <div class="setting-row"><div><strong>Push server</strong><small>VAPID keys used for background notifications</small></div><span class="health-pill ${backendState?.vapidConfigured ? "good" : "bad"}">${backendState?.vapidConfigured ? "Ready" : "Needs setup"}</span></div>
-      <div class="setting-row"><div><strong>Trend baselines</strong><small>30-day time-of-day history backfill</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : "Building…"}</span></div>
-      <div class="setting-row"><div><strong>App version</strong><small>Installed ParkPulse frontend</small></div><span class="setting-value">v${APP_VERSION}</span></div>
-      <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status only — no push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
+      <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Used by the Worker — never stored in the app.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
+      <div class="setting-row"><div><strong>Push server</strong><small>Background notification setup</small></div><span class="health-pill ${backendState?.vapidConfigured ? "good" : "bad"}">${backendState?.vapidConfigured ? "Ready" : "Needs setup"}</span></div>
+      <div class="setting-row"><div><strong>Trend baselines</strong><small>History used for Best Now + crowd estimates</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : "Building…"}</span></div>
+      <div class="setting-row"><div><strong>App version</strong><small>What you’re currently running</small></div><span class="setting-value">v${APP_VERSION}</span></div>
+      <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status. No secrets or push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
     </section>
-    <section class="settings-group liquid-glass"><div class="about-row"><strong>Data</strong><p>ThemeParks.wiki is ParkPulse’s primary live source. Queue-Times is used only as a fallback when a curated ride is missing. Stale or missing standby data is labeled instead of being presented as live.</p><a href="https://www.themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki ↗</a> · <a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times ↗</a></div></section>
+    <section class="settings-group liquid-glass"><div class="about-row"><strong>Data</strong><p>ThemeParks.wiki is the main live feed. Queue-Times only steps in when a ride is missing. If the data is stale, ParkPulse says so instead of pretending it’s live.</p><a href="https://www.themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki ↗</a> · <a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times ↗</a></div></section>
     <p class="fine-print">ParkPulse is an independent project and is not affiliated with or endorsed by Disney.</p>`;
 }
 function updateWatchBadge() {
@@ -563,11 +563,11 @@ function openRide(id) {
   const model = ride || existing;
   sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(model.name || model.rideName)}</h2></div><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div>
     <div class="sheet-status"><span class="wait ${rideStatus(ride).stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(rideStatus(ride).wait)}</span><small>${escapeHtml(rideStatus(ride).label)}</small></div>
-    <div id="rideInsights" class="ride-insights"><span class="insight-loading">Loading ParkPulse trend data…</span></div>
+    <div id="rideInsights" class="ride-insights"><span class="insight-loading">Checking the trend data…</span></div>
     <form id="watchForm">
-      <label class="toggle-row"><div><strong>Notify when it reopens</strong><small>Great for temporary downtime.</small></div><input id="reopenToggle" type="checkbox" ${existing?.reopen !== false ? "checked" : ""}><span class="switch"></span></label>
-      <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when the posted wait drops to or below:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>
-      <label class="duration-row"><span><strong>Watch for</strong><small>Temporary watches clean themselves up.</small></span><select id="durationSelect"><option value="today">Today</option><option value="3h">3 hours</option><option value="forever" ${existing && !existing.expiresAt ? "selected" : ""}>Until disabled</option></select></label>
+      <label class="toggle-row"><div><strong>Notify when it reopens</strong><small>Useful when a ride goes down.</small></div><input id="reopenToggle" type="checkbox" ${existing?.reopen !== false ? "checked" : ""}><span class="switch"></span></label>
+      <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when it hits this wait or better:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>
+      <label class="duration-row"><span><strong>Watch for</strong><small>Pick how long ParkPulse should keep checking.</small></span><select id="durationSelect"><option value="today">Today</option><option value="3h">3 hours</option><option value="forever" ${existing && !existing.expiresAt ? "selected" : ""}>Until disabled</option></select></label>
       <button class="primary-button" type="submit">${existing ? "Save watch" : "Start watching"}</button>
       ${existing ? `<button class="danger-text" type="button" data-remove-current>Stop watching this ride</button>` : ""}
     </form>`;
@@ -586,7 +586,7 @@ function openRide(id) {
     if (!reopen && !waitTarget) return toast("Choose at least one alert.");
     const duration = $("#durationSelect").value;
     store.saveRule({ rideId: id, parkId: model.parkId, rideName: model.name || model.rideName, land: model.land || "", reopen, threshold: waitTarget, expiresAt: durationExpiry(duration), createdAt: existing?.createdAt || Date.now() });
-    if (!pushOn) toast("Watch saved — enable notifications to get buzzed.");
+    if (!pushOn) toast("Watch saved — turn on notifications if you want it to buzz you.");
     else { await safeSync(); toast("Watch saved"); }
     closeSheet();
   };
@@ -597,7 +597,7 @@ async function loadRideInsights(id) {
   if (!host || sheet.classList.contains("hidden")) return;
 
   if (!data?.available) {
-    host.innerHTML = '<span class="insight-loading">ParkPulse is building trend history. This gets smarter as the 5-minute samples accumulate.</span>';
+    host.innerHTML = '<span class="insight-loading">Still building enough history for this ride. Give it a little time.</span>';
     return;
   }
 
@@ -613,13 +613,13 @@ async function loadRideInsights(id) {
   }
 
   const sourceCopy = data.baselineSource === "themeparks-history"
-    ? `30-day ThemeParks history · ${data.samples?.baselineDays || 0} days represented`
+    ? `30-day ThemeParks history · ${data.samples?.baselineDays || 0} days with data`
     : "ParkPulse is still building the historical baseline.";
 
   host.innerHTML = `
     <div class="insight-head"><span>ParkPulse trend</span>${data.comparison?.label ? `<b>${escapeHtml(data.comparison.label)}</b>` : ""}</div>
     ${stats.length ? `<div class="insight-grid">${stats.join("")}</div>` : ""}
-    <small>${escapeHtml(sourceCopy)} Today’s range comes from ParkPulse’s own live samples.</small>
+    <small>${escapeHtml(sourceCopy)} Today’s range comes from ParkPulse’s live samples.</small>
   `;
 }
 
@@ -642,16 +642,16 @@ function migrateLegacyRules() {
   if (changed) store.update((state) => { state.rules = next; }, "rule-migration");
   return changed;
 }
-async function safeSync() { try { await syncRules(store.snapshot.rules); } catch { toast("Saved locally; notification sync failed."); } }
+async function safeSync() { try { await syncRules(store.snapshot.rules); } catch { toast("Saved here, but notification sync failed."); } }
 async function activatePush() {
   const platform = platformInfo();
   if (platform.ios && !platform.standalone) {
-    return toast("On iPhone/iPad, add app.useparkpulse.com to your Home Screen, open that icon, then enable notifications.");
+    return toast("On iPhone/iPad, add ParkPulse to your Home Screen, open it there, then turn notifications on.");
   }
   if ("Notification" in window && Notification.permission === "denied") {
     return toast(platform.ios
       ? "Notifications are blocked. Allow ParkPulse in iOS Settings → Notifications, then try again."
-      : "Notifications are blocked in your browser or system settings.");
+      : "Notifications are blocked in your browser or device settings.");
   }
   try {
     await enablePush();
@@ -665,7 +665,7 @@ async function activatePush() {
 }
 async function deactivatePush() { await disablePush().catch(() => {}); pushOn = false; render(); toast("Notifications disabled"); }
 async function testNotification() {
-  try { await sendTestPush(); toast("Test sent — watch for the notification."); }
+  try { await sendTestPush(); toast("Test sent — you should get it in a second."); }
   catch (error) { toast(error.message || "Couldn't send test notification."); }
 }
 async function copyDiagnostics() {
@@ -699,7 +699,7 @@ async function installApp() {
     return;
   }
 
-  if (platform.ios) return toast("On iPhone/iPad: Share → Add to Home Screen.");
+  if (platform.ios) return toast("On iPhone/iPad: Share → Add to Home Screen, then open ParkPulse from there.");
   if (platform.android) return toast("On Android: browser menu → Install app / Add to Home screen.");
   toast("Use your browser menu → Install ParkPulse.");
 }

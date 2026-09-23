@@ -10,7 +10,6 @@ $RepoRoot = $PSScriptRoot
 $WorkerDir = Join-Path $RepoRoot "worker"
 $WranglerConfig = Join-Path $WorkerDir "wrangler.toml"
 $FrontendConfig = Join-Path $RepoRoot "assets\js\config.js"
-$AdminTokenFile = Join-Path $RepoRoot ".parkpulse-admin-token.txt"
 $VapidKeyFile = Join-Path $RepoRoot ".parkpulse-vapid-keys.json"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -177,14 +176,11 @@ try {
     Assert-LastCommand "Applying the D1 schema"
 
     Write-Step "Deploying the ParkPulse Worker and its secrets"
-    $AdminToken = New-UrlSafeToken
-    [IO.File]::WriteAllText($AdminTokenFile, $AdminToken + [Environment]::NewLine, $Utf8NoBom)
 
     $SecretFile = [IO.Path]::GetTempFileName()
     try {
         $SecretJson = @{
             VAPID_SERVER_PRIVATE_KEY = $PrivateKey
-            PUSH_ADMIN_TOKEN = $AdminToken
         } | ConvertTo-Json -Compress
         [IO.File]::WriteAllText($SecretFile, $SecretJson, $Utf8NoBom)
 
@@ -300,6 +296,5 @@ Write-Host ""
 Write-Host "ParkPulse push deployment is complete." -ForegroundColor Green
 Write-Host "Worker: $WorkerUrl"
 Write-Host "PWA: https://jamesthegreat1.github.io/park-pulse-web/"
-Write-Host "The push test admin token is stored locally in .parkpulse-admin-token.txt. Do not share or commit it."
 Write-Host "The reusable VAPID key pair is stored locally in .parkpulse-vapid-keys.json. Keep it private and do not commit it."
 Write-Host "GitHub Pages may take a minute or two to publish the updated Worker URL."

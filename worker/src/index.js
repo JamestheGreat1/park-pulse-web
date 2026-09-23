@@ -1,6 +1,6 @@
-import { buildPushPayload } from "@block65/webcrypto-web-push";
+import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.3.5";
+const VERSION = "1.3.6";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -106,6 +106,7 @@ export default {
           historyBackfillEnabled: Boolean(env.THEMEPARKS_API_KEY),
           historyBackfillBatchSize: BASELINE_BATCH_SIZE,
           liveFreshnessMinutes: LIVE_FRESHNESS_MS / 60000,
+          vapidConfigured: Boolean(env.VAPID_SUBJECT && env.VAPID_SERVER_PUBLIC_KEY && env.VAPID_SERVER_PRIVATE_KEY),
           now: new Date().toISOString()
         }, 200, cors);
       }
@@ -184,18 +185,48 @@ export default {
       if (request.method === "POST" && url.pathname === "/subscriptions/test") {
         const body = await request.json().catch(() => ({}));
         const subscription = validateSubscription(body?.subscription);
-        if (!subscription) return json({ error: "Invalid push subscription" }, 400, cors);
+        if (!subscription) return json({ error: "Invalid push subscription", code: "INVALID_SUBSCRIPTION" }, 400, cors);
 
-        const delivered = await sendPush(subscription, {
-          title: "ParkPulse test",
-          body: "Notifications are connected and ready for your ride watches.",
-          url: env.APP_URL || "/",
-          tag: "parkpulse-device-test",
-          renotify: true
-        }, env);
+        try {
+          const delivered = await sendPush(subscription, {
+            title: "ParkPulse test",
+            body: "Notifications are connected and ready for your ride watches.",
+            url: env.APP_URL || "/",
+            tag: "parkpulse-device-test",
+            renotify: true
+          }, env);
 
-        if (!delivered) return json({ error: "Push subscription expired" }, 410, cors);
-        return json({ ok: true, delivered: true }, 200, cors);
+          if (!delivered) {
+            return json({
+              error: "Push subscription expired",
+              code: "SUBSCRIPTION_EXPIRED"
+            }, 410, cors);
+          }
+
+          return json({ ok: true, delivered: true }, 200, cors);
+        } catch (error) {
+          console.warn("Push test failed", error);
+
+          if (error?.code === "PUSH_CONFIG_MISSING") {
+            return json({
+              error: "Push server configuration is incomplete",
+              code: "PUSH_CONFIG_MISSING"
+            }, 503, cors);
+          }
+
+          if (Number.isFinite(Number(error?.pushStatus))) {
+            return json({
+              error: "Push provider rejected the notification",
+              code: "PUSH_PROVIDER_REJECTED",
+              pushStatus: Number(error.pushStatus)
+            }, 502, cors);
+          }
+
+          return json({
+            error: "Push send failed",
+            code: "PUSH_SEND_FAILED"
+          }, 500, cors);
+        }
       }
 
       if (request.method === "DELETE" && url.pathname === "/subscriptions") {
@@ -1424,32 +1455,45 @@ function json(value, status = 200, headers = {}) {
 }
 
 async function sendPush(row, data, env) {
+  if (!env.VAPID_SUBJECT || !env.VAPID_SERVER_PUBLIC_KEY || !env.VAPID_SERVER_PRIVATE_KEY) {
+    const error = new Error("Push server configuration is incomplete");
+    error.code = "PUSH_CONFIG_MISSING";
+    throw error;
+  }
+
   const subscription = {
     endpoint: row.endpoint,
-    expirationTime: null,
     keys: {
       p256dh: row.p256dh,
       auth: row.auth
     }
   };
 
-  const vapid = {
+  const vapidDetails = {
     subject: env.VAPID_SUBJECT,
     publicKey: env.VAPID_SERVER_PUBLIC_KEY,
     privateKey: env.VAPID_SERVER_PRIVATE_KEY
   };
 
-  const requestInit = await buildPushPayload({
-    data: JSON.stringify(data),
-    options: {
-      ttl: 300,
-      urgency: "high",
-      topic: String(data.tag || "parkpulse")
-    }
-  }, subscription, vapid);
+  try {
+    await sendNotification(
+      subscription,
+      JSON.stringify(data),
+      {
+        vapidDetails,
+        TTL: 300,
+        urgency: "high",
+        topic: String(data.tag || "parkpulse")
+      }
+    );
+    return true;
+  } catch (cause) {
+    const status = Number(cause?.statusCode || cause?.status || 0);
+    if (status === 404 || status === 410) return false;
 
-  const response = await fetch(subscription.endpoint, requestInit);
-  if (response.status === 404 || response.status === 410) return false;
-  if (!response.ok) throw new Error(`Push service returned ${response.status}`);
-  return true;
+    const error = new Error(status ? `Push service returned ${status}` : "Push send failed");
+    error.code = "PUSH_SEND_FAILED";
+    if (status) error.pushStatus = status;
+    throw error;
+  }
 }

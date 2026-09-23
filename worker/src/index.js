@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.5.2";
+const VERSION = "1.5.3";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -206,7 +206,7 @@ export default {
         try {
           const delivered = await sendPush(subscription, {
             title: "ParkPulse test",
-            body: "Notifications are connected and ready for your ride watches.",
+            body: "Yep — notifications are working.",
             url: env.APP_URL || "/",
             tag: "parkpulse-device-test",
             renotify: true
@@ -274,6 +274,29 @@ export default {
 
 function ride(key, name, land, aliases = [], keepWhenMissing = false) {
   return { key, name, land, aliases, keepWhenMissing };
+}
+
+const NOTIFICATION_RIDE_NAMES = new Map([
+  ["mk:big-thunder", "Big Thunder"],
+  ["mk:seven-dwarfs", "Seven Dwarfs"],
+  ["mk:peoplemover", "PeopleMover"],
+  ["mk:tron", "TRON"],
+  ["epcot:figment", "Figment"],
+  ["epcot:cosmic-rewind", "Cosmic Rewind"],
+  ["epcot:soarin", "Soarin'"],
+  ["epcot:gran-fiesta", "Gran Fiesta Tour"],
+  ["epcot:remy", "Remy's Ratatouille"],
+  ["dhs:runaway-railway", "Runaway Railway"],
+  ["dhs:millennium-falcon", "Millennium Falcon"],
+  ["dhs:rise", "Rise of the Resistance"],
+  ["dhs:tower-of-terror", "Tower of Terror"],
+  ["dhs:rock-n-roller", "Rock 'n' Roller Coaster"],
+  ["ak:expedition-everest", "Everest"],
+  ["ak:flight-of-passage", "Flight of Passage"]
+]);
+
+function notificationRideName(ride) {
+  return NOTIFICATION_RIDE_NAMES.get(String(ride?.id || "")) || String(ride?.name || "Attraction");
 }
 
 function normalizeName(value) {
@@ -1079,11 +1102,16 @@ async function runRideWatch(env) {
         let payload = null;
         let kind = null;
 
+        const pushRideName = notificationRideName(ride);
+        const pushParkName = PARKS.get(ride.parkId).name;
+
         if (reopened && rule.reopen) {
           kind = "reopen";
           payload = {
-            title: `${ride.name} reopened`,
-            body: `${PARKS.get(ride.parkId).name} • ${ride.waitTime > 0 ? `${ride.waitTime} min` : "Open now"}`,
+            title: ride.waitTime > 0
+              ? `${pushRideName} reopened • ${ride.waitTime} min`
+              : `${pushRideName} reopened`,
+            body: pushParkName,
             url: `${env.APP_URL || "/"}?ride=${encodeURIComponent(ride.id)}`,
             tag: `ride-${safeTag(ride.id)}-reopen`,
             renotify: true
@@ -1100,8 +1128,8 @@ async function runRideWatch(env) {
         ) {
           kind = "wait";
           payload = {
-            title: `${ride.name} is down to ${ride.waitTime} min`,
-            body: `Your target was ${rule.threshold} min • ${PARKS.get(ride.parkId).name}`,
+            title: `${pushRideName} • ${ride.waitTime} min`,
+            body: `Target ≤${rule.threshold} • ${pushParkName}`,
             url: `${env.APP_URL || "/"}?ride=${encodeURIComponent(ride.id)}`,
             tag: `ride-${safeTag(ride.id)}-wait`,
             renotify: true

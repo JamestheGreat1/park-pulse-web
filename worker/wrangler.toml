@@ -3,7 +3,7 @@ main = "src/index.js"
 compatibility_date = "2026-09-01"
 
 [secrets]
-required = ["VAPID_SERVER_PRIVATE_KEY", "THEMEPARKS_API_KEY"]
+required = ["VAPID_SERVER_PRIVATE_KEY", "THEMEPARKS_API_KEY", "REFRESH_ADMIN_TOKEN"]
 
 [vars]
 APP_URL = "https://app.useparkpulse.com/"

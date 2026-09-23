@@ -314,3 +314,62 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 @media (min-width:1440px) {
   .shell-width{width:min(1240px,calc(100% - 72px))}
 }
+
+
+/* Native mobile pull-to-refresh */
+.pull-refresh{
+  --pull-y:0px;
+  position:fixed;
+  z-index:75;
+  left:50%;
+  top:calc(env(safe-area-inset-top,0px) + 6px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+  opacity:0;
+  transform:translate(-50%,calc(-58px + var(--pull-y)));
+  transition:transform .2s cubic-bezier(.2,.8,.2,1),opacity .16s ease;
+}
+.pull-refresh.active{opacity:1}
+.pull-refresh.pulling{transition:none}
+.pull-refresh.no-transition{transition:none!important}
+.pull-refresh-pill{
+  min-height:40px;
+  padding:8px 13px 8px 10px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--muted);
+  font-size:.76rem;
+  font-weight:760;
+  box-shadow:0 12px 34px rgba(0,0,0,.22);
+}
+.pull-refresh-icon{
+  width:25px;
+  height:25px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  color:var(--blue);
+  background:rgba(var(--blue2-rgb),.12);
+  transition:transform .18s ease,background-color .18s ease;
+}
+.pull-refresh-icon svg{width:15px;height:15px}
+.pull-refresh.armed .pull-refresh-icon{
+  transform:rotate(90deg);
+  background:rgba(var(--blue2-rgb),.2);
+}
+.pull-refresh.refreshing .pull-refresh-icon{animation:pull-refresh-spin .8s linear infinite}
+.pull-refresh.success .pull-refresh-icon{background:rgba(118,227,170,.14);color:var(--green)}
+.pull-refresh.error .pull-refresh-icon{background:rgba(255,142,157,.14);color:var(--red)}
+body.ptr-tracking{overscroll-behavior-y:none}
+@keyframes pull-refresh-spin{to{transform:rotate(360deg)}}
+@media (pointer:coarse) and (max-width:1023px){
+  .pull-refresh.enabled{display:flex}
+}
+@media(prefers-reduced-motion:reduce){
+  .pull-refresh,.pull-refresh-icon{transition:none!important}
+  .pull-refresh.refreshing .pull-refresh-icon{animation-duration:1.4s}
+}

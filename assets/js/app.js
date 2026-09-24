@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.5";
-import { store } from "./store.js?v=1.6.5";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.5";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.5";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.6";
+import { store } from "./store.js?v=1.6.6";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.6";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.6";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.6.5";
+const APP_VERSION = "1.6.6";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -613,6 +613,26 @@ function renderSettings() {
     : "";
   const backendCopy = backendState?.ok === true ? `Online · Worker ${backendState.version || ""}`.trim() : backendState?.ok === false ? "Unavailable" : "Checking…";
   const refreshCopy = rideData.updatedAt ? relativeTime(rideData.updatedAt) : "Not yet";
+  const notificationEngine = backendState?.notificationEngine || null;
+  const alertEngineCopy = !backendState?.ok
+    ? "Waiting for the Worker"
+    : !notificationEngine
+      ? "Deploy the latest Worker to check scheduled alerts"
+      : notificationEngine.status === "running"
+        ? `Checked ${relativeTime(notificationEngine.lastCheck)} · every ${notificationEngine.cadenceMinutes || 5} min`
+        : notificationEngine.status === "waiting"
+          ? "Waiting for the first scheduled check"
+          : notificationEngine.status === "stale"
+            ? `Last checked ${relativeTime(notificationEngine.lastCheck)} · scheduler may be stuck`
+            : "Alert evaluator isn’t available";
+  const alertEngineLabel = !notificationEngine
+    ? "Worker update"
+    : notificationEngine.status === "running"
+      ? "Running"
+      : notificationEngine.status === "waiting"
+        ? "Starting"
+        : "Needs attention";
+  const alertEngineTone = notificationEngine?.status === "running" ? "good" : notificationEngine ? "bad" : "";
   const historyDiagnosticsAvailable = analyticsState?.ok === true && typeof analyticsState.historyCollecting === "boolean";
   views.settings.innerHTML = `
     <div class="page-heading"><span class="eyebrow">ParkPulse</span><h2>Settings</h2><p>The useful stuff, plus a few ways to make ParkPulse yours.</p></div>
@@ -633,6 +653,7 @@ function renderSettings() {
       <div class="setting-row"><div><strong>Data source</strong><small>ThemeParks.wiki primary · Queue-Times fallback</small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
       <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Used by the Worker — never stored in the app.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
       <div class="setting-row"><div><strong>Push server</strong><small>Background notification setup</small></div><span class="health-pill ${backendState?.vapidConfigured ? "good" : "bad"}">${backendState?.vapidConfigured ? "Ready" : "Needs setup"}</span></div>
+      <div class="setting-row"><div><strong>Ride alert engine</strong><small>${escapeHtml(alertEngineCopy)}</small></div><span class="health-pill ${alertEngineTone}">${escapeHtml(alertEngineLabel)}</span></div>
       <div class="setting-row"><div><strong>History collection</strong><small>${!historyDiagnosticsAvailable ? "Update the Worker to check the five-minute history sampler." : analyticsState.historyCollecting ? "Five-minute ride samples are coming in normally." : analyticsState.latestHistorySample ? `Last sample ${relativeTime(analyticsState.latestHistorySample)} — this may need attention.` : "Waiting for the first history sample."}</small></div><span class="health-pill ${historyDiagnosticsAvailable && analyticsState.historyCollecting ? "good" : historyDiagnosticsAvailable ? "bad" : ""}">${!historyDiagnosticsAvailable ? "Worker update" : analyticsState.historyCollecting ? "Collecting" : "Not current"}</span></div>
       <div class="setting-row"><div><strong>Trend baselines</strong><small>${analyticsState?.themeParksApiKeyConfigured === false ? "Historical backfill is paused because the ThemeParks API key is missing." : "History used for Best Now + crowd estimates"}</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : "Building…"}</span></div>
       <div class="setting-row"><div><strong>App version</strong><small>What you’re currently running</small></div><span class="setting-value">v${APP_VERSION}</span></div>
@@ -789,7 +810,7 @@ function openRide(id) {
     <div id="rideInsights" class="ride-insights"><span class="insight-loading">Checking the trend data…</span></div>
     <form id="watchForm">
       <label class="toggle-row"><div><strong>Notify when it reopens</strong><small>Useful when a ride goes down.</small></div><input id="reopenToggle" type="checkbox" ${existing?.reopen !== false ? "checked" : ""}><span class="switch"></span></label>
-      <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when it hits this wait or better:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>
+      <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when the wait drops to this or better:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>
       <label class="duration-row"><span><strong>Watch for</strong><small>Pick how long ParkPulse should keep checking.</small></span><select id="durationSelect">${existing ? `<option value="keep" selected>Keep current expiration</option>` : ""}<option value="today">Today</option><option value="3h">3 hours</option><option value="forever" >Until disabled</option></select></label>
       <button class="primary-button" type="submit">${existing ? "Save watch" : "Start watching"}</button>
       ${existing ? `<button class="danger-text" type="button" data-remove-current>Stop watching this ride</button>` : ""}
@@ -972,6 +993,8 @@ async function copyDiagnostics() {
     `Ride sources: ${rideData.sourceSummary || "none"}`,
     `ThemeParks API key: ${backendState?.themeParksApiKeyConfigured ? "configured" : "anonymous"}`,
     `VAPID push server: ${backendState?.vapidConfigured ? "configured" : "missing"}`,
+    `Ride alert engine: ${backendState?.notificationEngine?.status || "unknown"}`,
+    `Ride alert last check: ${backendState?.notificationEngine?.lastCheck || "none"}`,
     `History collection: ${analyticsState?.historyCollecting ? "collecting" : analyticsState?.historyStatus || "unknown"}`,
     `History rides (31d): ${analyticsState?.ok ? analyticsState.historyRides : "unknown"}`,
     `Recent history samples: ${analyticsState?.ok ? analyticsState.recentHistorySamples : "unknown"}`,

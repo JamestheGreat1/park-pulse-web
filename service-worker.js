@@ -1,5 +1,5 @@
-const CACHE_NAME = "parkpulse-1.7.3-install-align-shell";
-const VERSION = "1.7.1";
+const CACHE_NAME = "parkpulse-1.7.4-history-lines";
+const VERSION = "1.7.4";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
   ...["app", "api", "data", "store", "push", "config"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
   `./assets/css/app.css?v=${VERSION}`,

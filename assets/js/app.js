@@ -12,7 +12,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.9";
+const APP_VERSION = "1.7.10";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -469,6 +469,23 @@ function applyPendingUpdate() {
   if (!pendingServiceWorker) return;
   pendingServiceWorker.postMessage({ type: "SKIP_WAITING" });
 }
+async function checkForAppUpdate() {
+  const registration = serviceWorkerRegistration;
+  if (!registration || !navigator.onLine || pendingServiceWorker) return;
+
+  try {
+    const response = await fetch(`./version.json?check=${Date.now()}`, { cache: "no-store" });
+    const remote = response.ok ? await response.json() : null;
+    if (remote?.version && remote.version !== APP_VERSION) {
+      await registration.update();
+      if (registration.waiting) {
+        pendingServiceWorker = registration.waiting;
+        renderStatusBanner();
+      }
+    }
+  } catch {}
+}
+
 function watchForServiceWorkerUpdate(registration) {
   serviceWorkerRegistration = registration;
 
@@ -488,7 +505,8 @@ function watchForServiceWorkerUpdate(registration) {
     });
   });
 
-  setInterval(() => registration.update().catch(() => {}), 30 * 60 * 1000);
+  checkForAppUpdate();
+  setInterval(checkForAppUpdate, 5 * 60 * 1000);
 }
 function setTheme() {
   const state = store.snapshot;
@@ -1289,8 +1307,12 @@ setupSheetDismissGesture();
   });
   window.addEventListener("offline", renderStatusBanner);
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") refreshPushState({ sync: true });
+    if (document.visibilityState === "visible") {
+      refreshPushState({ sync: true });
+      checkForAppUpdate();
+    }
   });
+  window.addEventListener("focus", checkForAppUpdate);
   window.addEventListener("keydown", handleDialogKeydown);
   rideData.addEventListener("update", () => {
     renderRideDataUpdate();

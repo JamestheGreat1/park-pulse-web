@@ -12,7 +12,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.7";
+const APP_VERSION = "1.7.8";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -1223,7 +1223,7 @@ function openInstallHelp() {
   installHelpBackdrop.setAttribute("aria-hidden", "false");
   document.body.classList.add("install-help-open");
 
-  $("[data-close-install-help]", installHelpSheet).forEach((button) => button.onclick = closeInstallHelp);
+  $$("[data-close-install-help]", installHelpSheet).forEach((button) => button.onclick = closeInstallHelp);
   installHelpBackdrop.onclick = closeInstallHelp;
   requestAnimationFrame(() => $("[data-close-install-help]", installHelpSheet)?.focus({ preventScroll: true }));
 }

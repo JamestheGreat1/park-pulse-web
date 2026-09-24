@@ -8,7 +8,7 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.9**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.10**
 
 ## What ParkPulse does
 
@@ -230,3 +230,4 @@ ParkPulse is a personal independent project built because I wanted something sim
 It is not affiliated with, sponsored by, or endorsed by Disney.
 
 **Less refreshing. More riding.**
+\n\nParkPulse checks for a new version when it opens, when you return to it, and about every five minutes while it stays active. When an update is ready, the in-app update banner appears — you shouldn't need to fully quit the PWA first.\n

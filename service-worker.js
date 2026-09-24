@@ -1,5 +1,5 @@
-const CACHE_NAME = "parkpulse-1.7.10-update-check-shell";
-const VERSION = "1.7.10";
+const CACHE_NAME = "parkpulse-1.7.11-diagnostics-retry-shell";
+const VERSION = "1.7.11";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
   ...["app", "api", "data", "store", "push", "config"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
   `./assets/css/app.css?v=${VERSION}`,

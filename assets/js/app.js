@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.4";
-import { store } from "./store.js?v=1.6.4";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.4";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.4";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.5";
+import { store } from "./store.js?v=1.6.5";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.5";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.5";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.6.4";
+const APP_VERSION = "1.6.5";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -303,7 +303,10 @@ function crowdMarkup(crowd, hours, now = Date.now()) {
   if (hours.closedToday || !Number.isFinite(opening) || !Number.isFinite(closing) || now < opening || now >= closing) return "";
   const view = crowdPresentation(crowd);
   if (view.kind === "level") {
-    return `<div class="park-crowd crowd-level-${view.level}"><span class="crowd-score"><b>${view.level}/10</b> ${escapeHtml(view.label)}</span>${view.trend ? `<span class="crowd-trend trend-${view.trend.direction}">${view.trend.symbol} ${escapeHtml(view.trend.label)}</span>` : ""}<span class="crowd-detail">${escapeHtml(view.text)} · ${view.samples} rides</span></div>`;
+    const level = Math.max(1, Math.min(10, Math.round(view.level)));
+    const segments = Array.from({ length: 10 }, (_, i) => `<i${i < level ? ' class="filled"' : ""}></i>`).join("");
+    const expanded = typeof document !== "undefined" && document.querySelector(".crowd-explanation")?.open;
+    return `<div class="park-crowd crowd-level-${level}"><div class="crowd-overview"><span class="crowd-meter" aria-hidden="true">${segments}</span><span class="crowd-score"><b>${level}/10</b> ${escapeHtml(view.label)}</span>${view.trend ? `<span class="crowd-trend trend-${view.trend.direction}">${view.trend.symbol} ${escapeHtml(view.trend.label)}</span>` : ""}</div><span class="crowd-detail">${escapeHtml(view.text)}</span><details class="crowd-explanation"${expanded ? " open" : ""}><summary>About this estimate</summary><p>Based on ${view.samples} rides with usable wait comparisons. This estimates crowd pressure from wait times, not a count of people in the park.</p></details></div>`;
   }
   if (view.kind === "note") {
     return `<div class="park-crowd crowd-note"><span class="crowd-detail">${escapeHtml(view.text)}</span></div>`;

@@ -145,7 +145,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 
 /* Park crowd intelligence */
 .park-crowd-wrap{margin-top:7px}
-.park-crowd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;line-height:1.25}
+.park-crowd{display:flex;flex-direction:column;align-items:flex-start;gap:6px;line-height:1.35;--crowd-color:var(--blue)}
+.crowd-overview{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.crowd-meter{display:inline-flex;gap:3px;width:107px;flex:0 0 107px}
+.crowd-meter i{height:12px;flex:1;border-radius:3px;background:var(--hair);border:1px solid var(--muted);opacity:.3}
+.crowd-meter i.filled{background:var(--crowd-color);border-color:var(--crowd-color);opacity:1}
+.crowd-level-1,.crowd-level-2,.crowd-level-3{--crowd-color:var(--good)}
+.crowd-level-7,.crowd-level-8{--crowd-color:var(--warn)}
+.crowd-level-9,.crowd-level-10{--crowd-color:var(--bad)}
+.crowd-explanation{font-size:.7rem;color:var(--muted);max-width:380px}
+.crowd-explanation summary{cursor:pointer;min-height:24px;padding:4px 0}
+.crowd-explanation summary:focus-visible{outline:2px solid var(--blue);outline-offset:3px;border-radius:3px}
+.crowd-explanation p{margin:5px 0 0;line-height:1.5}
 .crowd-score{font-size:.8rem;font-weight:760;color:var(--text)}
 .crowd-score b{font-size:.88rem;margin-right:3px}
 .crowd-detail{font-size:.74rem;color:var(--muted);font-weight:620}
@@ -169,7 +180,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .value-badge.high{color:var(--warn);background:rgba(var(--warn-rgb),.10);border:1px solid rgba(var(--warn-rgb),.24)}
 .value-badge.very-high{color:var(--bad);background:rgba(var(--bad-rgb),.10);border:1px solid rgba(var(--bad-rgb),.24)}
 .crowd-trend{font-size:.72rem;font-weight:800;text-transform:capitalize}
-.trend-up{color:#f1c56f}.trend-down{color:var(--green)}.trend-steady{color:var(--muted)}
+.trend-up{color:var(--warn)}.trend-down{color:var(--good)}.trend-steady{color:var(--muted)}
 .settings-section-title{padding:6px 7px 9px;font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;font-weight:800;color:var(--muted)}
 .accent-setting{align-items:center}
 .accent-picker{display:flex!important;flex-direction:row!important;align-items:center;justify-content:flex-end;gap:7px!important;flex-wrap:wrap;max-width:210px}
@@ -467,4 +478,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,[t
 }
 @media(prefers-reduced-motion:reduce){
   .network-banner,.first-run-card{scroll-behavior:auto}
+}
+
+/* Native dropdown menus need opaque surfaces; glass is for the closed control. */
+select{color-scheme:inherit}
+select option,select optgroup{color:var(--text);background-color:var(--bg2)}
+select option:disabled{color:var(--muted)}
+@media(forced-colors:active){
+  select option,select optgroup{color:CanvasText;background-color:Canvas}
+  select option:disabled{color:GrayText}
 }

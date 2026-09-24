@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.5 — 2026-09-24
+
+- Fix native dropdown option contrast with opaque, theme-aware menu colors.
+
+- Add a compact, theme-aware ten-segment crowd meter with the rating and trend.
+- Put wait comparisons on a separate line and sample counts in an accessible expandable explanation.
+- Preserve closed-park hiding. Frontend-only update; no Worker deploy required.
+
 ## 1.6.4 — 2026-09-24
 
 - Hide crowd estimates outside current park operating hours, including before opening and at closing.

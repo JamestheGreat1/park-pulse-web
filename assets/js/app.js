@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.3";
+const APP_VERSION = "1.7.5";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -903,11 +903,19 @@ async function loadRideHistory(id, range = "today") {
   const points = data.points || [];
   const open = points.filter(p => p.isOpen && Number.isFinite(p.waitTime));
   if (!open.length) { host.textContent = "No posted waits collected in this range yet."; return; }
-  const max = Math.max(15, ...open.map(p => p.waitTime));
+
+  const waits = open.map(p => Number(p.waitTime));
+  const low = Math.min(...waits);
+  const high = Math.max(...waits);
+  const average = Math.round(waits.reduce((sum, value) => sum + value, 0) / waits.length);
+  const axisMax = Math.max(15, Math.ceil(high / 15) * 15);
   const start = Date.parse(data.startAt), end = Date.parse(data.endAt);
-  const x = p => 10 + (Date.parse(p.observedAt) - start) / Math.max(1, end - start) * 580;
-  const y = p => 130 - p.waitTime / max * 120;
-  const ordered = [...points].sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt));
+  const plot = { left: 46, right: 590, top: 10, bottom: 130 };
+  const x = p => plot.left + (Date.parse(p.observedAt) - start) / Math.max(1, end - start) * (plot.right - plot.left);
+  const yValue = value => plot.bottom - value / axisMax * (plot.bottom - plot.top);
+  const y = p => yValue(p.waitTime);
+
+  const ordered = [...points].sort((p1, p2) => Date.parse(p1.observedAt) - Date.parse(p2.observedAt));
   const gapLimitMs = Math.max(10, Number(data.bucketMinutes || 5) * 1.75) * 60_000;
   const segments = [];
   let segment = [];
@@ -923,9 +931,7 @@ async function loadRideHistory(id, range = "today") {
       flushSegment();
       continue;
     }
-    if (previousOpen && Date.parse(point.observedAt) - Date.parse(previousOpen.observedAt) > gapLimitMs) {
-      flushSegment();
-    }
+    if (previousOpen && Date.parse(point.observedAt) - Date.parse(previousOpen.observedAt) > gapLimitMs) flushSegment();
     segment.push(point);
     previousOpen = point;
   }
@@ -934,10 +940,39 @@ async function loadRideHistory(id, range = "today") {
   const lines = segments.map(group =>
     `<polyline class="history-line" points="${group.map(p => `${x(p).toFixed(2)},${y(p).toFixed(2)}`).join(" ")}"/>`
   ).join("");
-  const dots = open.map(p => `<circle cx="${x(p).toFixed(2)}" cy="${y(p).toFixed(2)}" r="2.5"/>`).join("");
-  const low = Math.min(...open.map(p => p.waitTime)), high = max === 15 ? Math.max(...open.map(p => p.waitTime)) : max;
-  const format = value => new Date(value).toLocaleString([], { timeZone: data.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  host.innerHTML = `<p>${low}–${high} min · ${open.length} plotted samples</p><svg class="history-chart" viewBox="0 0 600 145" role="img" aria-label="Posted waits from ${low} to ${high} minutes. Continuous samples are connected; closures and missing stretches remain gaps."><path d="M10 10V130H590"/>${lines}${dots}</svg><div class="history-labels"><span>${escapeHtml(format(data.startAt))}</span><span>${escapeHtml(format(data.endAt))}</span></div><small>ParkPulse shared history · park time. ${data.bucketMinutes}-minute samples; continuous waits are connected while closures, unknown waits, and missing stretches stay as gaps.</small>`;
+  const dots = open.map(p => `<circle cx="${x(p).toFixed(2)}" cy="${y(p).toFixed(2)}" r="2.25"/>`).join("");
+
+  const yTicks = [0, axisMax / 3, axisMax * 2 / 3, axisMax];
+  const grid = yTicks.map(value => {
+    const py = yValue(value).toFixed(2);
+    return `<g class="history-grid"><line x1="${plot.left}" y1="${py}" x2="${plot.right}" y2="${py}"/><text x="${plot.left - 7}" y="${(Number(py) + 3).toFixed(2)}" text-anchor="end">${Math.round(value)}m</text></g>`;
+  }).join("");
+  const avgY = yValue(average).toFixed(2);
+  const averageLine = `<line class="history-average-line" x1="${plot.left}" y1="${avgY}" x2="${plot.right}" y2="${avgY}"/><text class="history-average-label" x="${plot.right - 4}" y="${Math.max(plot.top + 9, Number(avgY) - 5).toFixed(2)}" text-anchor="end">avg ${average}m</text>`;
+
+  const timeFormat = value => new Date(value).toLocaleString([], { timeZone: data.timezone, hour: "numeric" });
+  const dateFormat = value => new Date(value).toLocaleString([], { timeZone: data.timezone, month: "short", day: "numeric" });
+  const xTickCount = range === "today" ? 4 : 5;
+  const xTicks = Array.from({ length: xTickCount }, (_, index) => {
+    const ratio = xTickCount === 1 ? 0 : index / (xTickCount - 1);
+    const timestamp = start + (end - start) * ratio;
+    const px = plot.left + (plot.right - plot.left) * ratio;
+    const label = range === "today" ? timeFormat(timestamp) : dateFormat(timestamp);
+    return `<text class="history-x-label" x="${px.toFixed(2)}" y="144" text-anchor="${index === 0 ? "start" : index === xTickCount - 1 ? "end" : "middle"}">${escapeHtml(label)}</text>`;
+  }).join("");
+
+  host.innerHTML = `
+    <div class="history-chart-wrap">
+      <svg class="history-chart" viewBox="0 0 600 150" role="img" aria-label="Wait history from ${low} to ${high} minutes, averaging ${average} minutes. Continuous samples are connected; closures and missing stretches remain gaps.">
+        ${grid}${averageLine}${lines}${dots}${xTicks}
+      </svg>
+    </div>
+    <div class="history-stats" aria-label="Wait history summary">
+      <div><span>↓ Low</span><strong>${low}m</strong></div>
+      <div><span>− Average</span><strong>${average}m</strong></div>
+      <div><span>↑ High</span><strong>${high}m</strong></div>
+    </div>
+    <small class="history-note">${data.bucketMinutes}-minute posted waits. Gaps mean the ride was closed or data wasn’t available.</small>`;
 }
 
 function closeSheet() {
@@ -951,6 +986,64 @@ function closeSheet() {
   sheetReturnFocus = null;
   if (returnTo?.isConnected) requestAnimationFrame(() => returnTo.focus({ preventScroll: true }));
 }
+const SHEET_DISMISS_TRIGGER = 96;
+let sheetGesture = null;
+
+function setupSheetDismissGesture() {
+  sheet.addEventListener("touchstart", (event) => {
+    if (sheet.classList.contains("hidden") || event.touches.length !== 1 || sheet.scrollTop > 1) {
+      sheetGesture = null;
+      return;
+    }
+    const touch = event.touches[0];
+    sheetGesture = { x: touch.clientX, y: touch.clientY, dy: 0, dragging: false };
+  }, { passive: true });
+
+  sheet.addEventListener("touchmove", (event) => {
+    if (!sheetGesture || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - sheetGesture.x;
+    const dy = touch.clientY - sheetGesture.y;
+
+    if (dy <= 0 || Math.abs(dx) > Math.abs(dy) * 0.8 || sheet.scrollTop > 1) {
+      if (!sheetGesture.dragging) sheetGesture = null;
+      return;
+    }
+    if (dy < 8) return;
+
+    sheetGesture.dy = dy;
+    sheetGesture.dragging = true;
+    event.preventDefault();
+    sheet.classList.add("sheet-dragging");
+    sheet.style.setProperty("--sheet-drag-y", `${Math.min(180, dy * 0.72)}px`);
+    backdrop.style.opacity = String(Math.max(0.18, 1 - dy / 320));
+  }, { passive: false });
+
+  const finish = () => {
+    if (!sheetGesture) return;
+    const dismiss = sheetGesture.dragging && sheetGesture.dy >= SHEET_DISMISS_TRIGGER;
+    sheetGesture = null;
+    sheet.classList.remove("sheet-dragging");
+    if (dismiss) {
+      sheet.classList.add("sheet-dismissing");
+      sheet.style.setProperty("--sheet-drag-y", "100vh");
+      backdrop.style.opacity = "0";
+      window.setTimeout(() => {
+        closeSheet();
+        sheet.classList.remove("sheet-dismissing");
+        sheet.style.removeProperty("--sheet-drag-y");
+        backdrop.style.removeProperty("opacity");
+      }, 180);
+    } else {
+      sheet.style.removeProperty("--sheet-drag-y");
+      backdrop.style.removeProperty("opacity");
+    }
+  };
+
+  sheet.addEventListener("touchend", finish, { passive: true });
+  sheet.addEventListener("touchcancel", finish, { passive: true });
+}
+
 function migrateLegacyRules() {
   const current = store.snapshot.rules;
   let changed = false;
@@ -1092,6 +1185,7 @@ async function installApp() {
 async function init() {
   setTheme();
   setupPullToRefresh();
+setupSheetDismissGesture();
   if ("serviceWorker" in navigator) {
     let reloading = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {

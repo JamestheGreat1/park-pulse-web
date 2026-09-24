@@ -142,8 +142,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.6.3`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.6.3' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.6.4`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.6.4' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -169,4 +169,22 @@ test('editing a watch keeps its exact expiration unless a new duration is select
     await element('#watchForm').onsubmit({ preventDefault() {} });
     assert.equal(saved.expiresAt, duration === 'keep' ? existing.expiresAt : 9999999999);
   }
+});
+
+
+test('crowd estimates only display within current known park hours', () => {
+  const app = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  const code = app.slice(app.indexOf('function crowdMarkup('), app.indexOf('function zonedDateToUtc('));
+  const context = vm.createContext({ Date, Number,
+    dateKeyInZone: (date, timezone) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(date),
+    crowdPresentation: () => ({ kind: 'note', text: 'estimate' }), escapeHtml: x => x
+  });
+  const markup = vm.runInContext(code + ';crowdMarkup', context);
+  const hours = { date: '2026-09-24', timezone: 'America/New_York', openingTime: '2026-09-24T09:00:00-04:00', closingTime: '2026-09-25T01:00:00-04:00' };
+  assert.equal(markup({}, hours, Date.parse('2026-09-24T08:59:00-04:00')), '');
+  assert.match(markup({}, hours, Date.parse(hours.openingTime)), /estimate/);
+  assert.equal(markup({}, hours, Date.parse(hours.closingTime)), '');
+  assert.equal(markup({}, { ...hours, closedToday: true }, Date.parse(hours.openingTime)), '');
+  assert.equal(markup({}, null, Date.parse(hours.openingTime)), '');
+  assert.equal(markup({}, { ...hours, openingTime: 'invalid' }, Date.parse(hours.openingTime)), '');
 });

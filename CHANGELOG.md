@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.4 — 2026-09-24
+
+- Hide crowd estimates outside current park operating hours, including before opening and at closing.
+- Hide estimates when current hours are unavailable; recheck visibility every minute.
+- Frontend-only update; no Worker deployment or schema changes required.
+
 ## 1.6.3 — 2026-09-24
 
 - Render immediately while backend and push diagnostics run separately with timeouts.

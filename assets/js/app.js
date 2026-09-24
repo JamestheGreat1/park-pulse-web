@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.3";
-import { store } from "./store.js?v=1.6.3";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.3";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.3";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.4";
+import { store } from "./store.js?v=1.6.4";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.4";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.4";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.6.3";
+const APP_VERSION = "1.6.4";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -295,7 +295,12 @@ function crowdPresentation(crowd) {
 
   return { kind: "none", text: "" };
 }
-function crowdMarkup(crowd) {
+function crowdMarkup(crowd, hours, now = Date.now()) {
+  // Never present cached wait pressure as a live estimate outside today's hours.
+  if (!hours?.timezone || !hours?.date || hours.date !== dateKeyInZone(new Date(now), hours.timezone)) return "";
+  const opening = Date.parse(hours.openingTime);
+  const closing = Date.parse(hours.closingTime);
+  if (hours.closedToday || !Number.isFinite(opening) || !Number.isFinite(closing) || now < opening || now >= closing) return "";
   const view = crowdPresentation(crowd);
   if (view.kind === "level") {
     return `<div class="park-crowd crowd-level-${view.level}"><span class="crowd-score"><b>${view.level}/10</b> ${escapeHtml(view.label)}</span>${view.trend ? `<span class="crowd-trend trend-${view.trend.direction}">${view.trend.symbol} ${escapeHtml(view.trend.label)}</span>` : ""}<span class="crowd-detail">${escapeHtml(view.text)} · ${view.samples} rides</span></div>`;
@@ -564,7 +569,7 @@ function renderExplore() {
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
-    <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
+    <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderWatching() {
@@ -661,7 +666,7 @@ function renderParkHours() {
   }
 
   const crowdEl = $(".park-crowd-wrap", views.explore);
-  if (crowdEl) crowdEl.innerHTML = crowdMarkup(rideData.crowdForPark(parkId));
+  if (crowdEl) crowdEl.innerHTML = crowdMarkup(rideData.crowdForPark(parkId), schedule);
 }
 function renderRideDataUpdate() {
   if (document.activeElement?.id !== "rideSearch") return render();

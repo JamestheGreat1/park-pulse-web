@@ -8,9 +8,11 @@ const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
+const installHelpSheet = $("#installHelpSheet");
+const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.5";
+const APP_VERSION = "1.7.6";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -20,6 +22,7 @@ let analyticsState = null;
 let serviceWorkerRegistration = null;
 let pendingServiceWorker = null;
 let sheetReturnFocus = null;
+let installHelpReturnFocus = null;
 
 const FIRST_RUN_KEY = "parkpulse.quickStart.v1";
 
@@ -790,6 +793,11 @@ function focusableInSheet() {
     .filter((el) => !el.classList.contains("hidden") && el.offsetParent !== null);
 }
 function handleDialogKeydown(event) {
+  if (event.key === "Escape" && installHelpSheet && !installHelpSheet.classList.contains("hidden")) {
+    event.preventDefault();
+    closeInstallHelp();
+    return;
+  }
   if (sheet.classList.contains("hidden")) return;
   if (event.key === "Escape") {
     event.preventDefault();
@@ -1165,6 +1173,61 @@ async function copyDiagnostics() {
   try { await navigator.clipboard.writeText(lines.join("\n")); toast("Diagnostics copied"); }
   catch { toast(lines.join(" · ")); }
 }
+function closeInstallHelp() {
+  if (!installHelpSheet || installHelpSheet.classList.contains("hidden")) return;
+  installHelpSheet.classList.add("hidden");
+  installHelpSheet.setAttribute("aria-hidden", "true");
+  installHelpBackdrop?.classList.add("hidden");
+  installHelpBackdrop?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("install-help-open");
+  const returnTo = installHelpReturnFocus;
+  installHelpReturnFocus = null;
+  if (returnTo?.isConnected) requestAnimationFrame(() => returnTo.focus({ preventScroll: true }));
+}
+function openInstallHelp() {
+  if (!installHelpSheet || !installHelpBackdrop) {
+    return toast("On iPhone/iPad: Share → Add to Home Screen, then open ParkPulse from there.");
+  }
+
+  installHelpReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  installHelpSheet.innerHTML = `
+    <div class="install-help-handle" aria-hidden="true"></div>
+    <div class="install-help-head">
+      <div>
+        <span class="eyebrow">Add to Home Screen</span>
+        <h2 id="installHelpTitle">Add ParkPulse</h2>
+      </div>
+      <button type="button" class="install-help-close" data-close-install-help aria-label="Close">×</button>
+    </div>
+    <p class="install-help-lede">iPhone and iPad need one quick manual step. After this, ParkPulse opens like an app and can use push notifications.</p>
+    <div class="install-help-steps">
+      <div class="install-help-step">
+        <span class="install-help-number">1</span>
+        <span class="install-help-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+        </span>
+        <div><strong>Tap Share in Safari</strong><small>Use the Share button in Safari’s toolbar.</small></div>
+      </div>
+      <div class="install-help-step">
+        <span class="install-help-number">2</span>
+        <span class="install-help-icon install-help-plus" aria-hidden="true">＋</span>
+        <div><strong>Choose Add to Home Screen</strong><small>Then open ParkPulse from the new Home Screen icon.</small></div>
+      </div>
+    </div>
+    <button type="button" class="primary-button install-help-done" data-close-install-help>Got it</button>
+  `;
+
+  installHelpSheet.classList.remove("hidden");
+  installHelpSheet.setAttribute("aria-hidden", "false");
+  installHelpBackdrop.classList.remove("hidden");
+  installHelpBackdrop.setAttribute("aria-hidden", "false");
+  document.body.classList.add("install-help-open");
+
+  $("[data-close-install-help]", installHelpSheet).forEach((button) => button.onclick = closeInstallHelp);
+  installHelpBackdrop.onclick = closeInstallHelp;
+  requestAnimationFrame(() => $("[data-close-install-help]", installHelpSheet)?.focus({ preventScroll: true }));
+}
+
 async function installApp() {
   const platform = platformInfo();
   if (platform.standalone) return toast("ParkPulse is already installed.");
@@ -1178,7 +1241,7 @@ async function installApp() {
     return;
   }
 
-  if (platform.ios) return toast("On iPhone/iPad: Share → Add to Home Screen, then open ParkPulse from there.");
+  if (platform.ios) return openInstallHelp();
   if (platform.android) return toast("On Android: browser menu → Install app / Add to Home screen.");
   toast("Use your browser menu → Install ParkPulse.");
 }

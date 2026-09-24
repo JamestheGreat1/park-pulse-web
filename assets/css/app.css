@@ -507,3 +507,47 @@ select option:disabled{color:var(--muted)}
 .history-heading select{background:var(--bg2);border:1px solid var(--hair);border-radius:10px;padding:10px;min-height:44px}
 .history-chart{width:100%;height:auto;stroke:var(--hair)}.history-chart circle{fill:var(--blue);stroke:none}.history-labels{display:flex;justify-content:space-between;gap:12px;font-size:.7rem;margin-bottom:10px}
 @media(max-width:600px){#view-explore .toolbar{grid-template-columns:1fr 1fr}#view-explore .toolbar .search{grid-column:1/-1}#sortSelect{grid-column:1/-1}}
+
+
+/* v1.7.2 — keep diagnostics values visually anchored to the right */
+.status-diagnostics .setting-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(118px,180px);
+  align-items:center;
+}
+.status-diagnostics .setting-row>div{
+  min-width:0;
+}
+.status-diagnostics .health-pill,
+.status-diagnostics .setting-value,
+.status-diagnostics .setting-action{
+  justify-self:end;
+  margin-left:0;
+  max-width:100%;
+  width:auto;
+  text-align:right;
+}
+.status-diagnostics .health-pill{
+  justify-content:flex-end;
+}
+.status-diagnostics .setting-value{
+  line-height:1.25;
+}
+@media(max-width:640px){
+  .status-diagnostics .setting-row{
+    grid-template-columns:minmax(0,1fr) minmax(106px,42%);
+    align-items:center;
+  }
+  .status-diagnostics .health-pill,
+  .status-diagnostics .setting-value,
+  .status-diagnostics .setting-action{
+    max-width:100%;
+    padding-top:0;
+  }
+}
+@media(max-width:360px){
+  .status-diagnostics .setting-row{
+    grid-template-columns:minmax(0,1fr) minmax(96px,40%);
+    align-items:start;
+  }
+}

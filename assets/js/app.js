@@ -12,7 +12,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.8";
+const APP_VERSION = "1.7.9";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -32,7 +32,9 @@ const ACCENTS = [
   { id:"violet", label:"Violet" },
   { id:"pink", label:"Pink" },
   { id:"orange", label:"Orange" },
-  { id:"green", label:"Green" }
+  { id:"green", label:"Green" },
+  { id:"red", label:"Red" },
+  { id:"gold", label:"Gold" }
 ];
 
 const PULL_REFRESH_TRIGGER = 82;

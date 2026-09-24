@@ -4,7 +4,7 @@ ParkPulse is basically the Walt Disney World app I wanted while actually in the 
 
 No giant itinerary planner. No constantly refreshing wait times. Just the useful stuff.
 
-**Current version: 1.6.2**
+**Current version: 1.6.3**
 
 [Open ParkPulse](https://app.useparkpulse.com/)
 
@@ -141,7 +141,7 @@ Then choose how long you want the watch to last:
 - **3 hours**
 - **Until disabled**
 
-Tap **Start watching** and you're done.
+Tap **Start watching**. Settings shows whether your watches have synced; pending changes retry automatically while the app is open and online.
 
 ParkPulse keeps checking from the backend, so you do **not** need to leave the app open.
 
@@ -206,7 +206,9 @@ There are not enough mature ride baselines available right now to give you a cro
 
 Once push notifications are enabled, ParkPulse can send alerts for your watches while the PWA is closed.
 
-There is a **Send test** button in Settings if you want to make sure everything is working before relying on it in the park.
+The **Send test** button in Settings checks delivery to this device. It does not test ride transitions or the scheduled watcher. Check that Settings says **watches synced**, too.
+
+Offline, ParkPulse can reopen the cached app and last saved ride data. Those waits are last-known values, not live updates. Watch changes made offline need the app reopened online to sync. Editing a watch keeps its existing expiration unless you choose a new duration.
 
 If you change phones or reinstall the PWA, enable notifications again on the new installation.
 

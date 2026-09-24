@@ -1,8 +1,51 @@
-const CACHE_NAME = "parkpulse-1.6.2-runtime-fix-shell";
-const SHELL = ["./","./index.html","./manifest.webmanifest","./version.json","./assets/css/app.css?v=1.6.2-runtime-fix","./assets/js/config.js?v=1.6.2-runtime-fix","./assets/js/app.js?v=1.6.2-runtime-fix","./assets/icons/icon-192.png?v=1.6.2-runtime-fix","./assets/icons/icon-512.png?v=1.6.2-runtime-fix","./assets/icons/apple-touch-icon.png?v=1.6.2-runtime-fix"];
-self.addEventListener("install", e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(SHELL))));
-self.addEventListener("message", e => { if (e.data?.type === "SKIP_WAITING") self.skipWaiting(); });
-self.addEventListener("activate", e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("parkpulse-") && k !== CACHE_NAME).map(k => caches.delete(k)))).then(() => self.clients.claim())));
-self.addEventListener("fetch", e => { if (e.request.method !== "GET") return; const u = new URL(e.request.url); if (u.origin !== location.origin) return; if (e.request.mode === "navigate") { e.respondWith(fetch(e.request).catch(() => caches.match("./index.html"))); return; } e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request).then(r => { const copy = r.clone(); caches.open(CACHE_NAME).then(c => c.put(e.request, copy)); return r; }))); });
-self.addEventListener("push", e => { let p={}; try { p=e.data?.json()||{}; } catch { p={body:e.data?.text()||"Ride update"}; } e.waitUntil(self.registration.showNotification(p.title||"ParkPulse", { body:p.body||"One of your watches changed.", icon:"./assets/icons/icon-192.png?v=1.6.2-runtime-fix", tag:p.tag||"parkpulse", renotify:Boolean(p.renotify), data:{url:p.url||"./"} })); });
-self.addEventListener("notificationclick", e => { e.notification.close(); const target=new URL(e.notification.data?.url||"./", self.location.href).href; e.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(cs => { const c=cs[0]; if(c){c.navigate(target);return c.focus();} return self.clients.openWindow?.(target); })); });
+const CACHE_NAME = "parkpulse-1.6.3-shell";
+const VERSION = "1.6.3";
+const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
+  ...["app", "api", "data", "store", "push", "config"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
+  `./assets/css/app.css?v=${VERSION}`,
+  ...["icon-192", "icon-512", "apple-touch-icon"].map(name => `./assets/icons/${name}.png?v=${VERSION}`)
+];
+self.addEventListener("install", event => event.waitUntil(
+  caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL.map(url => new Request(url, { cache: "reload" }))))
+));
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+});
+self.addEventListener("activate", event => event.waitUntil(
+  caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith("parkpulse-") && key !== CACHE_NAME).map(key => caches.delete(key))))
+    .then(() => self.clients.claim())
+));
+self.addEventListener("fetch", event => {
+  if (event.request.method !== "GET" || new URL(event.request.url).origin !== location.origin) return;
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    if (event.request.mode === "navigate") {
+      try {
+        const response = await fetch(event.request);
+        if (response.ok) return response;
+        return await cache.match("./index.html") || response;
+      } catch { return await cache.match("./index.html") || Response.error(); }
+    }
+    const cached = await cache.match(event.request);
+    if (cached) return cached;
+    const response = await fetch(event.request);
+    if (response.ok && response.type !== "opaque") await cache.put(event.request, response.clone());
+    return response;
+  })());
+});
+self.addEventListener("push", e => { let p={}; try { p=e.data?.json()||{}; } catch { p={body:e.data?.text()||"Ride update"}; } e.waitUntil(self.registration.showNotification(p.title||"ParkPulse", { body:p.body||"One of your watches changed.", icon:"./assets/icons/icon-192.png?v=1.6.3", tag:p.tag||"parkpulse", renotify:Boolean(p.renotify), data:{url:p.url||"./"} })); });
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "./", self.location.href).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const client = windows.find(window => window.url.startsWith(self.registration.scope));
+    if (client) {
+      try {
+        const navigated = await client.navigate(target);
+        if (navigated) return await navigated.focus();
+      } catch { /* Open a fresh window when the old one can no longer navigate. */ }
+    }
+    return self.clients.openWindow?.(target);
+  })());
+});

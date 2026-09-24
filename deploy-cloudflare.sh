@@ -58,7 +58,7 @@ step "Checking the existing ParkPulse Worker secrets"
 SECRETS_JSON="$(npx wrangler secret list --format json)"
 
 missing=()
-for name in VAPID_SERVER_PRIVATE_KEY THEMEPARKS_API_KEY; do
+for name in VAPID_SERVER_PRIVATE_KEY THEMEPARKS_API_KEY REFRESH_ADMIN_TOKEN; do
   if ! grep -Eq "\"name\"[[:space:]]*:[[:space:]]*\"$name\"" <<<"$SECRETS_JSON"; then
     missing+=("$name")
   fi
@@ -80,6 +80,9 @@ if (("${#missing[@]}" > 0)); then
     echo "Do NOT generate a replacement VAPID private key unless you intend to invalidate existing push subscriptions."
     echo "Restore the existing VAPID secret first, then rerun this script."
     echo
+  fi
+  if printf '%s\n' "${missing[@]}" | grep -qx 'REFRESH_ADMIN_TOKEN'; then
+    echo "Set the manual refresh secret: cd worker && npx wrangler secret put REFRESH_ADMIN_TOKEN"
   fi
   exit 1
 fi

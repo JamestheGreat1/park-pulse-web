@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.2-runtime-fix";
-import { store } from "./store.js?v=1.6.2-runtime-fix";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.2-runtime-fix";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.2-runtime-fix";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.3";
+import { store } from "./store.js?v=1.6.3";
+import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.3";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.3";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,9 +10,11 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.6.2";
+const APP_VERSION = "1.6.3";
 let installPrompt = null;
 let pushOn = false;
+let rulesSynced = false;
+let syncQueue = Promise.resolve();
 let backendState = { ok: null };
 let analyticsState = null;
 let serviceWorkerRegistration = null;
@@ -585,7 +587,7 @@ function renderSettings() {
   const iosNeedsInstall = platform.ios && !platform.standalone;
   const pushBlocked = permission === "denied";
   const pushCopy = pushOn
-    ? "Connected to this device"
+    ? (rulesSynced ? "Connected · watches synced" : "Watches pending sync — retrying automatically")
     : iosNeedsInstall
       ? "Add ParkPulse to your Home Screen and open it there first."
       : pushBlocked
@@ -686,7 +688,7 @@ function bindDynamic() {
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
   const search = $("#rideSearch"); if (search) search.oninput = () => store.update((s) => { s.query = search.value; }, "search");
   const sort = $("#sortSelect"); if (sort) sort.onchange = () => store.update((s) => { s.sort = sort.value; }, "sort");
-  $$('[data-delete-watch]').forEach((b) => b.onclick = async () => { store.removeRule(b.dataset.deleteWatch); await safeSync(); toast("Watch removed"); });
+  $$('[data-delete-watch]').forEach((b) => b.onclick = async () => { store.removeRule(b.dataset.deleteWatch); if (await safeSync()) toast("Watch removed"); });
   $$('[data-enable-push]').forEach((b) => b.onclick = activatePush);
   $$('[data-toggle-push]').forEach((b) => b.onclick = pushOn ? deactivatePush : activatePush);
   $$('[data-install]').forEach((b) => b.onclick = installApp);
@@ -742,7 +744,7 @@ async function shareRide(id) {
   }
 }
 function focusableInSheet() {
-  return $('button:not([disabled]), select:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])', sheet)
+  return $$('button:not([disabled]), select:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])', sheet)
     .filter((el) => !el.classList.contains("hidden") && el.offsetParent !== null);
 }
 function handleDialogKeydown(event) {
@@ -780,7 +782,7 @@ function openRide(id) {
     <form id="watchForm">
       <label class="toggle-row"><div><strong>Notify when it reopens</strong><small>Useful when a ride goes down.</small></div><input id="reopenToggle" type="checkbox" ${existing?.reopen !== false ? "checked" : ""}><span class="switch"></span></label>
       <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when it hits this wait or better:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>
-      <label class="duration-row"><span><strong>Watch for</strong><small>Pick how long ParkPulse should keep checking.</small></span><select id="durationSelect"><option value="today">Today</option><option value="3h">3 hours</option><option value="forever" ${existing && !existing.expiresAt ? "selected" : ""}>Until disabled</option></select></label>
+      <label class="duration-row"><span><strong>Watch for</strong><small>Pick how long ParkPulse should keep checking.</small></span><select id="durationSelect">${existing ? `<option value="keep" selected>Keep current expiration</option>` : ""}<option value="today">Today</option><option value="3h">3 hours</option><option value="forever" >Until disabled</option></select></label>
       <button class="primary-button" type="submit">${existing ? "Save watch" : "Start watching"}</button>
       ${existing ? `<button class="danger-text" type="button" data-remove-current>Stop watching this ride</button>` : ""}
     </form>`;
@@ -797,16 +799,16 @@ function openRide(id) {
   $("#thresholdToggle").onclick = () => { thresholdEnabled = !thresholdEnabled; refreshThreshold(); };
   $$('[data-step]', sheet).forEach((b) => b.onclick = () => { threshold = Math.max(5, Math.min(180, threshold + Number(b.dataset.step))); refreshThreshold(); });
   $('[data-close-sheet]').onclick = closeSheet; backdrop.onclick = closeSheet;
-  $('[data-remove-current]', sheet)?.addEventListener("click", async () => { store.removeRule(id); await safeSync(); closeSheet(); toast("Watch removed"); });
+  $('[data-remove-current]', sheet)?.addEventListener("click", async () => { store.removeRule(id); const synced = await safeSync(); closeSheet(); if (synced) toast("Watch removed"); });
   $("#watchForm").onsubmit = async (event) => {
     event.preventDefault();
     const reopen = $("#reopenToggle").checked;
     const waitTarget = thresholdEnabled ? threshold : null;
     if (!reopen && !waitTarget) return toast("Choose at least one alert.");
     const duration = $("#durationSelect").value;
-    store.saveRule({ rideId: id, parkId: model.parkId, rideName: model.name || model.rideName, land: model.land || "", reopen, threshold: waitTarget, expiresAt: durationExpiry(duration), createdAt: existing?.createdAt || Date.now() });
+    store.saveRule({ rideId: id, parkId: model.parkId, rideName: model.name || model.rideName, land: model.land || "", reopen, threshold: waitTarget, expiresAt: duration === "keep" ? existing.expiresAt : durationExpiry(duration), createdAt: existing?.createdAt || Date.now() });
     if (!pushOn) toast("Watch saved — turn on notifications if you want it to buzz you.");
-    else { await safeSync(); toast("Watch saved"); }
+    else { if (await safeSync()) toast("Watch saved"); }
     closeSheet();
   };
 }
@@ -871,9 +873,18 @@ function migrateLegacyRules() {
   if (changed) store.update((state) => { state.rules = next; }, "rule-migration");
   return changed;
 }
-async function safeSync({ quiet = false } = {}) {
+function safeSync(options = {}) {
+  rulesSynced = false;
+  // Serialize full replacements so older saves cannot overwrite newer rules.
+  const task = syncQueue.then(() => performSync(options));
+  syncQueue = task.catch(() => false);
+  return task;
+}
+async function performSync({ quiet = false } = {}) {
   try {
-    const result = await syncRules(store.snapshot.rules);
+    const sent = JSON.stringify(store.snapshot.rules);
+    const result = await syncRules(JSON.parse(sent));
+    rulesSynced = result?.synced === true && sent === JSON.stringify(store.snapshot.rules);
     if (result?.synced === false && result.reason === "subscription") {
       pushOn = false;
       renderWatching();
@@ -882,14 +893,25 @@ async function safeSync({ quiet = false } = {}) {
       if (!quiet) toast("Notifications need to be turned on again.");
       return false;
     }
-    return result?.synced !== false;
+    renderSettings();
+    bindDynamic();
+    return rulesSynced;
   } catch {
-    if (!quiet) toast("Saved here, but notification sync failed.");
+    rulesSynced = false;
+    renderSettings();
+    bindDynamic();
+    if (!quiet) toast("Saved on this device. Notification changes are pending sync.");
     return false;
   }
 }
 async function refreshPushState({ sync = false } = {}) {
-  const next = Boolean(await currentSubscription().catch(() => null));
+  let next;
+  try { next = Boolean(await currentSubscription()); }
+  catch {
+    rulesSynced = false;
+    renderSettings(); bindDynamic();
+    return;
+  }
   const changed = next !== pushOn;
   pushOn = next;
 
@@ -914,14 +936,17 @@ async function activatePush() {
   try {
     await enablePush();
     pushOn = true;
-    await syncRules(store.snapshot.rules);
+    const synced = await safeSync();
     render();
-    toast("Notifications are on");
+    if (synced) toast("Notifications are on — watches synced");
   } catch (error) {
     toast(error.message || "Couldn't enable notifications.");
   }
 }
-async function deactivatePush() { await disablePush().catch(() => {}); pushOn = false; render(); toast("Notifications disabled"); }
+async function deactivatePush() {
+  try { await disablePush(); pushOn = false; rulesSynced = false; render(); toast("Notifications disabled"); }
+  catch { toast("Couldn’t disable notifications. Try again."); }
+}
 async function testNotification() {
   try { await sendTestPush(); toast("Test sent — you should get it in a second."); }
   catch (error) { toast(error.message || "Couldn't send test notification."); }
@@ -930,7 +955,8 @@ async function copyDiagnostics() {
   const lines = [
     `ParkPulse v${APP_VERSION}`,
     `Worker: ${backendState?.ok === true ? "online" : backendState?.ok === false ? "unavailable" : "unknown"}`,
-    `Push: ${pushOn ? "connected" : "not connected"}`,
+    `Push: ${pushOn ? "subscribed" : "not connected"}`,
+    `Watch sync: ${rulesSynced ? "synced" : "pending / unavailable"}`,
     `Notification permission: ${"Notification" in window ? Notification.permission : "unsupported"}`,
     `Platform: ${platformInfo().android ? "Android" : platformInfo().ios ? "iOS" : "browser"}${platformInfo().standalone ? " standalone" : ""}`,
     `Last app refresh: ${rideData.updatedAt || "none"}`,
@@ -975,12 +1001,15 @@ async function init() {
       reloading = true;
       location.reload();
     });
-    const registration = await navigator.serviceWorker.register("./service-worker.js").catch(() => null);
-    if (registration) watchForServiceWorkerUpdate(registration);
+    navigator.serviceWorker.register("./service-worker.js")
+      .then(watchForServiceWorkerUpdate).catch(() => {});
   }
-  backendState = await backendHealth().catch(() => ({ok:false}));
-  analyticsState = await fetchAnalyticsStatus().catch(() => null);
-  pushOn = Boolean(await currentSubscription().catch(() => null));
+  Promise.allSettled([backendHealth(), fetchAnalyticsStatus()]).then(([health, analytics]) => {
+    backendState = health.status === "fulfilled" ? health.value : { ok: false };
+    analyticsState = analytics.status === "fulfilled" ? analytics.value : null;
+    renderSettings(); bindDynamic();
+  });
+  refreshPushState({ sync: true });
   $$('[data-view-target]').forEach((button) => button.onclick = () => selectView(button.dataset.viewTarget));
   $("#refreshButton").onclick = () => rideData.refresh();
   window.addEventListener("beforeinstallprompt", (e) => {
@@ -1015,6 +1044,7 @@ async function init() {
     renderStatusBanner();
   });
   store.addEventListener("change", (e) => {
+    if (["rules", "expired", "rule-migration"].includes(e.detail.reason)) rulesSynced = false;
     if (e.detail.reason === "search") renderRideResults();
     else if (e.detail.reason !== "view") render();
   });
@@ -1033,6 +1063,7 @@ async function init() {
     bindDynamic();
   }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
   setInterval(() => {
+    if (navigator.onLine) refreshPushState({ sync: true });
     renderParkHours();
     renderRideResults();
   }, 60 * 1000);

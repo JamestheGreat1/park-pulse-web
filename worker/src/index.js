@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.5.4";
+const VERSION = "1.6.3";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -1181,6 +1181,8 @@ async function runRideWatch(env) {
           beforeFresh &&
           before.isOpen &&
           ride.isOpen &&
+          before.waitTime != null &&
+          ride.waitTime != null &&
           Number.isFinite(Number(before.waitTime)) &&
           Number.isFinite(Number(ride.waitTime)) &&
           Number(before.waitTime) > rule.threshold &&
@@ -1217,6 +1219,7 @@ async function runRideWatch(env) {
   }
 
   await writeCurrentRideSnapshot(env, current);
+  await writeCurrentRideSnapshot(env, current, true);
 
   await env.DB.prepare(
     "DELETE FROM notification_log_v2 WHERE last_sent < ?"
@@ -1803,7 +1806,8 @@ async function getRideInsights(env, rideKey) {
   };
 }
 
-async function writeCurrentRideSnapshot(env, rides) {
+async function writeCurrentRideSnapshot(env, rides, notificationCheckpoint = false) {
+  const stateTable = notificationCheckpoint ? "notification_ride_state" : "ride_state_v2";
   const now = Date.now();
   const bucket = Math.floor(now / (5 * 60 * 1000)) * (5 * 60 * 1000);
 
@@ -1834,7 +1838,7 @@ async function writeCurrentRideSnapshot(env, rides) {
   if (stateRows.length) {
     statements.push(
       env.DB.prepare(
-        `INSERT OR REPLACE INTO ride_state_v2(
+        `INSERT OR REPLACE INTO ${stateTable}(
            ride_key,park_id,source_id,name,land,is_open,wait_time,source,source_updated_at,updated_at
          )
          SELECT
@@ -1853,7 +1857,7 @@ async function writeCurrentRideSnapshot(env, rides) {
     );
   }
 
-  if (historyRows.length) {
+  if (!notificationCheckpoint && historyRows.length) {
     statements.push(
       env.DB.prepare(
         `INSERT OR REPLACE INTO ride_history(
@@ -1878,7 +1882,7 @@ async function readPriorRideState(env) {
   try {
     const rows = (await env.DB.prepare(
       `SELECT ride_key,park_id,source_id,name,land,is_open,wait_time,source,source_updated_at,updated_at
-       FROM ride_state_v2`
+       FROM notification_ride_state`
     ).all()).results || [];
 
     return rows.map((row) => ({
@@ -1893,8 +1897,8 @@ async function readPriorRideState(env) {
       lastUpdated: row.source_updated_at || null,
       updatedAt: Number(row.updated_at || 0)
     }));
-  } catch {
-    return [];
+  } catch (error) {
+    throw new Error("Notification checkpoint unavailable. Apply worker/schema.sql before deploying.", { cause: error });
   }
 }
 

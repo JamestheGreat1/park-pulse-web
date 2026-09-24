@@ -94,3 +94,18 @@ CREATE TABLE IF NOT EXISTS ride_baseline_meta (
   refreshed_at INTEGER NOT NULL,
   last_error TEXT
 );
+
+
+-- Only scheduled notification evaluation advances this checkpoint.
+CREATE TABLE IF NOT EXISTS notification_ride_state (
+  ride_key TEXT PRIMARY KEY,
+  park_id INTEGER NOT NULL,
+  source_id TEXT,
+  name TEXT NOT NULL,
+  land TEXT,
+  is_open INTEGER NOT NULL,
+  wait_time INTEGER,
+  source TEXT NOT NULL,
+  source_updated_at TEXT,
+  updated_at INTEGER NOT NULL
+);

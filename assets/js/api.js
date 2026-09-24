@@ -1,4 +1,4 @@
-import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.6.2-runtime-fix";
+import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.6.3";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");
@@ -15,7 +15,7 @@ async function fetchJson(url, options = {}) {
       cache: "no-store"
     });
     if (!response.ok) throw new Error(`Request failed (${response.status})`);
-    return response.json();
+    return await response.json();
   } finally {
     clearTimeout(timer);
   }
@@ -138,6 +138,18 @@ export class RideData extends EventTarget {
     this.refreshing = false;
     this.error = null;
     this.sourceSummary = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem("parkpulse.lastGoodRides.v1") || "null");
+      if (saved && Array.isArray(saved.parks)) {
+        for (const [id, data] of saved.parks) {
+          if (!PARKS.some((park) => park.id === Number(id)) || !Array.isArray(data.rides)) continue;
+          this.byPark.set(Number(id), data.rides);
+          this.hoursByPark.set(Number(id), data.parkHours || null);
+          this.crowdByPark.set(Number(id), null);
+        }
+        this.updatedAt = saved.updatedAt || null;
+      }
+    } catch { /* Storage may be unavailable or contain an older invalid snapshot. */ }
   }
 
   ridesForPark(id) {
@@ -193,6 +205,14 @@ export class RideData extends EventTarget {
 
       const sources = new Set(this.allRides().map((ride) => ride.source).filter(Boolean));
       this.sourceSummary = [...sources].sort().join(", ");
+      try {
+        localStorage.setItem("parkpulse.lastGoodRides.v1", JSON.stringify({
+          updatedAt: this.updatedAt,
+          parks: [...this.byPark].map(([id, rides]) => [id, {
+            rides, parkHours: this.hoursByPark.get(id)
+          }])
+        }));
+      } catch { /* Live data remains usable when storage is full or blocked. */ }
     } catch {
       this.error = navigator.onLine
         ? "ParkPulse couldn't reach live ride data."

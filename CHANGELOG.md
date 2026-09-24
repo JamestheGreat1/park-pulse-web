@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.6.3 — 2026-09-24
+
+- Render immediately while backend and push diagnostics run separately with timeouts.
+- Show pending watch sync, retry while online, and serialize rule updates.
+- Recover push-key failures without returning an unsubscribed object.
+- Keep manual refresh separate from notification checkpoints and reject unknown wait alerts.
+- Precache every runtime module, avoid caching HTTP errors, and restore last-good ride data offline.
+- Preserve watch expiration on edits and fix ride-dialog keyboard focus.
+- Requires applying the additive Worker schema before deploying the Worker.
+
+## 1.6.2 — 2026-09-23
+
+- Fixed collection selectors for navigation, first-run dismissal, and view jumps.
+- Refreshed runtime, push, manifest, and PWA cache versions.
+
 ## 1.5.5 — 2026-09-23
 
 - Fixed the bogus `↓ 100% vs typical` badge when a ride did not actually have a historical baseline.

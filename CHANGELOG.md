@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.4 — 2026-09-24
+
+- Connect continuous wait-history samples with a subtle line while keeping closures, unknown waits, and missing stretches as real gaps.
+- Updated chart accessibility/copy to match the new connected-history behavior.
+- Frontend-only update; no Worker deployment required.
+
+
 ## Worker 1.7.2 — 2026-09-24
 
 - Separated hourly baseline/retention maintenance from five-minute alert checks.

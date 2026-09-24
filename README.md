@@ -6,7 +6,7 @@ ParkPulse is basically the Walt Disney World app I wanted while actually in the 
 
 A short wait isn't always a good wait. And standing around refreshing Space Mountain every two minutes is not exactly the vacation plan.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.1**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.2**
 
 ## The useful stuff
 

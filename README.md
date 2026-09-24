@@ -8,7 +8,7 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.6**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.7**
 
 ## What ParkPulse does
 
@@ -40,9 +40,9 @@ You do not have to install anything just to check waits.
 
 If you want the more app-like experience, you can add ParkPulse to your Home Screen.
 
-**iPhone / iPad:** open ParkPulse in Safari, tap **Share → Add to Home Screen**, then launch it from the new icon.
+**iPhone / iPad:** in ParkPulse Settings, tap **Add** for a quick two-step guide. It shows you exactly where to use Safari’s **Share → Add to Home Screen**, then you can launch ParkPulse from the new icon.
 
-**Android:** open ParkPulse in a supported browser such as Chrome and choose **Install app** or **Add to Home screen**.
+**Android:** tap **Install** in ParkPulse Settings. When the browser supports the native PWA prompt, ParkPulse opens it directly; otherwise use the browser’s **Install app / Add to Home screen** option.
 
 **Desktop:** just open it in your browser. ParkPulse automatically uses a wider layout when it has the room.
 

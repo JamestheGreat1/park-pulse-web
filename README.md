@@ -1,72 +1,135 @@
 # ParkPulse
 
-Less refreshing. More riding.
+**Less refreshing. More riding.**
 
-ParkPulse is basically the Walt Disney World app I wanted while actually in the parks: open it, see what's worth riding, watch a few favorites, and get on with your day.
+ParkPulse is basically the Walt Disney World wait-time app I wanted while actually in the parks.
 
-A short wait isn't always a good wait. And standing around refreshing Space Mountain every two minutes is not exactly the vacation plan.
+Open it, see what looks good right now, save the rides you care about, and let ParkPulse keep an eye on the rest. The whole point is to spend less time staring at wait times and more time actually doing stuff.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.3**
+A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-## The useful stuff
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.5**
+
+## What ParkPulse does
 
 - **Live waits and ride status** for Magic Kingdom, EPCOT, Hollywood Studios, and Animal Kingdom.
-- **Best Now** compares a ride's current wait with what's typical for that ride around the same time of day. A 45-minute wait might actually be a pretty good deal.
-- **Wait comparison badges** call out waits that are lower or higher than typical, when enough history is available. Green means a better-than-typical wait; amber and red flag busier conditions.
-- **Favorites without the buzzing.** Star rides to save them, then use the Favorites filter. No notification permission needed.
-- **For me** puts your must-dos and favorites first among fresh, open rides, then compares waits with normal. Best Now keeps its usual ranking.
-- **Shared wait history** lets you check today, the past 7 days, or the past 30 days on a ride’s page. Each dot is a collected wait, not a prediction.
-- **Smart watches** let you follow a ride for a reopening, a wait-time target, or both. Background push alerts can reach you with the app closed.
-- **Crowd pressure at a glance:** a compact ten-segment meter, a 1–10 rating, and a trend when available. See whether waits are building, holding steady, or easing off.
-- **Useful park context:** today's hours, closing countdowns, same-day ticketed events, and observed downtime for rides reported as temporarily down.
-- **Made for your screen.** A compact phone layout, a wider desktop view, light/dark/system appearance, and six accent colors.
+- **Best Now** compares the current wait with what is normally expected for that ride around the same time of day.
+- **Wait comparisons** quickly show when something is running better or worse than typical.
+- **Favorites** let you save rides without turning on notifications.
+- **For me** puts your must-dos and favorites first while still paying attention to the current wait.
+- **Wait history** shows how a ride has moved today, over the past 7 days, or over the past 30 days.
+- **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both.
+- **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
+- **Park context** includes today's hours, closing information, ticketed events, and observed ride downtime.
+- **Customization** includes light, dark, and system themes plus six accent colors.
+- **Mobile-friendly controls** include pull-to-refresh and pull-down-to-close ride sheets.
 
-There's also pull-to-refresh on mobile, ride sharing, a quick first-run explanation, and an update prompt when a new version is ready. No giant itinerary planner. Just the stuff that helps you decide what to do next.
+No giant vacation planner. No twenty-step setup process. Just the stuff that helps answer:
 
-## Get started
+> **What should I ride next?**
 
-### 1. Open it—or add it to your Home Screen
+## Getting started
 
-You can browse waits right away at **[app.useparkpulse.com](https://app.useparkpulse.com/)**.
+### 1. Open ParkPulse
 
-For the app experience:
+You can use ParkPulse right in your browser:
 
-- **iPhone / iPad:** open the link in Safari, tap **Share → Add to Home Screen**, then launch it from that new icon. Use the installed Home Screen app for push notifications.
-- **Android:** open the link in a supported browser such as Chrome, then choose **Install app / Add to Home screen** from the browser menu. You can also use the install option in ParkPulse Settings when available.
-- **Desktop:** open the link in your browser. The layout adapts automatically; installation is optional where your browser supports it.
+**[app.useparkpulse.com](https://app.useparkpulse.com/)**
 
-Want alerts? Open **Settings**, enable **Push notifications**, and allow notifications when prompted.
+You do not have to install anything just to check waits.
 
-### 2. Pick a park and find your next ride
+If you want the more app-like experience, you can add ParkPulse to your Home Screen.
 
-Choose **MK**, **EPCOT**, **DHS**, or **AK** at the top. Leave the sort on **Best Now** to find waits that look good compared with that attraction's usual wait.
+**iPhone / iPad:** open ParkPulse in Safari, tap **Share → Add to Home Screen**, then launch it from the new icon.
 
-For example, **↓ 24% vs typical** means the posted wait is 24% lower than the historical comparison. An upward badge means it's higher. These are comparisons, not promises about how long you'll actually stand in line.
+**Android:** open ParkPulse in a supported browser such as Chrome and choose **Install app** or **Add to Home screen**.
 
-Prefer the basics? Switch to **Lowest wait** or **A–Z**, search for a ride, or use **Open only**.
+**Desktop:** just open it in your browser. ParkPulse automatically uses a wider layout when it has the room.
 
-Tap the star to save a favorite. Want to prioritize a ride? Open its page, enable **Must-do ride**, then choose **For me** in the sort menu. Favorites and must-dos stay on this browser; they don’t create alerts or sync to your iPhone app.
+On iPhone and iPad, the Home Screen version is also the one you should use for push notifications.
 
-On mobile, pull down from the very top and release to refresh. Your watches stay put.
+### 2. Pick a park
 
-### 3. Watch what matters
+Choose **MK**, **EPCOT**, **DHS**, or **AK** at the top.
 
-Tap a ride and choose either or both:
+The default **Best Now** sort is usually the easiest place to start. Instead of only sorting by the smallest number, it asks whether a ride's current wait is actually good *for that ride*.
 
-- Notify when it reopens.
-- Notify when its wait drops to or below your target.
+So if you see:
 
-Choose **Today**, **3 hours**, or **Until disabled**, then tap **Start watching**. Check Settings to make sure your watches have synced.
+**↓ 24% vs typical**
 
-Say Space Mountain is down, but you'd also ride it at 40 minutes or less. Enable the reopening alert, set a 40-minute target, and choose Today. Once notifications are enabled and the watch is synced, you can close the app and go do literally anything else.
+that means the posted wait is about 24% lower than ParkPulse's comparison for that ride around this time.
 
-The **Watching** tab keeps your watches together. Open one to edit it or remove it when you're done. Temporary watches expire automatically, and editing a target keeps the existing deadline unless you change the duration.
+That does **not** mean ParkPulse can predict exactly how long you will stand in line. It is just useful context for the posted wait.
+
+If you want something simpler, you can switch to **Lowest wait** or **A–Z**, search for a ride, or show only open rides.
+
+### 3. Save the stuff you care about
+
+Tap the **star** on a ride to add it to Favorites.
+
+Favorites stay on that device and do not create notifications.
+
+If there is something you absolutely want to ride, open it and turn on **Must-do ride**. Then use the **For me** sort to put your must-dos and favorites toward the top.
+
+That gives you a more personal list without turning ParkPulse into a spreadsheet wearing Mickey ears.
+
+## Watching a ride
+
+This is where ParkPulse becomes genuinely useful.
+
+Open a ride and choose either or both:
+
+- **Notify when it reopens**
+- **Notify when the wait drops to or below your target**
+
+Then choose how long you want ParkPulse to keep watching:
+
+- **Today**
+- **3 hours**
+- **Until disabled**
+
+Tap **Start watching**, and you are good to go.
+
+For example, if Space Mountain is down but you would also ride it at 40 minutes or less, you can turn on the reopening alert *and* set a 40-minute target.
+
+Then go do literally anything else.
+
+Your active watches live in the **Watching** tab. You can open one at any time to change it or stop watching.
+
+Temporary watches expire on their own.
+
+## Wait history
+
+Open a ride and scroll to **Wait history**.
+
+You can switch between:
+
+- **Today**
+- **7 Days**
+- **30 Days**
+
+The chart shows real collected posted waits.
+
+Continuous samples are connected so the trend is easier to read. If the ride was closed, the wait was unknown, or ParkPulse was missing data, the line breaks instead of pretending it knows what happened.
+
+You will also see:
+
+- **Low**
+- **Average**
+- **High**
+- an average reference line
+- time or date labels depending on the range
+
+The goal is not to turn you into a data analyst on vacation. It is just a quick way to answer things like:
+
+> "Has this ride actually been getting better?"
 
 ## Reading the crowd meter
 
-The filled segments show the park's **1–10 crowd-pressure rating**:
+ParkPulse can show a **1–10 crowd-pressure estimate** for the current park.
 
-| Rating | Label |
+| Rating | What it means |
 | --- | --- |
 | 1–2 | Very Light |
 | 3–4 | Light |
@@ -75,39 +138,95 @@ The filled segments show the park's **1–10 crowd-pressure rating**:
 | 9 | Very Busy |
 | 10 | Extremely Busy |
 
-When a trend is available, **↗ Building**, **→ Steady**, or **↘ Easing** tells you which way waits are moving. The quieter line underneath compares waits with typical conditions. Expand **About this estimate** to see how many rides contributed.
+When enough data is available, you may also see:
 
-This is an estimate based on wait times—not a count of people in the park. A low rating doesn't mean every ride has a short line.
+- **↗ Building** — waits are trending upward
+- **→ Steady** — waits are holding pretty steady
+- **↘ Easing** — waits are trending downward
 
-The meter stays hidden outside the park's current operating hours, or when current hours aren't available. If reliable ride history is still building, you'll see that instead of a made-up number. Normal-day crowd estimates also pause during active ticketed events.
+This is based on ride waits, not a literal count of how many people are inside the park.
+
+A low crowd rating also does not mean every single ride will have a short line. Cosmic Rewind can still choose violence.
+
+ParkPulse hides the normal crowd estimate when the park is closed, when current operating hours are unavailable, or during an active ticketed event where the normal comparison would not make much sense.
+
+If there is not enough reliable history yet, ParkPulse will say so instead of inventing a number.
+
+## A few nice mobile things
+
+On a phone:
+
+- **Pull down from the top of the main screen** to refresh ride data.
+- **Pull down on a ride sheet when you are already scrolled to the top** to close it.
+- Ride pages are designed as bottom sheets so you can check something quickly and get back to the park list.
+- The bottom navigation keeps Explore, Watching, and Settings easy to reach.
+
+Small stuff, but it makes ParkPulse feel a lot less like "website pretending to be an app."
 
 ## Make it yours
 
-Head to **Settings → Customization**:
+Go to **Settings → Customization**.
 
-- **Appearance:** System, Dark, or Light.
-- **Accent:** Blue, Cyan, Violet, Pink, Orange, or Green.
+You can choose:
 
-Pick your color and call it a day. The glass styling, highlights, and controls follow along; crowd and wait warnings keep their meaning.
+- **Appearance:** System, Dark, or Light
+- **Accent color:** Blue, Cyan, Violet, Pink, Orange, or Green
 
-## A few things worth knowing
+The accent changes the highlights, buttons, and glow while status colors still keep their actual meaning.
 
-**Notifications aren't instant.** The backend checks rides on a five-minute schedule, and alerts also depend on the source data updating and your device delivering the push. A watch alerts on a qualifying change; saving one isn't a promise of an immediate notification.
+Purely vibes. As it should be.
 
-**Check the ride alert engine too.** Settings shows when the scheduled evaluator last checked rides. “Running” confirms recent checks; it doesn’t guarantee a particular ride will trigger an alert.
+## Push notifications
 
-**“Send test” checks delivery to your device.** It doesn't test a real ride transition. Make sure Settings also says your watches have synced. Pending watch changes retry while the app is open and online.
+If you want ride alerts, open **Settings** and enable **Push notifications**.
 
-**Offline means last-known data.** After a successful load, ParkPulse can reopen its cached app and saved ride data. It can't fetch new waits without a connection. Reopen online to sync any watch changes you made offline.
+Once notifications are enabled, ParkPulse can send ride alerts even while the app is closed.
 
-**“Stale” means the data is too old to trust as live.** “Down 22m” means ParkPulse has observed the current reported downtime for about 22 minutes—not necessarily the exact moment the ride stopped.
+There are a few things worth knowing:
 
-**New phone or reinstall?** Enable notifications again on that installation. Accept the app's update prompt when a new version is ready.
+**Alerts are not instant to the second.** ParkPulse checks rides on a schedule, and delivery also depends on when the source data updates and when your device receives the push.
 
-## Data and project info
+**Make sure your watches are synced.** Settings will tell you whether push is connected and whether your watches made it to the backend.
 
-ParkPulse uses [ThemeParks.wiki](https://www.themeparks.wiki/) as its primary live source and [Queue-Times](https://queue-times.com/) as a fallback. Historical comparisons need enough usable data, so some rides may take longer to show insights.
+**Send test** checks whether a notification can reach your device. It does not simulate an actual ride reopening or wait-time change.
 
-Looking for backend setup or deployment instructions? See the [Worker README](worker/README.md). Release changes live in the [changelog](CHANGELOG.md).
+**New phone or reinstall?** Turn notifications on again for that installation.
 
-ParkPulse is an independent project and is not affiliated with or endorsed by Disney.
+## If something looks weird
+
+ParkPulse tries pretty hard not to fake certainty.
+
+**Stale** means the latest ride data is old enough that ParkPulse no longer wants to present it as confidently live.
+
+**Down 22m** means ParkPulse has observed that ride being reported down for about 22 minutes. It is not claiming to know the exact second the ride stopped.
+
+If you are offline, ParkPulse may still open using its cached app and last-known ride data, but it obviously cannot pull fresh waits from the void. Once you are back online, refresh and let any pending watch changes sync.
+
+Settings also has a small diagnostics section for checking the Worker, notification engine, ride data, and history collection if something seems off.
+
+## Updates
+
+ParkPulse checks for frontend updates and will let you know when a new version is ready.
+
+If the installed PWA ever seems stuck on an older version, fully close it and reopen it after accepting the update.
+
+Release notes are kept in the **[changelog](CHANGELOG.md)**.
+
+## Data
+
+ParkPulse currently uses:
+
+- **[ThemeParks.wiki](https://www.themeparks.wiki/)** for primary live ride data
+- **[Queue-Times](https://queue-times.com/)** as a fallback source
+
+Historical comparisons need enough usable data before they are worth showing, so newer or less-consistent rides may take longer to build a good baseline.
+
+For backend setup and deployment details, see the **[Worker README](worker/README.md)**.
+
+## About
+
+ParkPulse is a personal independent project built because I wanted something simpler and more useful while actually walking around Walt Disney World.
+
+It is not affiliated with, sponsored by, or endorsed by Disney.
+
+**Less refreshing. More riding.**

@@ -505,7 +505,7 @@ select option:disabled{color:var(--muted)}
 .ride-history{padding:16px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);margin:16px 0;color:var(--muted);font-size:.85rem}
 .history-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.history-heading h3{color:var(--text);font-size:1rem}
 .history-heading select{background:var(--bg2);border:1px solid var(--hair);border-radius:10px;padding:10px;min-height:44px}
-.history-chart{width:100%;height:auto;stroke:var(--hair)}.history-chart circle{fill:var(--blue);stroke:none}.history-labels{display:flex;justify-content:space-between;gap:12px;font-size:.7rem;margin-bottom:10px}
+.history-chart{width:100%;height:auto;stroke:var(--hair)}.history-chart .history-line{fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.65}.history-chart circle{fill:var(--blue);stroke:none}.history-labels{display:flex;justify-content:space-between;gap:12px;font-size:.7rem;margin-bottom:10px}
 @media(max-width:600px){#view-explore .toolbar{grid-template-columns:1fr 1fr}#view-explore .toolbar .search{grid-column:1/-1}#sortSelect{grid-column:1/-1}}
 
 

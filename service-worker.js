@@ -1,5 +1,5 @@
-const CACHE_NAME = "parkpulse-1.7.7-install-help-fix-shell";
-const VERSION = "1.7.7";
+const CACHE_NAME = "parkpulse-1.7.8-install-help-fix-shell";
+const VERSION = "1.7.8";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
   ...["app", "api", "data", "store", "push", "config"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
   `./assets/css/app.css?v=${VERSION}`,

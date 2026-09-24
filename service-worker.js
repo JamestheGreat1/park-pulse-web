@@ -1,5 +1,5 @@
-const CACHE_NAME = "parkpulse-1.7.9-accent-colors-shell";
-const VERSION = "1.7.9";
+const CACHE_NAME = "parkpulse-1.7.10-update-check-shell";
+const VERSION = "1.7.10";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
   ...["app", "api", "data", "store", "push", "config"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
   `./assets/css/app.css?v=${VERSION}`,
@@ -17,6 +17,11 @@ self.addEventListener("activate", event => event.waitUntil(
 ));
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET" || new URL(event.request.url).origin !== location.origin) return;
+  const url = new URL(event.request.url);
+  if (url.pathname.endsWith("/version.json")) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     if (event.request.mode === "navigate") {

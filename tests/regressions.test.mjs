@@ -259,3 +259,26 @@ test('notification schema and scheduler health from 1.6.6 remain intact', async 
   assert.match(app,/Ride alert engine/);
   assert.match(app,/notificationEngine\?\.lastCheck/);
 });
+
+test('scheduled alerts and hourly maintenance run in separate invocations', async () => {
+  const calls=[];
+  const context=vm.createContext({runRideWatch:async()=>calls.push('alerts'),runScheduledMaintenance:async()=>calls.push('maintenance')});
+  const method=worker.slice(worker.indexOf('  async scheduled('),worker.indexOf('\n};',worker.indexOf('  async scheduled(')));
+  const handler=vm.runInContext('({'+method+'})',context);
+  for (const cron of ['*/5 * * * *','17 * * * *']) {
+    let job;await handler.scheduled({cron},{},{waitUntil:p=>{job=p}});await job;
+  }
+  assert.deepEqual(calls,['alerts','maintenance']);
+  const alertCode=section('async function runRideWatch(', 'async function runScheduledMaintenance(');
+  assert.doesNotMatch(alertCode,/refreshRideBaselines|DELETE FROM ride_history/);
+});
+
+test('timezone formatters are reused without changing Eastern date parts', () => {
+  let constructions=0;
+  const context=vm.createContext({Map,Number,Intl:{DateTimeFormat:class extends Intl.DateTimeFormat {constructor(...args){super(...args);constructions++;}}}});
+  vm.runInContext(section('const zoneFormatters =','function zonedDateToUtc('),context);
+  const fn=vm.runInContext('zoneParts',context);
+  assert.equal(fn(new Date('2026-09-24T12:00:00Z')).hour,8);
+  assert.equal(fn(new Date('2026-01-24T12:00:00Z')).hour,7);
+  assert.equal(constructions,1);
+});

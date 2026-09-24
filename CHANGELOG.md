@@ -1,5 +1,13 @@
 # Changelog
 
+## Worker 1.7.2 — 2026-09-24
+
+- Separated hourly baseline/retention maintenance from five-minute alert checks.
+- Reused timezone formatters and calculated park opening state once per park.
+- Added safe stage logs for diagnosing CPU-limit failures.
+- Requires Worker redeployment; PWA stays at 1.7.1. Production CPU recovery must be verified in tail logs.
+
+
 ## 1.7.1 — 2026-09-24
 
 - Polished ride-card actions with equal favorite/watch sections, a continuous sidebar outline, and a visible divider.

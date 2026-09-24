@@ -17,4 +17,4 @@ database_name = "parkpulse"
 database_id = "3ccecfb8-45f9-49f4-a5e7-e90bdf5e9edb"
 
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/5 * * * *", "17 * * * *"]

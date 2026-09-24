@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.7.0";
+const VERSION = "1.7.2";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -300,8 +300,10 @@ export default {
     }
   },
 
-  async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(runRideWatch(env));
+  async scheduled(controller, env, ctx) {
+    // Separate invocations: maintenance cannot consume the alert job's CPU budget.
+    if (controller.cron === "17 * * * *") ctx.waitUntil(runScheduledMaintenance(env));
+    else ctx.waitUntil(runRideWatch(env));
   }
 };
 
@@ -1109,11 +1111,14 @@ async function runManualRefresh(env) {
 }
 
 async function runRideWatch(env) {
+  console.log("Alert job: start");
   await ensureNotificationSchema(env);
   const priorRows = await readPriorRideState(env);
   const prior = new Map(priorRows.map((row) => [row.id, row]));
 
+  console.log("Alert job: fetching live rides");
   const { rides: current } = await fetchCurrentRideSnapshot(env);
+  console.log("Alert job: evaluating", current.length, "rides");
 
   const currentByPark = groupByPark(current);
   const priorByPark = groupByPark([...prior.values()]);
@@ -1137,26 +1142,24 @@ async function runRideWatch(env) {
     }
   }
 
+  const now = Date.now();
   const easternHour = Number(new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "2-digit",
-    hourCycle: "h23"
-  }).format(new Date()));
+    timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23"
+  }).format(new Date(now)));
+  const parkActivity = new Map();
+  for (const [parkId, rides] of currentByPark) {
+    const nowOpen = rides.filter(item => item.isOpen).length;
+    const beforeOpen = (priorByPark.get(parkId) || []).filter(item =>
+      item.isOpen && now - Number(item.updatedAt || 0) <= LIVE_FRESHNESS_MS).length;
+    parkActivity.set(parkId, { operationalNow: nowOpen >= 3,
+      operationalBefore: beforeOpen >= 3, openingRamp: easternHour < 11 && nowOpen - beforeOpen >= 3 });
+  }
 
   for (const ride of current) {
     const before = prior.get(ride.id);
-
     if (before) {
-      const pNow = currentByPark.get(ride.parkId) || [];
-      const pBefore = priorByPark.get(ride.parkId) || [];
-      const beforeFresh = Date.now() - Number(before.updatedAt || 0) <= LIVE_FRESHNESS_MS;
-      const nowOpen = pNow.filter((item) => item.isOpen).length;
-      const beforeOpen = pBefore.filter(
-        (item) => item.isOpen && Date.now() - Number(item.updatedAt || 0) <= LIVE_FRESHNESS_MS
-      ).length;
-      const operationalNow = nowOpen >= 3;
-      const operationalBefore = beforeOpen >= 3;
-      const openingRamp = easternHour < 11 && nowOpen - beforeOpen >= 3;
+      const beforeFresh = now - Number(before.updatedAt || 0) <= LIVE_FRESHNESS_MS;
+      const { operationalNow, operationalBefore, openingRamp } = parkActivity.get(ride.parkId);
       const reopened =
         beforeFresh &&
         !before.isOpen &&
@@ -1232,22 +1235,25 @@ async function runRideWatch(env) {
 
   }
 
+  console.log("Alert job: saving history and checkpoint");
   await writeCurrentRideSnapshot(env, current);
   await writeCurrentRideSnapshot(env, current, true);
+  console.log("Alert job: complete");
+}
 
-  await env.DB.prepare(
-    "DELETE FROM notification_log_v2 WHERE last_sent < ?"
-  ).bind(Date.now() - 7 * 24 * 60 * 60 * 1000).run().catch(() => {});
-
-  await env.DB.prepare(
-    "DELETE FROM ride_history WHERE observed_at < ?"
-  ).bind(Date.now() - 31 * 24 * 60 * 60 * 1000).run().catch(() => {});
-
+async function runScheduledMaintenance(env) {
+  console.log("Maintenance job: start");
+  await env.DB.prepare("DELETE FROM notification_log_v2 WHERE last_sent < ?")
+    .bind(Date.now() - 7 * 86400000).run();
+  await env.DB.prepare("DELETE FROM ride_history WHERE observed_at < ?")
+    .bind(Date.now() - 31 * 86400000).run();
   if (env.THEMEPARKS_API_KEY) {
-    await refreshRideBaselines(env, current).catch((error) => {
-      console.warn("Baseline refresh failed", error);
-    });
+    const { rides } = await fetchCurrentRideSnapshot(env);
+    // Two rides per hour keeps historical computation out of five-minute checks.
+    const result = await refreshRideBaselines(env, rides, 2);
+    console.log("Maintenance job: baselines", JSON.stringify(result));
   }
+  console.log("Maintenance job: complete");
 }
 
 function catalogRideByKey(rideKey) {
@@ -1258,9 +1264,11 @@ function catalogRideByKey(rideKey) {
   return null;
 }
 
+const zoneFormatters = new Map();
 function zoneParts(date, timeZone = "America/New_York") {
-  const out = {};
-  for (const part of new Intl.DateTimeFormat("en-US", {
+  let formatter = zoneFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
     year: "numeric",
     month: "2-digit",
@@ -1269,7 +1277,13 @@ function zoneParts(date, timeZone = "America/New_York") {
     minute: "2-digit",
     second: "2-digit",
     hourCycle: "h23"
-  }).formatToParts(date)) {
+    });
+    // Bound isolate-local cache even if an upstream response supplies new zones.
+    if (zoneFormatters.size >= 16) zoneFormatters.clear();
+    zoneFormatters.set(timeZone, formatter);
+  }
+  const out = {};
+  for (const part of formatter.formatToParts(date)) {
     if (part.type !== "literal") out[part.type] = Number(part.value);
   }
   return out;
@@ -1547,7 +1561,7 @@ async function markBaselineError(env, ride, error) {
   ).run().catch(() => {});
 }
 
-async function refreshRideBaselines(env, currentRides) {
+async function refreshRideBaselines(env, currentRides, batchSize = BASELINE_BATCH_SIZE) {
   if (!env.THEMEPARKS_API_KEY) return { processed: 0, refreshed: 0, failed: 0 };
 
   let metaRows = [];
@@ -1581,7 +1595,7 @@ async function refreshRideBaselines(env, currentRides) {
       const bMeta = meta.get(String(b.id));
       return Number(aMeta?.refreshed_at || 0) - Number(bMeta?.refreshed_at || 0);
     })
-    .slice(0, BASELINE_BATCH_SIZE);
+    .slice(0, batchSize);
 
   let refreshed = 0;
   let failed = 0;

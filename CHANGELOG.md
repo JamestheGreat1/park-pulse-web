@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.5 — 2026-09-24
+
+- Rebuilt PWA wait-history charts with readable axes, grid lines, average reference, and Low / Average / High summaries.
+- Simplified ride-history explanatory copy while preserving real gaps for closures and missing data.
+- Right-aligned notification/settings actions consistently on mobile.
+- Added native-feeling pull-down dismissal for ride sheets when the sheet is already scrolled to the top.
+- Frontend-only update; no Worker deployment required.
+
+
 ## 1.7.4 — 2026-09-24
 
 - Connect continuous wait-history samples with a subtle line while keeping closures, unknown waits, and missing stretches as real gaps.

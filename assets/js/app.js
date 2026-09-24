@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.2";
+const APP_VERSION = "1.7.3";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -621,7 +621,7 @@ function renderSettings() {
         ? `<span class="health-pill bad">Blocked</span>`
         : `<button type="button" data-toggle-push class="setting-action">Enable</button>`;
   const installRow = install.visible
-    ? `<div class="setting-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>`
+    ? `<div class="setting-row install-status-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>`
     : "";
   const backendCopy = backendState?.ok === true ? `Online · Worker ${backendState.version || ""}`.trim() : backendState?.ok === false ? "Unavailable" : "Checking…";
   const refreshCopy = rideData.updatedAt ? relativeTime(rideData.updatedAt) : "Not yet";

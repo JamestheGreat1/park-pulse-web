@@ -1,5 +1,5 @@
-const CACHE_NAME = "parkpulse-1.7.5-history-sheet-polish";
-const VERSION = "1.7.5";
+const CACHE_NAME = "parkpulse-1.7.6-install-help-shell";
+const VERSION = "1.7.6";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
   ...["app", "api", "data", "store", "push", "config"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
   `./assets/css/app.css?v=${VERSION}`,

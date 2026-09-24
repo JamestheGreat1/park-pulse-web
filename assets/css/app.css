@@ -505,7 +505,12 @@ select option:disabled{color:var(--muted)}
 .ride-history{padding:16px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);margin:16px 0;color:var(--muted);font-size:.85rem}
 .history-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.history-heading h3{color:var(--text);font-size:1rem}
 .history-heading select{background:var(--bg2);border:1px solid var(--hair);border-radius:10px;padding:10px;min-height:44px}
-.history-chart{width:100%;height:auto;stroke:var(--hair)}.history-chart .history-line{fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.65}.history-chart circle{fill:var(--blue);stroke:none}.history-labels{display:flex;justify-content:space-between;gap:12px;font-size:.7rem;margin-bottom:10px}
+.history-chart-wrap{margin:2px 0 8px;overflow:hidden}.history-chart{display:block;width:100%;height:auto;overflow:visible}
+.history-grid line{stroke:var(--hair);stroke-width:1}.history-grid text,.history-x-label{fill:var(--muted);stroke:none;font-size:10px}
+.history-chart .history-line{fill:none;stroke:var(--blue);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round;opacity:.82}.history-chart circle{fill:var(--blue);stroke:none}
+.history-average-line{stroke:var(--blue);stroke-width:1;stroke-dasharray:5 5;opacity:.42}.history-average-label{fill:var(--muted);stroke:none;font-size:10px;font-weight:700}
+.history-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 10px}.history-stats>div{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.025)}.history-stats span{font-size:.68rem;color:var(--muted);font-weight:700}.history-stats strong{font-size:1rem;color:var(--text)}
+.history-note{display:block;line-height:1.45;color:var(--muted)}
 @media(max-width:600px){#view-explore .toolbar{grid-template-columns:1fr 1fr}#view-explore .toolbar .search{grid-column:1/-1}#sortSelect{grid-column:1/-1}}
 
 
@@ -580,4 +585,16 @@ select option:disabled{color:var(--muted)}
     max-width:100%;
     padding-top:0;
   }
+}
+
+/* v1.7.5 — keep notification controls anchored and make ride sheets swipe-dismissable */
+.settings-group .setting-row>div:first-child{min-width:0;flex:1 1 auto}
+.settings-group .setting-action,.settings-group .health-pill{flex:0 0 auto;margin-left:auto;text-align:center}
+.ride-sheet{transform:translate(-50%,var(--sheet-drag-y,0));transition:transform .22s ease-out}
+.ride-sheet.sheet-dragging{transition:none;overscroll-behavior:contain}
+.ride-sheet.sheet-dismissing{transition:transform .18s ease-in}
+.sheet-backdrop{transition:opacity .18s ease}
+@media(max-width:640px){
+  .settings-group .setting-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+  .settings-group .setting-action,.settings-group .health-pill{justify-self:end}
 }

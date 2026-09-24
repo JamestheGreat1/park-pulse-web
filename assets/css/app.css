@@ -551,3 +551,33 @@ select option:disabled{color:var(--muted)}
     align-items:start;
   }
 }
+
+
+/* v1.7.3 — align install status with health/status values */
+.install-status-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(118px,180px);
+  align-items:center;
+}
+.install-status-row>div{min-width:0}
+.install-status-row .health-pill,
+.install-status-row .setting-action{
+  justify-self:end;
+  margin-left:0;
+  max-width:100%;
+  width:auto;
+}
+.install-status-row .health-pill{
+  justify-content:flex-end;
+  text-align:right;
+}
+@media(max-width:640px){
+  .install-status-row{
+    grid-template-columns:minmax(0,1fr) minmax(106px,42%);
+  }
+  .install-status-row .health-pill,
+  .install-status-row .setting-action{
+    max-width:100%;
+    padding-top:0;
+  }
+}

@@ -40,7 +40,7 @@ export class Store extends EventTarget {
     this.state.favorites = [...new Set((Array.isArray(saved.favorites) ? saved.favorites : []).filter(id => typeof id === "string" && id.length < 120))];
     this.state.mustDo = [...new Set((Array.isArray(saved.mustDo) ? saved.mustDo : []).filter(id => typeof id === "string" && id.length < 120))];
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
-    if (!["blue","cyan","violet","pink","orange","green"].includes(this.state.accent)) this.state.accent = "blue";
+    if (!["blue","cyan","violet","pink","orange","green","red","gold"].includes(this.state.accent)) this.state.accent = "blue";
     this.pruneExpired(false);
   }
   get snapshot() { return structuredClone(this.state); }

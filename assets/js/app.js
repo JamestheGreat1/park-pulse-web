@@ -12,7 +12,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.10";
+const APP_VERSION = "1.7.11";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -622,6 +622,13 @@ function renderWatching() {
       return `<article class="watch-card liquid-glass ${status.stale ? "stale" : ""}"><button class="watch-card-main" type="button" data-open-ride="${rule.rideId}"><span class="ride-land">${escapeHtml(parkName(rule.parkId))}</span><h3>${escapeHtml(rule.rideName)}</h3><p>${escapeHtml(detail || "Status watch")} · ${remaining(rule)}</p></button><div class="watch-live"><span class="wait ${status.stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><button class="delete-watch" type="button" data-delete-watch="${rule.rideId}" aria-label="Stop watching ${escapeHtml(rule.rideName)}">×</button></div></article>`;
     }).join("") : `<div class="empty liquid-glass"><span class="empty-icon">🔔</span><h3>Nothing here yet</h3><p>Pick a ride, set a target, and ParkPulse will keep an eye on it.</p><button type="button" data-view-jump="explore">Find a ride</button></div>`}</div>`;
 }
+async function refreshAnalyticsState() {
+  const next = await fetchAnalyticsStatus().catch(() => null);
+  if (next) analyticsState = next;
+  renderSettings();
+  bindDynamic();
+}
+
 function renderSettings() {
   const state = store.snapshot;
   const permission = "Notification" in window ? Notification.permission : "unsupported";
@@ -669,6 +676,23 @@ function renderSettings() {
         : "Needs attention";
   const alertEngineTone = notificationEngine?.status === "running" ? "good" : notificationEngine ? "bad" : "";
   const historyDiagnosticsAvailable = analyticsState?.ok === true && typeof analyticsState.historyCollecting === "boolean";
+  const historyCopy = historyDiagnosticsAvailable
+    ? analyticsState.historyCollecting
+      ? "Five-minute ride samples are coming in normally."
+      : analyticsState.latestHistorySample
+        ? `Last sample ${relativeTime(analyticsState.latestHistorySample)} — this may need attention.`
+        : "Waiting for the first history sample."
+    : backendState?.ok === true
+      ? "Couldn’t check history right now — retrying automatically."
+      : backendState?.ok === false
+        ? "Worker unavailable — history status can’t be checked."
+        : "Checking history collection…";
+  const historyLabel = historyDiagnosticsAvailable
+    ? analyticsState.historyCollecting ? "Collecting" : "Not current"
+    : backendState?.ok === true ? "Retrying" : backendState?.ok === false ? "Unavailable" : "Checking";
+  const historyTone = historyDiagnosticsAvailable
+    ? analyticsState.historyCollecting ? "good" : "bad"
+    : backendState?.ok === false ? "bad" : "";
   views.settings.innerHTML = `
     <div class="page-heading"><span class="eyebrow">ParkPulse</span><h2>Settings</h2><p>The useful stuff, plus a few ways to make ParkPulse yours.</p></div>
     <section class="settings-group liquid-glass">
@@ -689,8 +713,8 @@ function renderSettings() {
       <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Used by the Worker — never stored in the app.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
       <div class="setting-row"><div><strong>Push server</strong><small>Background notification setup</small></div><span class="health-pill ${backendState?.vapidConfigured ? "good" : "bad"}">${backendState?.vapidConfigured ? "Ready" : "Needs setup"}</span></div>
       <div class="setting-row"><div><strong>Ride alert engine</strong><small>${escapeHtml(alertEngineCopy)}</small></div><span class="health-pill ${alertEngineTone}">${escapeHtml(alertEngineLabel)}</span></div>
-      <div class="setting-row"><div><strong>History collection</strong><small>${!historyDiagnosticsAvailable ? "Update the Worker to check the five-minute history sampler." : analyticsState.historyCollecting ? "Five-minute ride samples are coming in normally." : analyticsState.latestHistorySample ? `Last sample ${relativeTime(analyticsState.latestHistorySample)} — this may need attention.` : "Waiting for the first history sample."}</small></div><span class="health-pill ${historyDiagnosticsAvailable && analyticsState.historyCollecting ? "good" : historyDiagnosticsAvailable ? "bad" : ""}">${!historyDiagnosticsAvailable ? "Worker update" : analyticsState.historyCollecting ? "Collecting" : "Not current"}</span></div>
-      <div class="setting-row"><div><strong>Trend baselines</strong><small>${analyticsState?.themeParksApiKeyConfigured === false ? "Historical backfill is paused because the ThemeParks API key is missing." : "History used for Best Now + crowd estimates"}</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : "Building…"}</span></div>
+      <div class="setting-row"><div><strong>History collection</strong><small>${escapeHtml(historyCopy)}</small></div><span class="health-pill ${historyTone}">${escapeHtml(historyLabel)}</span></div>
+      <div class="setting-row"><div><strong>Trend baselines</strong><small>${analyticsState?.themeParksApiKeyConfigured === false ? "Historical backfill is paused because the ThemeParks API key is missing." : "History used for Best Now + crowd estimates"}</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : backendState?.ok === true ? "Retrying…" : backendState?.ok === false ? "Unavailable" : "Checking…"}</span></div>
       <div class="setting-row"><div><strong>App version</strong><small>What you’re currently running</small></div><span class="setting-value">v${APP_VERSION}</span></div>
       <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status. No secrets or push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
     </section>
@@ -1303,12 +1327,14 @@ setupSheetDismissGesture();
     renderStatusBanner();
     await rideData.refresh({ parkId: store.snapshot.selectedParkId });
     await refreshPushState({ sync: true });
+    await refreshAnalyticsState();
     renderStatusBanner();
   });
   window.addEventListener("offline", renderStatusBanner);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       refreshPushState({ sync: true });
+      refreshAnalyticsState();
       checkForAppUpdate();
     }
   });
@@ -1342,7 +1368,10 @@ setupSheetDismissGesture();
     bindDynamic();
   }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
   setInterval(() => {
-    if (navigator.onLine) refreshPushState({ sync: true });
+    if (navigator.onLine) {
+      refreshPushState({ sync: true });
+      if (!analyticsState?.ok) refreshAnalyticsState();
+    }
     renderParkHours();
     renderRideResults();
   }, 60 * 1000);

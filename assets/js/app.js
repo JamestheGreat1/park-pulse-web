@@ -907,11 +907,37 @@ async function loadRideHistory(id, range = "today") {
   const start = Date.parse(data.startAt), end = Date.parse(data.endAt);
   const x = p => 10 + (Date.parse(p.observedAt) - start) / Math.max(1, end - start) * 580;
   const y = p => 130 - p.waitTime / max * 120;
-  // Individual samples never draw a line through closures or missing observations.
+  const ordered = [...points].sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt));
+  const gapLimitMs = Math.max(10, Number(data.bucketMinutes || 5) * 1.75) * 60_000;
+  const segments = [];
+  let segment = [];
+  let previousOpen = null;
+  const flushSegment = () => {
+    if (segment.length >= 2) segments.push(segment);
+    segment = [];
+    previousOpen = null;
+  };
+  for (const point of ordered) {
+    const validOpen = point.isOpen && Number.isFinite(point.waitTime);
+    if (!validOpen) {
+      flushSegment();
+      continue;
+    }
+    if (previousOpen && Date.parse(point.observedAt) - Date.parse(previousOpen.observedAt) > gapLimitMs) {
+      flushSegment();
+    }
+    segment.push(point);
+    previousOpen = point;
+  }
+  flushSegment();
+
+  const lines = segments.map(group =>
+    `<polyline class="history-line" points="${group.map(p => `${x(p).toFixed(2)},${y(p).toFixed(2)}`).join(" ")}"/>`
+  ).join("");
   const dots = open.map(p => `<circle cx="${x(p).toFixed(2)}" cy="${y(p).toFixed(2)}" r="2.5"/>`).join("");
   const low = Math.min(...open.map(p => p.waitTime)), high = max === 15 ? Math.max(...open.map(p => p.waitTime)) : max;
   const format = value => new Date(value).toLocaleString([], { timeZone: data.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  host.innerHTML = `<p>${low}–${high} min · ${open.length} plotted samples</p><svg class="history-chart" viewBox="0 0 600 145" role="img" aria-label="Posted waits from ${low} to ${high} minutes. Each dot is a collected wait; gaps are not estimated."><path d="M10 10V130H590"/>${dots}</svg><div class="history-labels"><span>${escapeHtml(format(data.startAt))}</span><span>${escapeHtml(format(data.endAt))}</span></div><small>ParkPulse shared history · park time. ${data.bucketMinutes}-minute samples; closed or unknown waits are omitted. Gaps aren’t estimates.</small>`;
+  host.innerHTML = `<p>${low}–${high} min · ${open.length} plotted samples</p><svg class="history-chart" viewBox="0 0 600 145" role="img" aria-label="Posted waits from ${low} to ${high} minutes. Continuous samples are connected; closures and missing stretches remain gaps."><path d="M10 10V130H590"/>${lines}${dots}</svg><div class="history-labels"><span>${escapeHtml(format(data.startAt))}</span><span>${escapeHtml(format(data.endAt))}</span></div><small>ParkPulse shared history · park time. ${data.bucketMinutes}-minute samples; continuous waits are connected while closures, unknown waits, and missing stretches stay as gaps.</small>`;
 }
 
 function closeSheet() {

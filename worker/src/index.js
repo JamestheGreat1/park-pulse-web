@@ -100,6 +100,8 @@ export default {
 
     try {
       if (request.method === "GET" && url.pathname === "/health") {
+        await ensureNotificationSchema(env).catch(() => {});
+        const notificationEngine = await getNotificationHealth(env);
         return json({
           ok: true,
           service: "parkpulse-api",
@@ -112,6 +114,7 @@ export default {
           historyBackfillBatchSize: BASELINE_BATCH_SIZE,
           liveFreshnessMinutes: LIVE_FRESHNESS_MS / 60000,
           vapidConfigured: Boolean(env.VAPID_SUBJECT && env.VAPID_SERVER_PUBLIC_KEY && env.VAPID_SERVER_PRIVATE_KEY),
+          notificationEngine,
           now: new Date().toISOString()
         }, 200, cors);
       }
@@ -187,6 +190,7 @@ export default {
       }
 
       if (request.method === "POST" && url.pathname === "/subscriptions") {
+        await ensureNotificationSchema(env);
         const body = await request.json();
         const subscription = validateSubscription(body?.subscription);
         if (!subscription) return json({ error: "Invalid push subscription" }, 400, cors);
@@ -1096,6 +1100,7 @@ async function runManualRefresh(env) {
 }
 
 async function runRideWatch(env) {
+  await ensureNotificationSchema(env);
   const priorRows = await readPriorRideState(env);
   const prior = new Map(priorRows.map((row) => [row.id, row]));
 
@@ -1876,6 +1881,64 @@ async function writeCurrentRideSnapshot(env, rides, notificationCheckpoint = fal
   }
 
   if (statements.length) await env.DB.batch(statements);
+}
+
+async function ensureNotificationSchema(env) {
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS notification_ride_state (
+      ride_key TEXT PRIMARY KEY,
+      park_id INTEGER NOT NULL,
+      source_id TEXT,
+      name TEXT NOT NULL,
+      land TEXT,
+      is_open INTEGER NOT NULL,
+      wait_time INTEGER,
+      source TEXT NOT NULL,
+      source_updated_at TEXT,
+      updated_at INTEGER NOT NULL
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS notification_log_v2 (
+      endpoint TEXT NOT NULL,
+      ride_key TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      last_sent INTEGER NOT NULL,
+      PRIMARY KEY (endpoint, ride_key, kind)
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_notification_log_v2_last_sent ON notification_log_v2(last_sent)")
+  ]);
+}
+
+async function getNotificationHealth(env) {
+  try {
+    const checkpoint = await env.DB.prepare(
+      "SELECT COUNT(*) AS rides, MAX(updated_at) AS latest FROM notification_ride_state"
+    ).first();
+
+    const latestMs = Number(checkpoint?.latest || 0);
+    const ageMs = latestMs ? Date.now() - latestMs : null;
+    const healthyWindowMs = 15 * 60 * 1000;
+    const status = !latestMs
+      ? "waiting"
+      : ageMs <= healthyWindowMs
+        ? "running"
+        : "stale";
+
+    return {
+      ready: status === "running",
+      status,
+      lastCheck: latestMs ? new Date(latestMs).toISOString() : null,
+      checkpointRides: Number(checkpoint?.rides || 0),
+      cadenceMinutes: 5
+    };
+  } catch {
+    return {
+      ready: false,
+      status: "unavailable",
+      lastCheck: null,
+      checkpointRides: 0,
+      cadenceMinutes: 5
+    };
+  }
 }
 
 async function readPriorRideState(env) {

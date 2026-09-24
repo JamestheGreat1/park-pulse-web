@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.1 — 2026-09-24
+
+- Polished ride-card actions with equal favorite/watch sections, a continuous sidebar outline, and a visible divider.
+- Matched icon sizing, active backgrounds, and inset keyboard focus indicators across themes.
+- Frontend-only update; no Worker deployment required.
+
+
 ## 1.7.0 — 2026-09-24
 
 - Added favorites separate from watches, a Favorites filter, and optional must-do priorities in the For me sort.

@@ -490,10 +490,17 @@ select option:disabled{color:var(--muted)}
 }
 
 /* Saved rides stay independent of notification watches. */
-.ride-actions{display:flex;flex-direction:column;align-items:stretch;justify-content:center}
-.favorite-button{min-height:44px;min-width:44px;border:0;background:none;color:var(--muted);display:grid;place-items:center}
-.favorite-button.active{color:var(--blue)}.favorite-button.active svg{fill:currentColor}
-.ride-actions .watch-button{min-height:44px;flex:1}.personal-copy{color:var(--muted);font-size:.85rem;line-height:1.5;margin:0 0 14px}
+/* One outlined rail with two equal, independently highlighted controls. */
+.ride-actions{display:grid;grid-template-rows:repeat(2,minmax(44px,1fr));align-self:stretch;border-left:1px solid color-mix(in srgb,var(--muted) 38%,transparent);background:rgba(var(--blue-rgb),.035)}
+.ride-actions .favorite-button,.ride-actions .watch-button{display:grid;place-items:center;width:100%;min-width:0;min-height:44px;margin:0;padding:10px;border:0;border-radius:0;background:transparent;color:var(--muted);box-shadow:none;touch-action:manipulation}
+.ride-actions .watch-button{border-top:1px solid color-mix(in srgb,var(--muted) 38%,transparent)}
+.ride-actions svg{width:22px;height:22px;display:block}
+.ride-actions .favorite-button.active,.ride-actions .watch-button.active{color:var(--blue);background:rgba(var(--blue-rgb),.14)}
+.ride-actions .favorite-button.active svg{fill:currentColor}
+.ride-actions button:focus-visible{outline:2px solid var(--blue);outline-offset:-4px}
+@media(hover:hover) and (pointer:fine){.ride-actions button:hover{background:rgba(var(--blue-rgb),.20);color:var(--text)}}
+@media(forced-colors:active){.ride-actions{border-color:ButtonText}.ride-actions .watch-button{border-color:ButtonText}.ride-actions button[aria-pressed="true"],.ride-actions .watch-button.active{outline:2px solid Highlight;outline-offset:-4px}}
+.personal-copy{color:var(--muted);font-size:.85rem;line-height:1.5;margin:0 0 14px}
 #view-explore .toolbar{grid-template-columns:minmax(140px,1fr) auto auto auto}
 .ride-history{padding:16px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);margin:16px 0;color:var(--muted);font-size:.85rem}
 .history-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.history-heading h3{color:var(--text);font-size:1rem}

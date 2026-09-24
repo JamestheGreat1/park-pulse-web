@@ -35,8 +35,8 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.locator('#thresholdToggle').click();
     await page.locator('#watchForm button[type="submit"]').click();
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1')).rules[0].expiresAt), deadline);
-    const cached = await page.evaluate(async () => (await (await caches.open('parkpulse-1.7.0-alert-engine-shell')).keys()).map(r => r.url));
-    for (const module of ['app', 'api', 'data', 'store', 'push', 'config']) assert(cached.some(url => url.endsWith(`/assets/js/${module}.js?v=1.7.0`)));
+    const cached = await page.evaluate(async () => (await (await caches.open('parkpulse-1.7.1-alert-engine-shell')).keys()).map(r => r.url));
+    for (const module of ['app', 'api', 'data', 'store', 'push', 'config']) assert(cached.some(url => url.endsWith(`/assets/js/${module}.js?v=1.7.1`)));
     await context.setOffline(true);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#view-explore [data-open-ride]', { timeout: 5000 });

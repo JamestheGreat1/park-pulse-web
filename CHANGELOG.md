@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.0 — 2026-09-24
+
+- Added favorites separate from watches, a Favorites filter, and optional must-do priorities in the For me sort.
+- Added shared ride-history charts for today, 7 days, and 30 days, with bounded server sampling and explicit gaps.
+- Preserved 1.6.6 notification schema initialization, scheduled alert health, diagnostics, and updated target wording.
+- Kept public ride links compatible with the native app's sharing flow.
+- Worker deployment required for `/api/ride/:id/history`; existing D1 tables are reused.
+
+
 ## 1.6.5 — 2026-09-24
 
 - Fix native dropdown option contrast with opaque, theme-aware menu colors.

@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.6.6";
-import { store } from "./store.js?v=1.6.6";
-import { rideData, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.6.6";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.6.6";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.7.0";
+import { store } from "./store.js?v=1.7.0";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.7.0";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.7.0";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -10,7 +10,7 @@ const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.6.6";
+const APP_VERSION = "1.7.0";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -503,7 +503,7 @@ function selectView(name) {
 }
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
-  let list = rides.filter((r) => (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) && (!state.openOnly || (r.isOpen && !isRideStale(r))));
+  let list = rides.filter((r) => (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) && (!state.openOnly || (r.isOpen && !isRideStale(r))) && (!state.favoritesOnly || state.favorites.includes(String(r.id))));
   const staleRank = (ride) => isRideStale(ride) ? 1 : 0;
   if (state.sort === "wait") list.sort((a,b) => staleRank(a) - staleRank(b) || (a.isOpen === b.isOpen ? (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) : a.isOpen ? -1 : 1));
   else if (state.sort === "name") list.sort((a,b) => staleRank(a) - staleRank(b) || a.name.localeCompare(b.name));
@@ -514,6 +514,11 @@ function sortedRides(rides, state) {
     const operating = Number(b.isOpen) - Number(a.isOpen);
     if (operating) return operating;
 
+    if (state.sort === "personal") {
+      const priority = ride => (state.mustDo.includes(String(ride.id)) ? 2 : state.favorites.includes(String(ride.id)) ? 1 : 0);
+      const preference = priority(b) - priority(a);
+      if (preference) return preference;
+    }
     const aRatio = rideComparison(a)?.ratio ?? Infinity;
     const bRatio = rideComparison(b)?.ratio ?? Infinity;
     if (aRatio !== bRatio) return aRatio - bRatio;
@@ -523,6 +528,7 @@ function sortedRides(rides, state) {
   return list;
 }
 function rideCard(ride) {
+  const favorite = store.snapshot.favorites.includes(String(ride.id));
   const rule = store.ruleForRide(ride.id);
   const status = rideStatus(ride);
   const valueBadge = typicalComparisonBadge(ride);
@@ -531,7 +537,8 @@ function rideCard(ride) {
       <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${rule ? `<span class="watch-badge">Watching</span>` : ""}${valueBadge ? `<span class="value-badge ${valueBadge.tone}">${escapeHtml(valueBadge.text)}</span>` : ""}</div></div>
       <div class="ride-status"><span class="wait ${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><span class="status-label">${escapeHtml(status.label)}</span></div>
     </button>
-    <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button>
+    <div class="ride-actions"><button class="favorite-button ${favorite ? "active" : ""}" type="button" data-favorite="${ride.id}" aria-pressed="${favorite}" aria-label="${favorite ? "Unfavorite" : "Favorite"} ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
+    <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button></div>
   </article>`;
 }
 function rideListMarkup(state = store.snapshot) {
@@ -541,6 +548,9 @@ function rideListMarkup(state = store.snapshot) {
     : `<div class="empty liquid-glass">${rideData.error || "No rides match that search."}</div>`;
 }
 function bindRideCards(root = views.explore) {
+  $$('[data-favorite]', root).forEach(button => {
+    button.onclick = () => store.toggleFavorite(button.dataset.favorite);
+  });
   $$('[data-open-ride]', root).forEach((button) => {
     button.onclick = () => openRide(button.dataset.openRide);
   });
@@ -570,9 +580,11 @@ function renderExplore() {
     <section class="toolbar liquid-glass">
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="Search rides in ${escapeHtml(parkName(state.selectedParkId))}" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
-      <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
+      <button class="filter-button ${state.favoritesOnly ? "active" : ""}" type="button" data-toggle-favorites aria-pressed="${state.favoritesOnly}">Favorites</button>
+      <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="personal" ${state.sort === "personal" ? "selected" : ""}>For me</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
     <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
+    ${state.sort === "personal" ? '<p class="personal-copy">Open, fresh rides first. Then your must-dos, favorites, and the best waits versus normal. Set a must-do on any ride’s page.</p>' : ""}
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderWatching() {
@@ -714,6 +726,7 @@ function bindDynamic() {
   bindRideCards();
   $$('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
+  $$('[data-toggle-favorites]').forEach(b => b.onclick = () => store.update(s => { s.favoritesOnly = !s.favoritesOnly; }, 'filter'));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
   const search = $("#rideSearch"); if (search) search.oninput = () => store.update((s) => { s.query = search.value; }, "search");
   const sort = $("#sortSelect"); if (sort) sort.onchange = () => store.update((s) => { s.sort = sort.value; }, "sort");
@@ -804,10 +817,13 @@ function openRide(id) {
   const existing = store.ruleForRide(id);
   if (!ride && !existing) return;
   const model = ride || existing;
+  sheet.dataset.rideId = String(id);
   sheetReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(model.name || model.rideName)}</h2></div><div class="sheet-actions"><button class="sheet-action" type="button" data-share-ride="${id}" aria-label="Share ${escapeHtml(model.name || model.rideName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div></div>
     <div class="sheet-status"><span class="wait ${rideStatus(ride).stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(rideStatus(ride).wait)}</span><small>${escapeHtml(rideStatus(ride).label)}</small></div>
     <div id="rideInsights" class="ride-insights"><span class="insight-loading">Checking the trend data…</span></div>
+    <section class="ride-history"><div class="history-heading"><h3>Wait history</h3><select id="historyRange" aria-label="History range"><option value="today">Today</option><option value="7d">7 days</option><option value="30d">30 days</option></select></div><div id="rideHistory" aria-live="polite"></div></section>
+    <label class="toggle-row"><div><strong>Must-do ride</strong><small>Put it first in “For me.” This doesn’t create an alert.</small></div><input id="mustDoToggle" type="checkbox" ${store.snapshot.mustDo.includes(String(id)) ? "checked" : ""}><span class="switch"></span></label>
     <form id="watchForm">
       <label class="toggle-row"><div><strong>Notify when it reopens</strong><small>Useful when a ride goes down.</small></div><input id="reopenToggle" type="checkbox" ${existing?.reopen !== false ? "checked" : ""}><span class="switch"></span></label>
       <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when the wait drops to this or better:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>
@@ -823,6 +839,9 @@ function openRide(id) {
   $('[data-share-ride]', sheet)?.addEventListener("click", () => shareRide(id));
   requestAnimationFrame(() => $('[data-close-sheet]', sheet)?.focus({ preventScroll: true }));
   loadRideInsights(id);
+  loadRideHistory(id);
+  $('#historyRange', sheet).onchange = event => loadRideHistory(id, event.target.value);
+  $('#mustDoToggle', sheet).onchange = event => store.setMustDo(id, event.target.checked);
   let thresholdEnabled = Boolean(existing?.threshold), threshold = Number(existing?.threshold || 30);
   const refreshThreshold = () => { $("#thresholdValue").textContent = threshold; $("#thresholdControls").classList.toggle("disabled", !thresholdEnabled); $("#thresholdToggle").classList.toggle("active", thresholdEnabled); $("#thresholdToggle").textContent = thresholdEnabled ? "On" : "Off"; };
   $("#thresholdToggle").onclick = () => { thresholdEnabled = !thresholdEnabled; refreshThreshold(); };
@@ -842,9 +861,9 @@ function openRide(id) {
   };
 }
 async function loadRideInsights(id) {
-  const data = await fetchRideInsights(id);
   const host = $("#rideInsights");
-  if (!host || sheet.classList.contains("hidden")) return;
+  const data = await fetchRideInsights(id);
+  if (!host?.isConnected || sheet.dataset.rideId !== String(id) || sheet.classList.contains("hidden")) return;
 
   if (!data?.available) {
     host.innerHTML = '<span class="insight-loading">Still building enough history for this ride. Give it a little time.</span>';
@@ -871,6 +890,28 @@ async function loadRideInsights(id) {
     ${stats.length ? `<div class="insight-grid">${stats.join("")}</div>` : ""}
     <small>${escapeHtml(sourceCopy)} Today’s range comes from ParkPulse’s live samples.</small>
   `;
+}
+
+let historyRequest = 0;
+async function loadRideHistory(id, range = "today") {
+  const request = ++historyRequest;
+  const host = $("#rideHistory");
+  host.textContent = "Loading shared history…";
+  const data = await fetchRideHistory(id, range);
+  if (request !== historyRequest || !host.isConnected || sheet.dataset.rideId !== String(id)) return;
+  if (!data) { host.textContent = "History couldn’t load. Try another range or reopen this ride."; return; }
+  const points = data.points || [];
+  const open = points.filter(p => p.isOpen && Number.isFinite(p.waitTime));
+  if (!open.length) { host.textContent = "No posted waits collected in this range yet."; return; }
+  const max = Math.max(15, ...open.map(p => p.waitTime));
+  const start = Date.parse(data.startAt), end = Date.parse(data.endAt);
+  const x = p => 10 + (Date.parse(p.observedAt) - start) / Math.max(1, end - start) * 580;
+  const y = p => 130 - p.waitTime / max * 120;
+  // Individual samples never draw a line through closures or missing observations.
+  const dots = open.map(p => `<circle cx="${x(p).toFixed(2)}" cy="${y(p).toFixed(2)}" r="2.5"/>`).join("");
+  const low = Math.min(...open.map(p => p.waitTime)), high = max === 15 ? Math.max(...open.map(p => p.waitTime)) : max;
+  const format = value => new Date(value).toLocaleString([], { timeZone: data.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  host.innerHTML = `<p>${low}–${high} min · ${open.length} plotted samples</p><svg class="history-chart" viewBox="0 0 600 145" role="img" aria-label="Posted waits from ${low} to ${high} minutes. Each dot is a collected wait; gaps are not estimated."><path d="M10 10V130H590"/>${dots}</svg><div class="history-labels"><span>${escapeHtml(format(data.startAt))}</span><span>${escapeHtml(format(data.endAt))}</span></div><small>ParkPulse shared history · park time. ${data.bucketMinutes}-minute samples; closed or unknown waits are omitted. Gaps aren’t estimates.</small>`;
 }
 
 function closeSheet() {

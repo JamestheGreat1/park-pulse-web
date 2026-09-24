@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.6.3";
+const VERSION = "1.7.0";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -155,6 +155,15 @@ export default {
           generatedAt: new Date().toISOString(),
           rides
         }, 200, { ...cors, "Cache-Control": "public, max-age=120" });
+      }
+
+      const historyMatch = url.pathname.match(/^\/api\/ride\/([^/]+)\/history$/);
+      if (request.method === "GET" && historyMatch) {
+        const rideKey = decodeURIComponent(historyMatch[1]);
+        if (!catalogRideByKey(rideKey)) return json({ error: "Unknown ride" }, 404, cors);
+        const range = url.searchParams.get("range") || "today";
+        if (!["today", "7d", "30d"].includes(range)) return json({ error: "Use today, 7d, or 30d" }, 400, cors);
+        return json(await getRideHistory(env, rideKey, range), 200, { ...cors, "Cache-Control": "public, max-age=120" });
       }
 
       const insightMatch = url.pathname.match(/^\/api\/ride\/([^/]+)\/insights$/);
@@ -1689,6 +1698,23 @@ async function getAnalyticsStatus(env) {
       reason: "schema-not-ready"
     };
   }
+}
+
+// Return the last actual sample in each bucket, including closed/unknown states.
+// No averages masquerading as posted waits, and at most 1,441 points per response.
+async function getRideHistory(env, rideKey, range, now = Date.now()) {
+  const bucketMinutes = range === "today" ? 5 : range === "7d" ? 15 : 30;
+  const start = range === "today" ? parkDayStartMs(new Date(now)) : now - (range === "7d" ? 7 : 30) * 86400000;
+  const rows = await env.DB.prepare(`SELECT h.wait_time,h.is_open,h.observed_at FROM ride_history h
+    JOIN (SELECT MAX(observed_at) AS stamp FROM ride_history
+      WHERE ride_key = ? AND observed_at >= ? AND observed_at <= ?
+      GROUP BY CAST(observed_at / ? AS INTEGER)) buckets ON h.observed_at = buckets.stamp
+    WHERE h.ride_key = ? ORDER BY h.observed_at LIMIT 1441`)
+    .bind(rideKey, start, now, bucketMinutes * 60000, rideKey).all();
+  return { rideId: rideKey, range, timezone: "America/New_York", bucketMinutes,
+    startAt: new Date(start).toISOString(), endAt: new Date(now).toISOString(),
+    points: (rows.results || []).map(row => ({ observedAt: new Date(row.observed_at).toISOString(),
+      isOpen: row.is_open === 1, waitTime: row.wait_time == null ? null : Number(row.wait_time) })) };
 }
 
 async function getRideInsights(env, rideKey) {

@@ -1,4 +1,4 @@
-import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.6.6";
+import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=1.7.0";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");
@@ -225,3 +225,10 @@ export class RideData extends EventTarget {
 }
 
 export const rideData = new RideData();
+
+export async function fetchRideHistory(rideId, range = "today") {
+  if (!workerBase || !rideId) return null;
+  try {
+    return await fetchJson(`${workerBase}/api/ride/${encodeURIComponent(String(rideId))}/history?range=${encodeURIComponent(range)}`);
+  } catch { return null; }
+}

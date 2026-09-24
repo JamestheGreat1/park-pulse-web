@@ -8,6 +8,9 @@ const defaults = {
   sort: "recommended",
   theme: "system",
   accent: "blue",
+  favorites: [],
+  mustDo: [],
+  favoritesOnly: false,
   rules: []
 };
 
@@ -34,6 +37,8 @@ export class Store extends EventTarget {
     super();
     const saved = parse(localStorage.getItem(KEY), {});
     this.state = { ...defaults, ...saved };
+    this.state.favorites = [...new Set((Array.isArray(saved.favorites) ? saved.favorites : []).filter(id => typeof id === "string" && id.length < 120))];
+    this.state.mustDo = [...new Set((Array.isArray(saved.mustDo) ? saved.mustDo : []).filter(id => typeof id === "string" && id.length < 120))];
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
     if (!["blue","cyan","violet","pink","orange","green"].includes(this.state.accent)) this.state.accent = "blue";
     this.pruneExpired(false);
@@ -53,6 +58,18 @@ export class Store extends EventTarget {
       localStorage.setItem(KEY, JSON.stringify(this.state));
       if (emit) this.dispatchEvent(new CustomEvent("change", { detail: { reason: "expired" } }));
     }
+  }
+  toggleFavorite(rideId) {
+    this.update(state => {
+      const id = String(rideId);
+      state.favorites = state.favorites.includes(id) ? state.favorites.filter(item => item !== id) : [...state.favorites, id];
+    }, "preferences");
+  }
+  setMustDo(rideId, enabled) {
+    this.update(state => {
+      state.mustDo = state.mustDo.filter(id => id !== String(rideId));
+      if (enabled) state.mustDo.push(String(rideId));
+    }, "preferences");
   }
   ruleForRide(rideId) {
     this.pruneExpired(false);

@@ -13,6 +13,7 @@ async function evaluate(beforeWait, currentWait) {
   const context = vm.createContext({
     Date, Intl, Map, JSON, Number, console, LIVE_FRESHNESS_MS: 1200000,
     PARKS: new Map([[6, { name: 'Magic Kingdom' }]]),
+    ensureNotificationSchema: async () => {},
     readPriorRideState: async () => [{ ...ride, waitTime: beforeWait, updatedAt: Date.now() }],
     fetchCurrentRideSnapshot: async () => ({ rides: [ride] }),
     groupByPark: rows => new Map([[6, rows]]), normalizeRules: x => x,
@@ -142,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.6.5`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.6.5' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.7.0`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.7.0' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -152,17 +153,17 @@ test('editing a watch keeps its exact expiration unless a new duration is select
     const existing = { rideId: 'mk:test', parkId: 6, expiresAt: 1234567890, createdAt: 42, reopen: true };
     const elements = new Map();
     const element = selector => {
-      if (!elements.has(selector)) elements.set(selector, { value: duration, checked: true, classList: { add() {}, remove() {}, toggle() {} }, setAttribute() {}, addEventListener() {}, focus() {} });
+      if (!elements.has(selector)) elements.set(selector, { dataset: {}, value: duration, checked: true, classList: { add() {}, remove() {}, toggle() {} }, setAttribute() {}, addEventListener() {}, focus() {} });
       return elements.get(selector);
     };
     let saved;
     const context = vm.createContext({
       rideData: { rideById: () => ({ id: 'mk:test', parkId: 6, name: 'Test Mountain' }) },
-      store: { ruleForRide: () => existing, saveRule: value => { saved = value; } },
+      store: { snapshot: { mustDo: [] }, ruleForRide: () => existing, saveRule: value => { saved = value; } },
       document: { activeElement: null, body: element('body') }, HTMLElement: class {},
       sheet: element('sheet'), backdrop: element('backdrop'), sheetReturnFocus: null,
       $: element, $$: () => [], escapeHtml: x => x, parkName: () => 'MK', rideStatus: () => ({ wait: 30 }),
-      requestAnimationFrame: callback => callback(), loadRideInsights() {}, closeSheet() {}, shareRide() {},
+      requestAnimationFrame: callback => callback(), loadRideInsights() {}, loadRideHistory() {}, closeSheet() {}, shareRide() {},
       durationExpiry: () => 9999999999, pushOn: false, toast() {}, Date, Number, Boolean
     });
     vm.runInContext(app.slice(app.indexOf('function openRide('), app.indexOf('async function loadRideInsights(')) + ';openRide("mk:test")', context);
@@ -187,4 +188,74 @@ test('crowd estimates only display within current known park hours', () => {
   assert.equal(markup({}, { ...hours, closedToday: true }, Date.parse(hours.openingTime)), '');
   assert.equal(markup({}, null, Date.parse(hours.openingTime)), '');
   assert.equal(markup({}, { ...hours, openingTime: 'invalid' }, Date.parse(hours.openingTime)), '');
+});
+
+test('favorites persist independently of notification watches', () => {
+  const saved = new Map();
+  const context = vm.createContext({ EventTarget, Event, structuredClone, Date, Number, JSON,
+    CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
+    window: {}, localStorage: { getItem: k => saved.get(k), setItem: (k,v) => saved.set(k,v) } });
+  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  vm.runInContext(code + ';store.toggleFavorite("mk:test");store.setMustDo("mk:test",true);', context);
+  const state = JSON.parse(saved.values().next().value);
+  assert.deepEqual(state.favorites, ['mk:test']);
+  assert.deepEqual(state.mustDo, ['mk:test']);
+  assert.deepEqual(state.rules, []);
+  vm.runInContext('store.toggleFavorite("mk:test");', context);
+  assert.deepEqual(JSON.parse(saved.values().next().value).favorites, []);
+  assert.equal(vm.runInContext('new Store().snapshot.mustDo[0]', context), 'mk:test');
+});
+
+test('personalized ordering never promotes a stale or closed must-do above fresh open rides', () => {
+  const code = app.slice(app.indexOf('function sortedRides('), app.indexOf('function rideCard('));
+  const context = vm.createContext({ isRideStale: r => !!r.stale, rideComparison: r => ({ratio:r.ratio}) });
+  vm.runInContext(code, context);
+  const rides = [
+    {id:'stale',name:'Stale',isOpen:true,stale:true,ratio:0.1,waitTime:5},
+    {id:'closed',name:'Closed',isOpen:false,ratio:0.1,waitTime:0},
+    {id:'favorite',name:'Favorite',isOpen:true,ratio:0.9,waitTime:30},
+    {id:'best',name:'Best',isOpen:true,ratio:0.5,waitTime:20}
+  ];
+  context.rides = rides;
+  context.state = {query:'',openOnly:false,favoritesOnly:false,sort:'personal',favorites:['favorite'],mustDo:['closed','stale']};
+  assert.equal(vm.runInContext('sortedRides(rides,state).map(r=>r.id).join(",")',context),'favorite,best,closed,stale');
+  context.state.sort='recommended';
+  assert.equal(vm.runInContext('sortedRides(rides,state)[0].id',context),'best');
+  context.state.favoritesOnly=true;
+  assert.equal(vm.runInContext('sortedRides(rides,state).length',context),1);
+});
+
+test('history keeps zero waits, null waits, and closures distinct and bounds queries', async () => {
+  let bindings, query;
+  const now = Date.parse('2026-09-24T12:00:00Z');
+  const context = vm.createContext({ Date, Number, parkDayStartMs: () => now-8*3600000,
+    env: {DB:{prepare(sql){query=sql;return {bind(...args){bindings=args;return {all:async()=>({results:[
+      {wait_time:0,is_open:1,observed_at:now-60000},
+      {wait_time:null,is_open:1,observed_at:now-30000},
+      {wait_time:null,is_open:0,observed_at:now}
+    ]})}}}}}}, now });
+  vm.runInContext(section('async function getRideHistory(', 'async function getRideInsights('),context);
+  const result=await vm.runInContext('getRideHistory(env,"mk:test","30d",now)',context);
+  assert.equal(result.points[0].waitTime,0);
+  assert.equal(result.points[1].waitTime,null);
+  assert.equal(result.points[2].isOpen,false);
+  assert.equal(bindings[1],now-30*86400000);
+  assert.equal(bindings[3],30*60000);
+  assert.match(query,/LIMIT 1441/);
+});
+
+test('notification schema and scheduler health from 1.6.6 remain intact', async () => {
+  let schema;
+  const context=vm.createContext({Date,Number,env:{DB:{prepare:sql=>sql,batch:async statements=>{schema=statements}}}});
+  await vm.runInContext(section('async function ensureNotificationSchema(', 'async function getNotificationHealth(')+';ensureNotificationSchema(env)',context);
+  assert(schema.some(sql=>sql.includes('CREATE TABLE IF NOT EXISTS notification_ride_state')));
+  assert(schema.some(sql=>sql.includes('CREATE TABLE IF NOT EXISTS notification_log_v2')));
+  const healthCode=section('async function getNotificationHealth(', 'async function readPriorRideState(');
+  for (const [age,status] of [[0,'running'],[20*60000,'stale'],[null,'waiting']]) {
+    context.env={DB:{prepare:()=>({first:async()=>({rides:47,latest:age===null?0:Date.now()-age})})}};
+    const result=await vm.runInContext(healthCode+';getNotificationHealth(env)',context);
+    assert.equal(result.status,status);
+  }
+  assert.match(app,/Ride alert engine/);
+  assert.match(app,/notificationEngine\?\.lastCheck/);
 });

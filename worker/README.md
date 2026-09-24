@@ -48,3 +48,10 @@ curl -sS -X POST \
 
 The response includes the number of rides updated, primary/fallback source usage, baseline batch results, and the current analytics status.
 
+
+
+### Shared ride history (1.7.0)
+
+`GET /api/ride/:id/history?range=today|7d|30d` returns actual collected samples, including closed and unknown states. Today uses the park's Eastern day boundary. Responses use 5-, 15-, or 30-minute buckets, retain the last actual sample per bucket, and contain at most 1,441 points. These are not full-resolution min/max statistics. Existing `ride_history` data is reused; no new migration is required.
+
+Deploy this Worker after updating the frontend: `cd worker && npm ci && npx wrangler deploy`. The 1.6.6 notification schema initialization and scheduler health endpoint remain included.

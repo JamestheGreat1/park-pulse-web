@@ -6,13 +6,16 @@ ParkPulse is basically the Walt Disney World app I wanted while actually in the 
 
 A short wait isn't always a good wait. And standing around refreshing Space Mountain every two minutes is not exactly the vacation plan.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.6.5**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.0**
 
 ## The useful stuff
 
 - **Live waits and ride status** for Magic Kingdom, EPCOT, Hollywood Studios, and Animal Kingdom.
 - **Best Now** compares a ride's current wait with what's typical for that ride around the same time of day. A 45-minute wait might actually be a pretty good deal.
 - **Wait comparison badges** call out waits that are lower or higher than typical, when enough history is available. Green means a better-than-typical wait; amber and red flag busier conditions.
+- **Favorites without the buzzing.** Star rides to save them, then use the Favorites filter. No notification permission needed.
+- **For me** puts your must-dos and favorites first among fresh, open rides, then compares waits with normal. Best Now keeps its usual ranking.
+- **Shared wait history** lets you check today, the past 7 days, or the past 30 days on a ride’s page. Each dot is a collected wait, not a prediction.
 - **Smart watches** let you follow a ride for a reopening, a wait-time target, or both. Background push alerts can reach you with the app closed.
 - **Crowd pressure at a glance:** a compact ten-segment meter, a 1–10 rating, and a trend when available. See whether waits are building, holding steady, or easing off.
 - **Useful park context:** today's hours, closing countdowns, same-day ticketed events, and observed downtime for rides reported as temporarily down.
@@ -41,6 +44,8 @@ Choose **MK**, **EPCOT**, **DHS**, or **AK** at the top. Leave the sort on **Bes
 For example, **↓ 24% vs typical** means the posted wait is 24% lower than the historical comparison. An upward badge means it's higher. These are comparisons, not promises about how long you'll actually stand in line.
 
 Prefer the basics? Switch to **Lowest wait** or **A–Z**, search for a ride, or use **Open only**.
+
+Tap the star to save a favorite. Want to prioritize a ride? Open its page, enable **Must-do ride**, then choose **For me** in the sort menu. Favorites and must-dos stay on this browser; they don’t create alerts or sync to your iPhone app.
 
 On mobile, pull down from the very top and release to refresh. Your watches stay put.
 
@@ -88,6 +93,8 @@ Pick your color and call it a day. The glass styling, highlights, and controls f
 ## A few things worth knowing
 
 **Notifications aren't instant.** The backend checks rides on a five-minute schedule, and alerts also depend on the source data updating and your device delivering the push. A watch alerts on a qualifying change; saving one isn't a promise of an immediate notification.
+
+**Check the ride alert engine too.** Settings shows when the scheduled evaluator last checked rides. “Running” confirms recent checks; it doesn’t guarantee a particular ride will trigger an alert.
 
 **“Send test” checks delivery to your device.** It doesn't test a real ride transition. Make sure Settings also says your watches have synced. Pending watch changes retry while the app is open and online.
 

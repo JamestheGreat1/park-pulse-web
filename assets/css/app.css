@@ -488,3 +488,15 @@ select option:disabled{color:var(--muted)}
   select option,select optgroup{color:CanvasText;background-color:Canvas}
   select option:disabled{color:GrayText}
 }
+
+/* Saved rides stay independent of notification watches. */
+.ride-actions{display:flex;flex-direction:column;align-items:stretch;justify-content:center}
+.favorite-button{min-height:44px;min-width:44px;border:0;background:none;color:var(--muted);display:grid;place-items:center}
+.favorite-button.active{color:var(--blue)}.favorite-button.active svg{fill:currentColor}
+.ride-actions .watch-button{min-height:44px;flex:1}.personal-copy{color:var(--muted);font-size:.85rem;line-height:1.5;margin:0 0 14px}
+#view-explore .toolbar{grid-template-columns:minmax(140px,1fr) auto auto auto}
+.ride-history{padding:16px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);margin:16px 0;color:var(--muted);font-size:.85rem}
+.history-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.history-heading h3{color:var(--text);font-size:1rem}
+.history-heading select{background:var(--bg2);border:1px solid var(--hair);border-radius:10px;padding:10px;min-height:44px}
+.history-chart{width:100%;height:auto;stroke:var(--hair)}.history-chart circle{fill:var(--blue);stroke:none}.history-labels{display:flex;justify-content:space-between;gap:12px;font-size:.7rem;margin-bottom:10px}
+@media(max-width:600px){#view-explore .toolbar{grid-template-columns:1fr 1fr}#view-explore .toolbar .search{grid-column:1/-1}#sortSelect{grid-column:1/-1}}

@@ -4498,3 +4498,19 @@ body{
     min-width:68px;
   }
 }
+
+
+/* v1.8.5 — mobile ride sheets must stay vertically scrollable */
+@media (max-width:1023px){
+  .ride-sheet,
+  :root[data-preview-surface="neutral"] .ride-sheet,
+  :root[data-preview-surface="liquid"] .ride-sheet{
+    max-height:calc(100dvh - env(safe-area-inset-top,0px) - 10px)!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    overscroll-behavior:contain!important;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y pinch-zoom!important;
+    padding-bottom:calc(34px + env(safe-area-inset-bottom,0px))!important;
+  }
+}

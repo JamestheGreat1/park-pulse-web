@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.0-preview.11";
-import { store } from "./store.js?v=1.9.0-preview.11";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.0-preview.11";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.0-preview.11";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.0-preview.11";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.0-preview.12";
+import { store } from "./store.js?v=1.9.0-preview.12";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.0-preview.12";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.0-preview.12";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.0-preview.12";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.0-preview.11";
+const APP_VERSION = "1.9.0-preview.12";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -922,7 +922,7 @@ function bindDynamic() {
   document.querySelectorAll('[data-park]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
   document.querySelectorAll('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
   bindRideCards(views.explore);
-  $('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
+  document.querySelectorAll('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-favorites]').forEach(b => b.onclick = () => store.update(s => { s.favoritesOnly = !s.favoritesOnly; }, 'filter'));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));

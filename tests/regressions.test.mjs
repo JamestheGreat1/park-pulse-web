@@ -388,22 +388,6 @@ test('legacy Must-do state is discarded', () => {
 
 
 
-test('desktop ride sheet expands to content with no scrolling', () => {
-  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
-  const marker = css.lastIndexOf('desktop ride sheets are full-content centered modals');
-  assert.ok(marker >= 0);
-  const finalDesktop = css.slice(marker);
-  assert.match(finalDesktop, /@media \(min-width:1024px\)/);
-  assert.match(finalDesktop, /top:50%!important/);
-  assert.match(finalDesktop, /bottom:auto!important/);
-  assert.match(finalDesktop, /width:min\(760px,calc\(100vw - 64px\)\)!important/);
-  assert.match(finalDesktop, /max-height:none!important/);
-  assert.match(finalDesktop, /height:auto!important/);
-  assert.match(finalDesktop, /overflow:visible!important/);
-  assert.match(finalDesktop, /transform:translate\(-50%,-50%\)!important/);
-});
-
-
 test('desktop wait-target controls stay grouped', () => {
   const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
   const marker = css.lastIndexOf('desktop threshold controls stay grouped');
@@ -436,4 +420,19 @@ test('mobile Liquid Glass ride sheet hides the inner-rim seam', () => {
   assert.match(mobile, /@media \(max-width:1023px\)/);
   assert.match(mobile, /:root\[data-preview-surface="liquid"\] \.ride-sheet::after/);
   assert.match(mobile, /display:none!important/);
+});
+
+
+test('desktop ride sheet stays compact and scrollable', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('compact, scrollable desktop ride sheets');
+  assert.ok(marker >= 0);
+  const desktop = css.slice(marker);
+  assert.match(desktop, /@media \(min-width:1024px\)/);
+  assert.match(desktop, /width:min\(680px,calc\(100vw - 72px\)\)!important/);
+  assert.match(desktop, /max-height:calc\(100dvh - 72px\)!important/);
+  assert.match(desktop, /overflow-y:auto!important/);
+  assert.match(desktop, /overflow-x:hidden!important/);
+  assert.match(desktop, /scrollbar-width:thin/);
+  assert.match(desktop, /transform:translate\(-50%,-50%\)!important/);
 });

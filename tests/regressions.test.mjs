@@ -159,7 +159,7 @@ test('editing a watch keeps its exact expiration unless a new duration is select
     let saved;
     const context = vm.createContext({
       rideData: { rideById: () => ({ id: 'mk:test', parkId: 6, name: 'Test Mountain' }) },
-      store: { snapshot: { mustDo: [] }, ruleForRide: () => existing, saveRule: value => { saved = value; } },
+      store: { snapshot: {}, ruleForRide: () => existing, saveRule: value => { saved = value; } },
       document: { activeElement: null, body: element('body') }, HTMLElement: class {},
       sheet: element('sheet'), backdrop: element('backdrop'), sheetReturnFocus: null,
       $: element, $$: () => [], escapeHtml: x => x, parkName: () => 'MK', rideStatus: () => ({ wait: 30 }),
@@ -196,14 +196,12 @@ test('favorites persist independently of notification watches', () => {
     CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
     window: {}, localStorage: { getItem: k => saved.get(k), setItem: (k,v) => saved.set(k,v) } });
   const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
-  vm.runInContext(code + ';store.toggleFavorite("mk:test");store.setMustDo("mk:test",true);', context);
+  vm.runInContext(code + ';store.toggleFavorite("mk:test");', context);
   const state = JSON.parse(saved.values().next().value);
   assert.deepEqual(state.favorites, ['mk:test']);
-  assert.deepEqual(state.mustDo, ['mk:test']);
   assert.deepEqual(state.rules, []);
   vm.runInContext('store.toggleFavorite("mk:test");', context);
   assert.deepEqual(JSON.parse(saved.values().next().value).favorites, []);
-  assert.equal(vm.runInContext('new Store().snapshot.mustDo[0]', context), 'mk:test');
 });
 
 test('Favorites narrows Best Now without changing its ordering logic', () => {
@@ -217,7 +215,7 @@ test('Favorites narrows Best Now without changing its ordering logic', () => {
     {id:'favorite-closed',name:'Favorite Closed',isOpen:false,ratio:0.1,waitTime:0}
   ];
   context.rides = rides;
-  context.state = {query:'',openOnly:false,favoritesOnly:true,sort:'recommended',favorites:['favorite-good','favorite-ok','favorite-closed'],mustDo:[]};
+  context.state = {query:'',openOnly:false,favoritesOnly:true,sort:'recommended',favorites:['favorite-good','favorite-ok','favorite-closed']};
   assert.equal(
     vm.runInContext('sortedRides(rides,state).map(r=>r.id).join(",")',context),
     'favorite-good,favorite-ok,favorite-closed'
@@ -235,7 +233,7 @@ test('ride cards bind Favorite and Alert without quick actions', () => {
 test('Next Up skips stale, closed, and source-missing rides', () => {
   const code = app.slice(app.indexOf('function recommendationScore('), app.indexOf('function rideStatus('));
   const rides = [
-    {id:'must',name:'Must Do',parkId:6,isOpen:true,waitTime:45},
+    {id:'other',name:'Other Ride',parkId:6,isOpen:true,waitTime:45},
     {id:'best',name:'Best Value',parkId:6,isOpen:true,waitTime:15},
     {id:'open',name:'Open Ride',parkId:6,isOpen:true,waitTime:5},
     {id:'closed',name:'Closed',parkId:6,isOpen:false,waitTime:0},
@@ -247,14 +245,14 @@ test('Next Up skips stale, closed, and source-missing rides', () => {
     store:{snapshot:{}},
     rideData:{ridesForPark:()=>rides,rideById:id=>rides.find(r=>r.id===id)},
     isRideStale:r=>Boolean(r.stale),
-    rideComparison:r=>r.id==='best'?{ratio:.5,percentDelta:-50}:r.id==='must'?{ratio:1,percentDelta:0}:null,
+    rideComparison:r=>r.id==='best'?{ratio:.5,percentDelta:-50}:r.id==='other'?{ratio:1,percentDelta:0}:null,
     rideStatus:r=>({stale:false,wait:String(r.waitTime),label:'Operating'}),
     escapeHtml:value=>String(value),
     nextUpOffset:0
   });
   vm.runInContext(code, context);
-  context.state = {selectedParkId:6,mustDo:['must'],favorites:[],rules:[]};
-  assert.deepEqual(vm.runInContext('recommendationCandidates(state).map(r=>r.id)', context), ['must','best','open']);
+  context.state = {selectedParkId:6,favorites:[],rules:[]};
+  assert.deepEqual(vm.runInContext('recommendationCandidates(state).map(r=>r.id)', context), ['best','open','other']);
 });
 
 test('history keeps zero waits, null waits, and closures distinct and bounds queries', async () => {
@@ -384,4 +382,31 @@ test('desktop ride sheet wins over swipe transform and stays centered', () => {
   assert.match(finalDesktop, /width:min\(760px,calc\(100vw - 64px\)\)!important/);
   assert.match(finalDesktop, /max-height:calc\(100dvh - 32px\)!important/);
   assert.match(finalDesktop, /transform:translate\(-50%,-50%\)!important/);
+});
+
+
+test('legacy Must-do state is discarded', () => {
+  const saved = new Map([['parkpulse.rideWatcher.v1', JSON.stringify({mustDo:['mk:test'],favorites:['mk:test']})]]);
+  const context = vm.createContext({
+    EventTarget, Event, structuredClone, Date, Number, JSON,
+    CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
+    window: { PARKPULSE_CONFIG: {} },
+    localStorage: { getItem: k => saved.get(k) || null, setItem: (k,v) => saved.set(k,v) }
+  });
+  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  vm.runInContext(code, context);
+  const snapshot = vm.runInContext('store.snapshot', context);
+  assert.equal(snapshot.mustDo, undefined);
+  assert.deepEqual(snapshot.favorites, ['mk:test']);
+});
+
+
+test('desktop ride sheet hides scrollbar without disabling scroll', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('hide desktop ride-sheet scrollbars without disabling scroll');
+  assert.ok(marker >= 0);
+  const block = css.slice(marker);
+  assert.match(block, /scrollbar-width:none/);
+  assert.match(block, /overflow-x:hidden!important/);
+  assert.match(block, /\.ride-sheet::\-webkit-scrollbar/);
 });

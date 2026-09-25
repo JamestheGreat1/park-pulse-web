@@ -6,7 +6,7 @@ This branch is the protected test bed for ParkPulse features before they move to
 
 `preview/seasonal-overlays`
 
-Preview version: `1.9.0-preview.7`
+Preview version: `1.9.0-preview.8`
 
 Production `main` remains unchanged until the preview work is explicitly approved.
 
@@ -16,7 +16,7 @@ This build ports four native-app ideas into the PWA without bringing back the ol
 
 - **Next Up** — one recommended ride at a time, with “I’m heading there” and “Show another.”
 - **Recommendation explanations** — concise, factual reasons based on must-dos, favorites, live waits, and the existing historical comparison.
-- **Park Day Lite** — a lightweight session that tracks the current Next Up ride, rides marked ridden, remaining must-dos, and watched rides.
+- **Park Day Lite** — a lightweight session that tracks the current Next Up ride, rides marked ridden, remaining must-dos, and watched rides. **Dedicated Park Day screen** opens from Explore while the normal three-tab bottom navigation stays unchanged.
 - **Quick Actions** — Favorite, Must-do, Watch/Edit Watch, Set as Next Up, mark a completed ride back as not ridden, and Share.
 
 No new backend schema or Worker logic is required for these features. Park Day Lite is intentionally device-local.

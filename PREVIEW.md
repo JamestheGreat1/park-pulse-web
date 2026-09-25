@@ -101,3 +101,4 @@ URL overrides are ignored outside the protected preview hostname/localhost.
 Test each season in light and dark mode, with representative accent colors, on iPhone/PWA and desktop. Confirm Reduced Motion removes particles and that operational status colors stay visually distinct.
 
 <!-- preview-build-trigger: 2026-09-24T19:58-06:00 -->
+<!-- preview-build-trigger: 2026-09-24T20:06-06:00 -->

@@ -4473,10 +4473,11 @@ body{
   .ride-sheet{
     top:50%!important;
     bottom:auto!important;
-    max-height:min(82dvh,760px)!important;
+    width:min(760px,calc(100vw - 64px))!important;
+    max-height:calc(100dvh - 32px)!important;
     transform:translate(-50%,-50%)!important;
     border-radius:30px;
-    overflow:auto;
+    overflow:auto!important;
   }
   .ride-sheet.sheet-dragging,
   .ride-sheet.sheet-dismissing{

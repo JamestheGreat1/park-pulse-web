@@ -358,3 +358,21 @@ test('condensed Status keeps four summary rows and expandable diagnostics', () =
   assert.match(settings, /Data source/);
   assert.match(settings, /Ride alert engine/);
 });
+
+
+test('Settings customization bindings survive diagnostics wiring', () => {
+  const block = app.slice(app.indexOf('function bindDynamic('), app.indexOf('async function copyText('));
+  assert.match(block, /querySelectorAll\('\[data-copy-diagnostics\]'\)/);
+  assert.match(block, /const theme = \$\("#themeSelect"\)/);
+  assert.match(block, /button\[data-accent-choice\]/);
+  assert.match(block, /\[data-glass-style\]/);
+  assert.match(block, /seasonalEffectsToggle/);
+  assert.doesNotMatch(block, /(?<!\$)\$\([^;\n]*\)\.forEach/g);
+});
+
+test('desktop wait cards use a centered content column', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const desktop = css.slice(css.indexOf('@media (min-width:1024px)'), css.indexOf('@media', css.indexOf('@media (min-width:1024px)') + 1));
+  assert.match(desktop, /#view-explore \.ride-list\{[^}]*width:min\(100%,1040px\)[^}]*justify-self:center/s);
+  assert.match(desktop, /#view-explore \.section-heading\{[^}]*width:min\(100%,1040px\)[^}]*justify-self:center/s);
+});

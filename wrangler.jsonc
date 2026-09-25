@@ -15,5 +15,12 @@
       "service": "parkpulse-api"
     }
   ],
-  "previews": {}
+  "previews": {
+    "services": [
+      {
+        "binding": "PARKPULSE_API",
+        "service": "parkpulse-api"
+      }
+    ]
+  }
 }

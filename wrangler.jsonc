@@ -9,11 +9,5 @@
     "binding": "ASSETS",
     "run_worker_first": ["/api", "/api/*", "/auth", "/auth/*", "/health", "/vapid-key", "/subscriptions", "/subscriptions/*"]
   },
-  "services": [
-    {
-      "binding": "PARKPULSE_API",
-      "service": "parkpulse-api"
-    }
-  ],
   "previews": {}
 }

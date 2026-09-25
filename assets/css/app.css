@@ -4657,3 +4657,85 @@ body{
     --glass-interaction-shift:2px;
   }
 }
+
+
+/* v1.8.10 — desktop ride-sheet controls + seasonal parity */
+@media (min-width:1024px){
+  .threshold-controls{
+    display:flex!important;
+    width:max-content;
+    max-width:100%;
+    margin:8px 0 0 auto!important;
+    align-items:center;
+    justify-content:flex-end!important;
+    gap:8px;
+  }
+  .threshold-controls button{
+    flex:0 0 44px;
+    width:44px;
+  }
+  .threshold-controls output{
+    flex:0 0 auto;
+    min-width:58px!important;
+    text-align:right;
+  }
+  .threshold-controls>span{
+    flex:0 0 auto;
+    margin-left:-3px;
+  }
+
+  /* Desktop has more glass/card coverage, so keep the ambience equally legible. */
+  :root.season-active .seasonal-layer{
+    opacity:.88;
+  }
+}
+
+/* Respect reduced motion without making seasonal mode look disabled. */
+@media (prefers-reduced-motion:reduce){
+  :root.season-active .seasonal-layer{
+    opacity:.88!important;
+    transition:none!important;
+  }
+  :root[data-season="christmas"] .seasonal-layer,
+  :root[data-season="easter"] .seasonal-layer,
+  :root[data-season="fall"] .seasonal-layer,
+  :root[data-season="july4"] .seasonal-layer,
+  :root[data-season="halloween"] .seasonal-layer{
+    filter:none!important;
+  }
+  :root[data-season="christmas"] .seasonal-layer > .seasonal-particle:nth-child(-n+14),
+  :root[data-season="easter"] .seasonal-layer > .seasonal-particle:nth-child(-n+12),
+  :root[data-season="fall"] .seasonal-layer > .seasonal-particle:nth-child(-n+14),
+  :root[data-season="july4"] .seasonal-layer > .seasonal-particle:nth-child(-n+12){
+    display:block!important;
+    top:var(--particle-top)!important;
+    bottom:auto!important;
+    width:4px!important;
+    height:4px!important;
+    margin:0!important;
+    border-radius:50%!important;
+    opacity:.22!important;
+    animation:none!important;
+    transform:none!important;
+    background:var(--season-particle)!important;
+    box-shadow:0 0 10px color-mix(in srgb,var(--season-particle) 55%,transparent)!important;
+  }
+  :root[data-season="easter"] .seasonal-layer > .seasonal-particle:nth-child(-n+12){
+    width:7px!important;
+    height:4px!important;
+    border-radius:70% 30% 70% 30%!important;
+    opacity:.26!important;
+  }
+  :root[data-season="fall"] .seasonal-layer > .seasonal-particle:nth-child(-n+14){
+    width:9px!important;
+    height:13px!important;
+    border-radius:68% 32% 62% 38%!important;
+    opacity:.30!important;
+  }
+  :root[data-season="july4"] .seasonal-layer > .seasonal-particle:nth-child(-n+12){
+    width:3px!important;
+    height:3px!important;
+    border-radius:1px!important;
+    opacity:.30!important;
+  }
+}

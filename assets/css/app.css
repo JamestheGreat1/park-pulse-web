@@ -1028,8 +1028,8 @@ body{
   -webkit-backdrop-filter:blur(18px) saturate(150%);
   font-size:.62rem;
   font-weight:900;
-  letter-spacing:.08em;
-  text-transform:uppercase;
+  letter-spacing:.05em;
+  text-transform:none;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;

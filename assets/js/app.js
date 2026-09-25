@@ -1204,7 +1204,7 @@ async function loadRideHistory(id, range = "today") {
     return `<g class="history-grid"><line x1="${plot.left}" y1="${py}" x2="${plot.right}" y2="${py}"/><text x="${plot.left - 7}" y="${(Number(py) + 3).toFixed(2)}" text-anchor="end">${Math.round(value)}m</text></g>`;
   }).join("");
   const avgY = yValue(average).toFixed(2);
-  const averageLine = `<line class="history-average-line" x1="${plot.left}" y1="${avgY}" x2="${plot.right}" y2="${avgY}"/><text class="history-average-label" x="${plot.right - 4}" y="${Math.max(plot.top + 9, Number(avgY) - 5).toFixed(2)}" text-anchor="end">avg ${average}m</text>`;
+  const averageLine = `<line class="history-average-line" x1="${plot.left}" y1="${avgY}" x2="${plot.right}" y2="${avgY}"/>`;
 
   const timeFormat = value => new Date(value).toLocaleString([], { timeZone: data.timezone, hour: "numeric" });
   const dateFormat = value => new Date(value).toLocaleString([], { timeZone: data.timezone, month: "short", day: "numeric" });

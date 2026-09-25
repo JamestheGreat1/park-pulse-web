@@ -6,7 +6,7 @@ This branch is the protected test bed for ParkPulse features before they move to
 
 `preview/seasonal-overlays`
 
-Preview version: `1.9.0-preview.11`
+Preview version: `1.9.0-preview.12`
 
 Production `main` remains unchanged until the preview work is explicitly approved.
 

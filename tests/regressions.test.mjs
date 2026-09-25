@@ -402,3 +402,14 @@ test('desktop ride sheet expands to content with no scrolling', () => {
   assert.match(finalDesktop, /overflow:visible!important/);
   assert.match(finalDesktop, /transform:translate\(-50%,-50%\)!important/);
 });
+
+
+test('desktop wait-target controls stay grouped', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('desktop threshold controls stay grouped');
+  assert.ok(marker >= 0);
+  const finalDesktop = css.slice(marker);
+  assert.match(finalDesktop, /grid-template-columns:44px auto auto 44px/);
+  assert.match(finalDesktop, /justify-content:end/);
+  assert.match(finalDesktop, /min-width:68px/);
+});

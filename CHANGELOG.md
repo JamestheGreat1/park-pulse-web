@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.14 — 2026-09-25
+
+- Removed the remaining Liquid Glass specular/caustic overlay from ride sheets, eliminating the dark shaded band that could appear near the bottom while scrolling.
+- Kept the ride sheet's glass material, blur, border, outer shadow, scrolling, and desktop/mobile layout intact.
+- Preserves the 1.8.13 threshold-control geometry and all recent seasonal/chart cleanup.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.13 — 2026-09-25
 
 - Fixed the desktop wait-time target controls for Windows scaling/browser zoom by applying the centered geometry from 700px upward instead of relying on the old 1024px desktop breakpoint.

@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.9";
-import { store } from "./store.js?v=1.8.0-preview.9";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.9";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.9";
-import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls } from "./seasonal.js?v=1.8.0-preview.9";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.10";
+import { store } from "./store.js?v=1.8.0-preview.10";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.10";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.10";
+import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled } from "./seasonal.js?v=1.8.0-preview.10";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.8.0-preview.9";
+const APP_VERSION = "1.8.0-preview.10";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -666,6 +666,7 @@ function renderSettings() {
     ? `<div class="setting-row install-status-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>`
     : "";
   const backendCopy = backendState?.ok === true ? `Online · Worker ${backendState.version || ""}`.trim() : backendState?.ok === false ? "Unavailable" : "Checking…";
+  const previewApiRow = isSeasonPreviewEnabled() ? `<div class="setting-row"><div><strong>Preview API route</strong><small>Same-origin preview → ParkPulse API service binding</small></div><span class="health-pill ${backendState?.previewProxy ? "good" : backendState?.ok === false ? "bad" : ""}">${backendState?.previewProxy ? "Connected" : backendState?.ok === false ? "Unavailable" : "Checking…"}</span></div>` : "";
   const refreshCopy = rideData.updatedAt ? relativeTime(rideData.updatedAt) : "Not yet";
   const notificationEngine = backendState?.notificationEngine || null;
   const alertEngineCopy = !backendState?.ok
@@ -722,7 +723,7 @@ function renderSettings() {
     ${seasonalPreviewControlsMarkup()}
     <div class="settings-section-title">Status & diagnostics</div>
     <section class="settings-group liquid-glass status-diagnostics">
-      <div class="setting-row"><div><strong>Worker</strong><small>Backend + notification status</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
+      <div class="setting-row"><div><strong>Worker</strong><small>Backend + notification status</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>${previewApiRow}
       <div class="setting-row"><div><strong>Ride data</strong><small>Last time ParkPulse got fresh ride data</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
       <div class="setting-row"><div><strong>Data source</strong><small>ThemeParks.wiki primary · Queue-Times fallback</small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
       <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Used by the Worker — never stored in the app.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>

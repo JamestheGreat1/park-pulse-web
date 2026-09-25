@@ -21,8 +21,9 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both.
 - **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
 - **Park context** includes today's hours, closing information, ticketed events, and observed ride downtime.
-- **Customization** includes light, dark, and system themes plus six accent colors.
+- **Customization** includes light, dark, and system themes plus eight accent colors.
 - **Mobile-friendly controls** include pull-to-refresh and pull-down-to-close ride sheets.
+- **D1-efficient diagnostics** keep backend health checks lightweight instead of repeatedly scanning the full wait-history table.
 
 No giant vacation planner. No twenty-step setup process. Just the stuff that helps answer:
 

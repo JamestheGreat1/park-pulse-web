@@ -659,7 +659,13 @@ function selectView(name) {
 }
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
-  let list = rides.filter((r) => (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) && (!state.openOnly || (r.isOpen && !isRideStale(r))) && (!state.favoritesOnly || state.favorites.includes(String(r.id))));
+  const personal = state.sort === "personal";
+  let list = rides.filter((r) =>
+    (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) &&
+    (!state.openOnly || (r.isOpen && !isRideStale(r))) &&
+    (!state.favoritesOnly || state.favorites.includes(String(r.id))) &&
+    (!personal || state.favorites.includes(String(r.id)))
+  );
   const staleRank = (ride) => isRideStale(ride) ? 1 : 0;
   if (state.sort === "wait") list.sort((a,b) => staleRank(a) - staleRank(b) || (a.isOpen === b.isOpen ? (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) : a.isOpen ? -1 : 1));
   else if (state.sort === "name") list.sort((a,b) => staleRank(a) - staleRank(b) || a.name.localeCompare(b.name));
@@ -670,11 +676,6 @@ function sortedRides(rides, state) {
     const operating = Number(b.isOpen) - Number(a.isOpen);
     if (operating) return operating;
 
-    if (state.sort === "personal") {
-      const priority = ride => (state.mustDo.includes(String(ride.id)) ? 2 : state.favorites.includes(String(ride.id)) ? 1 : 0);
-      const preference = priority(b) - priority(a);
-      if (preference) return preference;
-    }
     const aRatio = rideComparison(a)?.ratio ?? Infinity;
     const bRatio = rideComparison(b)?.ratio ?? Infinity;
     if (aRatio !== bRatio) return aRatio - bRatio;
@@ -688,7 +689,7 @@ function rideCard(ride, state = store.snapshot, index = 0) {
   const rule = store.ruleForRide(ride.id);
   const status = rideStatus(ride);
   const valueBadge = typicalComparisonBadge(ride);
-  const explanation = ["recommended", "personal"].includes(state.sort) && index < 3 && ride.isOpen && !status.stale
+  const explanation = state.sort === "recommended" && index < 3 && ride.isOpen && !status.stale
     ? recommendationReason(ride, state)
     : "";
   return `<article class="ride-card liquid-glass ${rule ? "watching" : ""} ${status.stale ? "stale" : ""}" data-ride-id="${ride.id}">
@@ -704,9 +705,11 @@ function rideCard(ride, state = store.snapshot, index = 0) {
 }
 function rideListMarkup(state = store.snapshot) {
   const rides = sortedRides(rideData.ridesForPark(state.selectedParkId), state);
-  return rides.length
-    ? rides.map((ride, index) => rideCard(ride, state, index)).join("")
-    : `<div class="empty liquid-glass">${rideData.error || "No rides match that search."}</div>`;
+  if (rides.length) return rides.map((ride, index) => rideCard(ride, state, index)).join("");
+  const emptyCopy = state.sort === "personal" && !state.query
+    ? "No favorites in this park yet. Tap the star on a ride to add one."
+    : rideData.error || "No rides match that search.";
+  return `<div class="empty liquid-glass">${escapeHtml(emptyCopy)}</div>`;
 }
 function bindRideCards(root = views.explore) {
   root.querySelectorAll('[data-favorite]').forEach(button => {
@@ -746,7 +749,6 @@ function renderExplore() {
     </section>
     ${nextUpMarkup(state)}
     <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
-    ${state.sort === "personal" ? '<p class="personal-copy">Open, fresh rides first. Then your must-dos, favorites, and the best waits versus normal. Set a must-do on any ride’s page.</p>' : ""}
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderWatching() {

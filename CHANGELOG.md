@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.6 — 2026-09-25
+
+- Removed a stray horizontal Liquid Glass seam that could appear near the bottom of scrollable ride sheets on iPhone/iPad.
+- Kept the outer glass border and mobile scrolling behavior intact; only the conflicting inner refractive rim is suppressed on mobile ride sheets.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.5 — 2026-09-25
 
 - Fixed Liquid Glass ride sheets on iPhone/iPad so long ride cards scroll vertically instead of clipping the bottom controls.

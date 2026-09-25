@@ -1714,3 +1714,10 @@ body{
   filter:opacity(1.12);
 }
 
+
+/* v1.8.0-preview.12 — align Halloween rain streaks with right-to-left wind. */
+@keyframes halloween-rain{
+  0%{transform:translate3d(46px,-18vh,0) rotate(13deg);opacity:0}
+  10%{opacity:.58}
+  100%{transform:translate3d(-64px,122vh,0) rotate(13deg);opacity:.16}
+}

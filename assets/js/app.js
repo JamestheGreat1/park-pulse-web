@@ -413,7 +413,6 @@ function recommendationScore(ride, state = store.snapshot) {
   const wait = Number(ride.waitTime);
   let score = 0;
 
-  if (state.mustDo.includes(id)) score += 500;
   if (state.favorites.includes(id)) score += 220;
   if (comparison) score += Math.max(-180, Math.min(300, (1 - comparison.ratio) * 320));
   if (Number.isFinite(wait)) score += Math.max(-80, 120 - wait) * 1.15;
@@ -428,7 +427,7 @@ function recommendationReason(ride, state = store.snapshot) {
   const id = String(ride.id);
   const comparison = rideComparison(ride);
   const wait = Number(ride.waitTime);
-  const priority = state.mustDo.includes(id) ? "Must-do" : state.favorites.includes(id) ? "Favorite" : "";
+  const priority = state.favorites.includes(id) ? "Favorite" : "";
 
   if (comparison?.percentDelta <= -25) {
     return `${priority ? priority + " · " : ""}${Math.abs(comparison.percentDelta)}% below typical right now`;
@@ -470,11 +469,9 @@ function nextUpMarkup(state = store.snapshot) {
   const comparison = rideComparison(ride);
   const label = comparison?.percentDelta <= -25
     ? "Great right now"
-    : state.mustDo.includes(String(ride.id))
-      ? "Must-do pick"
-      : state.favorites.includes(String(ride.id))
-        ? "Favorite pick"
-        : "ParkPulse pick";
+    : state.favorites.includes(String(ride.id))
+      ? "Favorite pick"
+      : "ParkPulse pick";
 
   return `<section class="next-up-card liquid-glass">
     <div class="next-up-head">
@@ -1084,7 +1081,6 @@ function openRide(id) {
     ${ride ? `<div class="sheet-recommendation"><span>ParkPulse context</span><strong>${escapeHtml(recommendationReason(ride, store.snapshot))}</strong></div>` : ""}
     <div id="rideInsights" class="ride-insights"><span class="insight-loading">Checking the trend data…</span></div>
     <section class="ride-history"><div class="history-heading"><h3>Wait history</h3><select id="historyRange" aria-label="History range"><option value="today">Today</option><option value="7d">7 days</option><option value="30d">30 days</option></select></div><div id="rideHistory" aria-live="polite"></div></section>
-    <label class="toggle-row"><div><strong>Must-do ride</strong><small>Prioritize it in Next Up. This doesn’t create an alert.</small></div><input id="mustDoToggle" type="checkbox" ${store.snapshot.mustDo.includes(String(id)) ? "checked" : ""}><span class="switch"></span></label>
     <form id="watchForm">
       <label class="toggle-row"><div><strong>Notify when it reopens</strong><small>Useful when a ride goes down.</small></div><input id="reopenToggle" type="checkbox" ${existing?.reopen !== false ? "checked" : ""}><span class="switch"></span></label>
       <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when the wait drops to this or better:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>
@@ -1102,7 +1098,6 @@ function openRide(id) {
   loadRideInsights(id);
   loadRideHistory(id);
   $('#historyRange', sheet).onchange = event => loadRideHistory(id, event.target.value);
-  $('#mustDoToggle', sheet).onchange = event => store.setMustDo(id, event.target.checked);
   let thresholdEnabled = Boolean(existing?.threshold), threshold = Number(existing?.threshold || 30);
   const refreshThreshold = () => { $("#thresholdValue").textContent = threshold; $("#thresholdControls").classList.toggle("disabled", !thresholdEnabled); $("#thresholdToggle").classList.toggle("active", thresholdEnabled); $("#thresholdToggle").textContent = thresholdEnabled ? "On" : "Off"; };
   $("#thresholdToggle").onclick = () => { thresholdEnabled = !thresholdEnabled; refreshThreshold(); };

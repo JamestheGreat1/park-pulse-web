@@ -1057,3 +1057,186 @@ body{
   .seasonal-layer,.seasonal-layer:before,.seasonal-particle{animation:none!important;transition:none!important}
   .seasonal-particle{display:none!important}
 }
+
+
+/* v1.8.0-preview.6 — balanced accent grid + distinct seasonal motion. */
+.accent-picker{
+  display:grid!important;
+  grid-template-columns:repeat(4,38px)!important;
+  grid-auto-rows:38px;
+  justify-content:end!important;
+  align-items:center!important;
+  gap:7px!important;
+  width:max-content;
+  max-width:none!important;
+  flex:none!important;
+}
+@media(max-width:640px){
+  .accent-picker{
+    grid-template-columns:repeat(4,38px)!important;
+    gap:6px!important;
+    max-width:none!important;
+  }
+}
+
+/* Christmas: soft snowfall, with varied flake size/depth. */
+:root[data-season="christmas"] .seasonal-layer:after{opacity:.08}
+:root[data-season="christmas"] .seasonal-particle{
+  display:block;
+  bottom:auto;
+  top:-10vh;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:rgba(255,255,255,.94);
+  box-shadow:0 0 9px rgba(255,255,255,.28);
+  filter:none;
+  opacity:.56;
+  animation:season-snowfall var(--particle-duration) linear infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(3n){
+  width:3px;height:3px;opacity:.38;
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(4n){
+  width:7px;height:7px;opacity:.68;
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(5n){
+  background:#ffe6a8;
+  box-shadow:0 0 10px rgba(255,218,124,.38);
+}
+@keyframes season-snowfall{
+  0%{transform:translate3d(-10px,-10vh,0) rotate(0deg);opacity:0}
+  10%{opacity:.56}
+  50%{transform:translate3d(18px,52vh,0) rotate(100deg)}
+  100%{transform:translate3d(-6px,118vh,0) rotate(210deg);opacity:.12}
+}
+
+/* Halloween: stormy purple/orange atmosphere with intermittent lightning. */
+:root[data-season="halloween"]{
+  --season-glow1:rgba(110,65,210,.30);
+  --season-glow2:rgba(255,112,34,.12);
+  --season-glow3:rgba(70,55,130,.22);
+}
+:root[data-season="halloween"] .seasonal-particle{display:none!important}
+:root[data-season="halloween"] .seasonal-layer{
+  background-color:rgba(15,7,30,.16);
+}
+:root[data-season="halloween"] .seasonal-layer:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  opacity:0;
+  background:
+    radial-gradient(circle at 78% 8%,rgba(237,241,255,.92),transparent 24%),
+    linear-gradient(180deg,rgba(158,170,255,.22),transparent 56%);
+  mix-blend-mode:screen;
+  animation:halloween-sky-flash 10.8s linear infinite;
+}
+:root[data-season="halloween"] .seasonal-layer:after{
+  content:"";
+  position:absolute;
+  top:-3vh;
+  right:12vw;
+  width:112px;
+  height:320px;
+  opacity:0;
+  background:linear-gradient(180deg,#fff 0%,#dce0ff 48%,rgba(176,165,255,.18) 100%);
+  clip-path:polygon(53% 0,74% 0,58% 29%,77% 27%,39% 66%,52% 42%,32% 45%);
+  filter:drop-shadow(0 0 8px rgba(219,224,255,.85)) drop-shadow(0 0 24px rgba(132,112,255,.45));
+  -webkit-mask-image:none;
+  mask-image:none;
+  animation:halloween-bolt 10.8s linear infinite;
+}
+@keyframes halloween-sky-flash{
+  0%,68%,70.6%,72.2%,100%{opacity:0}
+  68.4%{opacity:.62}
+  69%{opacity:.14}
+  70.1%{opacity:.84}
+  71%{opacity:.2}
+}
+@keyframes halloween-bolt{
+  0%,68.2%,69.7%,70.8%,100%{opacity:0}
+  68.45%{opacity:.82}
+  70.05%{opacity:1}
+  70.45%{opacity:.18}
+}
+
+/* Easter: small blossoms drifting like a spring breeze. */
+:root[data-season="easter"] .seasonal-layer:after{opacity:.08}
+:root[data-season="easter"] .seasonal-particle{
+  --flower:#ffb8d7;
+  --flower-center:#ffe17b;
+  display:block;
+  bottom:auto;
+  top:-10vh;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 13%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 86% 42%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 72% 83%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 28% 83%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 14% 42%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 50% 50%,var(--flower-center) 0 20%,transparent 22%);
+  box-shadow:none;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.12));
+  opacity:.56;
+  animation:season-flower-fall var(--particle-duration) ease-in-out infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="easter"] .seasonal-particle:nth-child(3n){--flower:#c9b5ff}
+:root[data-season="easter"] .seasonal-particle:nth-child(4n){--flower:#fff0f7;--flower-center:#f2c65d}
+:root[data-season="easter"] .seasonal-particle:nth-child(5n){--flower:#ffc8a6}
+:root[data-season="easter"] .seasonal-particle:nth-child(6n){width:10px;height:10px;opacity:.42}
+@keyframes season-flower-fall{
+  0%{transform:translate3d(-18px,-10vh,0) rotate(0deg);opacity:0}
+  12%{opacity:.55}
+  46%{transform:translate3d(28px,48vh,0) rotate(170deg)}
+  72%{transform:translate3d(-14px,78vh,0) rotate(265deg)}
+  100%{transform:translate3d(18px,116vh,0) rotate(390deg);opacity:0}
+}
+
+/* Fourth of July: sparse red/white/blue/gold firework bursts in the upper sky. */
+:root[data-season="july4"] .seasonal-layer:after{opacity:.05}
+:root[data-season="july4"] .seasonal-particle{
+  display:none;
+  bottom:auto;
+  top:var(--particle-top);
+  width:64px;
+  height:64px;
+  margin-left:-32px;
+  margin-top:-32px;
+  border-radius:50%;
+  background:repeating-conic-gradient(from 0deg,currentColor 0 2deg,transparent 2deg 18deg);
+  -webkit-mask-image:radial-gradient(circle,transparent 0 18%,#000 20% 56%,transparent 59%);
+  mask-image:radial-gradient(circle,transparent 0 18%,#000 20% 56%,transparent 59%);
+  color:#ff6f7e;
+  box-shadow:none;
+  filter:drop-shadow(0 0 5px currentColor);
+  opacity:0;
+  transform-origin:center;
+  animation:season-firework var(--particle-duration) ease-out infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(4n+1){display:block}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){color:#73b8ff;width:76px;height:76px;margin-left:-38px;margin-top:-38px}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){color:#fff;width:54px;height:54px;margin-left:-27px;margin-top:-27px}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){color:#ffd56b}
+@keyframes season-firework{
+  0%,68%{opacity:0;transform:scale(.08) rotate(0deg)}
+  72%{opacity:.82;transform:scale(.55) rotate(7deg)}
+  78%{opacity:.62;transform:scale(1) rotate(13deg)}
+  86%{opacity:.18;transform:scale(1.16) rotate(18deg)}
+  100%{opacity:0;transform:scale(1.22) rotate(21deg)}
+}
+
+@media(prefers-reduced-motion:reduce){
+  :root[data-season="halloween"] .seasonal-layer:before,
+  :root[data-season="halloween"] .seasonal-layer:after{display:none!important}
+  :root[data-season="christmas"] .seasonal-particle,
+  :root[data-season="easter"] .seasonal-particle,
+  :root[data-season="july4"] .seasonal-particle{display:none!important}
+}
+

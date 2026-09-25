@@ -3353,3 +3353,146 @@ body{
   .firework-emitted-spark{display:none!important}
 }
 
+
+/* v1.8.0-preview.25 — Fall / Thanksgiving leaves + public seasonal toggle. */
+:root[data-season="fall"]{
+  --season-glow1:rgba(210,116,42,.22);
+  --season-glow2:rgba(164,72,37,.16);
+  --season-glow3:rgba(228,167,70,.14);
+  --season-particle:#d9863b;
+  --season-particle-alt:#b95732;
+}
+:root[data-season="fall"] .seasonal-layer{
+  background-color:rgba(78,37,13,.035);
+}
+:root[data-season="fall"] .seasonal-layer:after{
+  opacity:.045;
+}
+:root[data-season="fall"] .seasonal-particle{
+  display:block;
+  bottom:auto;
+  top:-12vh;
+  width:10px;
+  height:7px;
+  border-radius:78% 12% 72% 18%;
+  background:#d8873a;
+  box-shadow:none;
+  filter:drop-shadow(0 2px 2px rgba(46,22,8,.20));
+  opacity:.72;
+  transform-origin:45% 50%;
+  animation:fall-leaf-drift var(--particle-duration) linear infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="fall"] .seasonal-particle::after{
+  content:"";
+  position:absolute;
+  left:47%;
+  top:50%;
+  width:5px;
+  height:1px;
+  border-radius:999px;
+  background:rgba(79,39,15,.50);
+  transform:rotate(-35deg);
+  transform-origin:left center;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(3n){
+  width:8px;
+  height:6px;
+  background:#c85c35;
+  border-radius:70% 18% 78% 12%;
+  animation-name:fall-leaf-drift-alt;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(4n){
+  width:11px;
+  height:8px;
+  background:#e5ab45;
+  opacity:.66;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(5n){
+  width:7px;
+  height:10px;
+  background:#a94e2e;
+  opacity:.62;
+  border-radius:76% 16% 68% 20%;
+  animation-name:fall-leaf-drift-alt;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(7n){
+  background:#d06d2f;
+}
+:root[data-season="fall"][data-season-intensity="extra"] .seasonal-particle:nth-child(n+35){
+  display:none!important;
+}
+
+@keyframes fall-leaf-drift{
+  0%{
+    transform:translate3d(-14px,-10vh,0) rotate3d(.4,1,.2,0deg);
+    opacity:0;
+  }
+  8%{opacity:.72}
+  28%{
+    transform:translate3d(18px,27vh,0) rotate3d(.8,.4,.3,150deg);
+  }
+  52%{
+    transform:translate3d(-12px,55vh,0) rotate3d(.3,.8,.5,300deg);
+  }
+  74%{
+    transform:translate3d(26px,80vh,0) rotate3d(.7,.3,.8,430deg);
+    opacity:.66;
+  }
+  100%{
+    transform:translate3d(5px,118vh,0) rotate3d(.5,.9,.4,610deg);
+    opacity:0;
+  }
+}
+@keyframes fall-leaf-drift-alt{
+  0%{
+    transform:translate3d(18px,-10vh,0) rotate3d(.8,.3,.5,25deg);
+    opacity:0;
+  }
+  10%{opacity:.68}
+  32%{
+    transform:translate3d(-20px,31vh,0) rotate3d(.3,.9,.4,180deg);
+  }
+  58%{
+    transform:translate3d(14px,61vh,0) rotate3d(.7,.4,.7,335deg);
+  }
+  79%{
+    transform:translate3d(-18px,86vh,0) rotate3d(.4,.8,.2,470deg);
+    opacity:.60;
+  }
+  100%{
+    transform:translate3d(12px,118vh,0) rotate3d(.7,.5,.5,640deg);
+    opacity:0;
+  }
+}
+
+.setting-switch{
+  position:relative;
+  flex:0 0 48px;
+  width:48px;
+  height:28px;
+}
+.setting-switch input{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  margin:0;
+  opacity:0;
+  cursor:pointer;
+  z-index:2;
+}
+.setting-switch .switch{
+  display:block;
+}
+.setting-switch input:checked + .switch{
+  background:var(--blue2);
+}
+.setting-switch input:checked + .switch:after{
+  transform:translateX(20px);
+}
+.setting-switch input:focus-visible + .switch{
+  outline:2px solid var(--blue);
+  outline-offset:3px;
+}
+

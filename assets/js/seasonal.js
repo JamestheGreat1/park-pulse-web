@@ -3,11 +3,13 @@ const PREVIEW_WORKERS_SUFFIX = "-park-pulse-web.jamesp5297.workers.dev";
 const PREVIEW_SEASON_KEY = "parkpulse.preview.season";
 const PREVIEW_INTENSITY_KEY = "parkpulse.preview.seasonIntensity";
 const PREVIEW_SURFACE_KEY = "parkpulse.preview.surface";
+const SEASONAL_EFFECTS_KEY = "parkpulse.seasonalEffects";
 
 export const SEASONS = [
   { id: "auto", label: "Automatic", emoji: "✦" },
   { id: "none", label: "None", emoji: "—" },
   { id: "halloween", label: "Halloween", emoji: "🎃" },
+  { id: "fall", label: "Fall / Thanksgiving", emoji: "🍂" },
   { id: "christmas", label: "Christmas", emoji: "🎄" },
   { id: "easter", label: "Easter", emoji: "🌸" },
   { id: "july4", label: "Fourth of July", emoji: "🎆" }
@@ -31,6 +33,14 @@ function safeGet(key, fallback) {
 
 function safeSet(key, value) {
   try { localStorage.setItem(key, value); } catch {}
+}
+
+export function seasonalEffectsEnabled() {
+  return safeGet(SEASONAL_EFFECTS_KEY, "on") !== "off";
+}
+
+export function setSeasonalEffectsEnabled(enabled) {
+  safeSet(SEASONAL_EFFECTS_KEY, enabled ? "on" : "off");
 }
 
 export function isSeasonPreviewEnabled() {
@@ -66,6 +76,12 @@ function addDays(date, days) {
   return next;
 }
 
+function thanksgivingDay(year) {
+  const first = new Date(year, 10, 1);
+  const firstThursdayOffset = (4 - first.getDay() + 7) % 7;
+  return new Date(year, 10, 1 + firstThursdayOffset + 21);
+}
+
 export function automaticSeason(now = new Date()) {
   const date = atLocalMidnight(now);
   const year = date.getFullYear();
@@ -73,7 +89,11 @@ export function automaticSeason(now = new Date()) {
   const day = date.getDate();
 
   if (month === 10) return "halloween";
-  if ((month === 11 && day >= 20) || month === 12) return "christmas";
+  if (month === 11) {
+    const thanksgiving = thanksgivingDay(year);
+    return date <= thanksgiving ? "fall" : "christmas";
+  }
+  if (month === 12) return "christmas";
   if (month === 7 && day >= 1 && day <= 5) return "july4";
 
   const easter = easterSunday(year);
@@ -107,6 +127,7 @@ export function previewSurfaceSetting() {
 }
 
 export function activeSeason(now = new Date()) {
+  if (!seasonalEffectsEnabled()) return "none";
   const forced = requestedPreviewSeason();
   const selected = forced || (isSeasonPreviewEnabled() ? previewSeasonSetting() : "auto");
   return selected === "auto" ? automaticSeason(now) : selected;
@@ -326,7 +347,9 @@ export function applySeasonalTheme() {
   const intensity = isSeasonPreviewEnabled() ? previewIntensitySetting() : "normal";
   const surface = isSeasonPreviewEnabled() ? previewSurfaceSetting() : "navy";
   const root = document.documentElement;
+  const effectsEnabled = seasonalEffectsEnabled();
 
+  root.dataset.seasonalEffects = effectsEnabled ? "on" : "off";
   root.dataset.season = season;
   root.dataset.seasonIntensity = intensity;
   root.dataset.previewSurface = surface;
@@ -340,7 +363,9 @@ export function applySeasonalTheme() {
   if (badge) {
     const meta = SEASONS.find((item) => item.id === season) || SEASONS[1];
     const forced = requestedPreviewSeason();
-    badge.textContent = `PREVIEW · ${meta.emoji} ${meta.label} · ${intensity}${forced ? " · URL override" : ""}`;
+    badge.textContent = effectsEnabled
+      ? `PREVIEW · ${meta.emoji} ${meta.label} · ${intensity}${forced ? " · URL override" : ""}`
+      : "PREVIEW · Seasonal effects off";
   }
 
   return { season, intensity, surface };

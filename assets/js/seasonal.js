@@ -364,13 +364,7 @@ export function applySeasonalTheme() {
   syncFireworkEmitter();
 
   const badge = ensurePreviewBadge();
-  if (badge) {
-    const meta = SEASONS.find((item) => item.id === season) || SEASONS[1];
-    const forced = requestedPreviewSeason();
-    badge.textContent = effectsEnabled
-      ? `PREVIEW · ${meta.emoji} ${meta.label} · ${intensity}${forced ? " · URL override" : ""}`
-      : "PREVIEW · Seasonal effects off";
-  }
+  if (badge) badge.textContent = "Feature Preview";
 
   return { season, intensity, surface };
 }

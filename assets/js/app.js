@@ -619,7 +619,7 @@ function renderParkDay() {
     </div>
 
     <section class="park-day-hero liquid-glass">
-      <div class="park-day-hero-label"><span class="eyebrow">Next Up</span>${current ? '<span class="park-day-current">Locked in</span>' : '<span class="park-day-current">Suggested</span>'}</div>
+      <div class="park-day-hero-label"><span class="eyebrow">Next Up</span>${nextRide ? (current ? '<span class="park-day-current">Locked in</span>' : '<span class="park-day-current">Suggested</span>') : '<span class="park-day-current">Waiting</span>'}</div>
       ${nextRide ? `
         <button class="park-day-next-ride" type="button" data-open-ride="${nextRide.id}">
           <div><span class="ride-land">${escapeHtml(nextRide.land)}</span><h3>${escapeHtml(nextRide.name)}</h3><p>${escapeHtml(recommendationReason(nextRide, state))}</p></div>
@@ -630,7 +630,7 @@ function renderParkDay() {
             ? `<button class="primary-button" type="button" data-mark-ridden="${nextRide.id}">Mark ridden</button><button class="secondary-button" type="button" data-next-up-another>Pick another</button>`
             : `<button class="primary-button" type="button" data-next-up-go="${nextRide.id}">Make this Next Up</button><button class="secondary-button" type="button" data-next-up-another>Show another</button>`}
         </div>`
-        : `<div class="park-day-no-next"><strong>No strong pick right now</strong><p>ParkPulse will keep looking as ride status and waits change.</p></div>`}
+        : `<div class="park-day-no-next"><strong>No strong pick right now</strong><p>ParkPulse will keep looking as ride status and waits change.</p><button class="secondary-button" type="button" data-view-jump="explore">Browse rides</button></div>`}
     </section>
 
     <div class="park-day-stats park-day-page-stats">

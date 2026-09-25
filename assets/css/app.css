@@ -869,7 +869,8 @@ body{
   opacity:.24;
   background-image:radial-gradient(circle at center,rgba(255,255,255,.16) 0 1px,transparent 1.6px);
   background-size:74px 74px;
-  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),transparent 78%);\n  mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),transparent 78%);
+  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),transparent 78%);
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),transparent 78%);
 }
 .seasonal-particle{
   --particle-size:4px;
@@ -988,7 +989,8 @@ body{
   top:var(--particle-top);
   border-radius:1px;
   transform:rotate(45deg);
-  animation:season-twinkle 5.4s ease-in-out infinite;\n  animation-delay:var(--particle-delay);
+  animation:season-twinkle 5.4s ease-in-out infinite;
+  animation-delay:var(--particle-delay);
 }
 :root[data-season="july4"] .seasonal-particle:nth-child(7n){
   box-shadow:

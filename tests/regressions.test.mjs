@@ -500,3 +500,13 @@ test('scaled desktop viewports keep threshold controls centered and clear of gla
   assert.match(final, /max-width:calc\(100% - 48px\)!important/);
   assert.match(final, /margin:10px auto 0!important/);
 });
+
+
+test('Liquid Glass ride sheets have no internal pseudo-layer shading', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('robust ride-sheet threshold geometry');
+  assert.ok(marker >= 0);
+  const final = css.slice(marker);
+  assert.match(final, /ride-sheet::before,/);
+  assert.match(final, /ride-sheet::after\{[^}]*display:none!important/s);
+});

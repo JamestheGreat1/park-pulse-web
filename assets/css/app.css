@@ -3184,3 +3184,172 @@ body{
   72%{opacity:.12;transform:translate(-50%,-50%) scale(.44)}
 }
 
+
+/* v1.8.0-preview.24 — true emitted firework trail.
+   The head rises smoothly and leaves independent falling sparks behind. */
+
+/* Override the previous staggered-trail experiment: one smooth head again. */
+.firework-rocket{
+  display:block!important;
+  position:absolute!important;
+  left:0!important;
+  top:0!important;
+  width:1px!important;
+  height:1px!important;
+  opacity:0;
+  z-index:3;
+  animation:fw-emitter-head-flight var(--fw-duration) cubic-bezier(.22,.58,.28,1) infinite!important;
+  animation-delay:var(--fw-delay)!important;
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+.firework-rocket > .firework-trail-spark{
+  display:none!important;
+}
+.firework-head{
+  position:absolute;
+  left:-2px;
+  top:-2px;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:
+    0 0 4px currentColor,
+    0 0 9px currentColor;
+}
+
+@keyframes fw-emitter-head-flight{
+  0%,31%{
+    opacity:0;
+    transform:translate3d(var(--rocket-x0),100vh,0) scale(.82);
+  }
+  34%{opacity:.24}
+  40%{opacity:.78}
+  50%{opacity:.98}
+  59%{opacity:1}
+  64%{opacity:.92}
+  65.4%{opacity:.48}
+  66%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(1);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(1);
+  }
+}
+
+/* Sparks are emitted into the field, so they stay behind after the head moves on. */
+.firework-emitted-spark{
+  position:absolute;
+  width:var(--spark-size);
+  height:var(--spark-size);
+  margin-left:calc(var(--spark-size) / -2);
+  margin-top:calc(var(--spark-size) / -2);
+  border-radius:50%;
+  color:inherit;
+  pointer-events:none;
+  z-index:1;
+  opacity:0;
+  animation:fw-emitted-spark var(--spark-life) cubic-bezier(.18,.68,.28,1) forwards;
+  will-change:transform,opacity;
+}
+.firework-emitted-spark > i{
+  position:absolute;
+  inset:0;
+  display:block;
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:0 0 4px currentColor;
+  animation:fw-emitted-twinkle var(--spark-twinkle) ease-in-out infinite;
+  will-change:transform,opacity,filter;
+}
+.firework-emitted-spark.star::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:2px;
+  height:2px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:
+    0 -5px 4px -1px rgba(255,255,255,.96),
+    0 5px 4px -1px rgba(255,255,255,.82),
+    -5px 0 4px -1px rgba(255,255,255,.90),
+    5px 0 4px -1px rgba(255,255,255,.90);
+  transform:translate(-50%,-50%) scale(.18);
+  opacity:0;
+  animation:fw-emitted-star var(--spark-life) ease-in-out forwards;
+}
+
+@keyframes fw-emitted-spark{
+  0%{
+    opacity:.96;
+    transform:translate3d(0,0,0) scale(.72);
+  }
+  28%{
+    opacity:.92;
+    transform:translate3d(var(--spark-dx1),var(--spark-dy1),0) scale(1);
+  }
+  60%{
+    opacity:.68;
+    transform:translate3d(var(--spark-dx2),var(--spark-dy2),0) scale(.88);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(var(--spark-dx3),var(--spark-dy3),0) scale(.52);
+  }
+}
+
+@keyframes fw-emitted-twinkle{
+  0%,100%{
+    opacity:.48;
+    transform:scale(.72);
+    filter:brightness(.90) drop-shadow(0 0 1px currentColor);
+  }
+  19%{
+    opacity:1;
+    transform:scale(1.10);
+    filter:brightness(1.58) drop-shadow(0 0 4px currentColor);
+  }
+  42%{
+    opacity:.62;
+    transform:scale(.84);
+    filter:brightness(1.02) drop-shadow(0 0 2px currentColor);
+  }
+  68%{
+    opacity:.96;
+    transform:scale(1.20);
+    filter:brightness(1.72) drop-shadow(0 0 5px currentColor);
+  }
+  84%{
+    opacity:.56;
+    transform:scale(.80);
+    filter:brightness(.96) drop-shadow(0 0 2px currentColor);
+  }
+}
+
+@keyframes fw-emitted-star{
+  0%,26%,100%{
+    opacity:0;
+    transform:translate(-50%,-50%) scale(.16);
+  }
+  40%{
+    opacity:.92;
+    transform:translate(-50%,-50%) scale(1.08);
+  }
+  55%{
+    opacity:.12;
+    transform:translate(-50%,-50%) scale(.44);
+  }
+}
+
+.firework-burst{z-index:2}
+
+@media(prefers-reduced-motion:reduce){
+  .firework-emitted-spark{display:none!important}
+}
+

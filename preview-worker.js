@@ -10,6 +10,20 @@ function shouldUseApi(pathname) {
 }
 
 async function proxyApi(request, env) {
+  if (!env.PARKPULSE_API || typeof env.PARKPULSE_API.fetch !== "function") {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "PREVIEW_API_BINDING_MISSING",
+      message: "PARKPULSE_API is not configured for this Worker Preview."
+    }), {
+      status: 503,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
   const response = await env.PARKPULSE_API.fetch(request);
   const headers = new Headers(response.headers);
   headers.set("X-ParkPulse-Preview-API", "service-binding");

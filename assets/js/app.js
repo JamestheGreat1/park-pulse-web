@@ -1,7 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.7.16";
-import { store } from "./store.js?v=1.7.16";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.7.16";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.7.16";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0";
+import { store } from "./store.js?v=1.8.0";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.8.0";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -12,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.16";
+const APP_VERSION = "1.8.0";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -513,19 +514,52 @@ function watchForServiceWorkerUpdate(registration) {
 }
 function setTheme() {
   const state = store.snapshot;
-  document.documentElement.dataset.theme = state.theme;
-  document.documentElement.dataset.accent = state.accent || "blue";
+  const root = document.documentElement;
+  const nextTheme = state.theme;
+  const nextAccent = state.accent || "blue";
+  const visualColorChanged =
+    root.dataset.theme !== nextTheme ||
+    root.dataset.accent !== nextAccent;
+
+  root.dataset.theme = nextTheme;
+  root.dataset.accent = nextAccent;
+
+  if (visualColorChanged) {
+    root.classList.add("glass-color-snap");
+    void root.offsetWidth;
+    requestAnimationFrame(() => root.classList.remove("glass-color-snap"));
+  }
+
+  applySeasonalTheme();
 }
 function selectView(name) {
+  const target = views[name];
+  if (!target) return;
+
   store.update((s) => { s.activeView = name; }, "view");
+
+  // Only build the views once. Recreating backdrop-filter elements on every
+  // tab change makes browsers briefly composite them against a stale backdrop.
+  if (!target.childElementCount) render();
+
+  const root = document.documentElement;
+  const liquid = root.dataset.previewSurface === "liquid";
+  if (liquid) root.classList.add("glass-color-snap");
+
   for (const [key, el] of Object.entries(views)) el.classList.toggle("active", key === name);
-  $$(".nav-item").forEach((button) => {
+  document.querySelectorAll(".nav-item").forEach((button) => {
     const active = button.dataset.viewTarget === name;
     button.classList.toggle("active", active);
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   });
-  window.scrollTo({ top: 0, left: 0, behavior: "auto" }); render();
+
+  if (liquid) {
+    void target.offsetWidth;
+    requestAnimationFrame(() => root.classList.remove("glass-color-snap"));
+  }
+
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 }
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
@@ -716,6 +750,8 @@ function renderSettings() {
     <section class="settings-group liquid-glass">
       <label class="setting-row"><div><strong>Appearance</strong><small>Follow your system, or pick light or dark yourself.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
       <div class="setting-row accent-setting"><div><strong>Accent color</strong><small>Changes the highlights and glow. Purely vibes.</small></div><div class="accent-picker" role="group" aria-label="Accent color">${ACCENTS.map((accent) => `<button type="button" class="accent-swatch accent-${accent.id} ${state.accent === accent.id ? "active" : ""}" data-accent-choice="${accent.id}" aria-label="${accent.label}" aria-pressed="${state.accent === accent.id}"><span></span></button>`).join("")}</div></div>
+      <div class="setting-row glass-style-setting"><div><strong>Glass style</strong><small>Choose a softer frosted look or the clearer refractive Liquid Glass effect.</small></div><div class="glass-style-picker" role="group" aria-label="Glass style"><button type="button" data-glass-style="frosted" aria-pressed="${glassStyleSetting() === "frosted"}" class="${glassStyleSetting() === "frosted" ? "active" : ""}">Frosted</button><button type="button" data-glass-style="liquid" aria-pressed="${glassStyleSetting() === "liquid"}" class="${glassStyleSetting() === "liquid" ? "active" : ""}">Liquid</button></div></div>
+      <label class="setting-row seasonal-effects-setting"><div><strong>Seasonal effects</strong><small>Automatically adds subtle holiday ambience when the season rolls around.</small></div><span class="setting-switch"><input id="seasonalEffectsToggle" type="checkbox" ${seasonalEffectsEnabled() ? "checked" : ""} aria-label="Seasonal effects"><span class="switch"></span></span></label>
     </section>
     <div class="settings-section-title">Status & diagnostics</div>
     <section class="settings-group liquid-glass status-diagnostics">
@@ -796,9 +832,26 @@ function bindDynamic() {
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
   $$('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
-  $$("button[data-accent-choice]").forEach((button) => {
+  document.querySelectorAll("button[data-accent-choice]").forEach((button) => {
     button.onclick = () => store.update((s) => { s.accent = button.dataset.accentChoice; }, "accent");
   });
+  document.querySelectorAll("[data-glass-style]").forEach((button) => {
+    button.onclick = () => {
+      const style = button.dataset.glassStyle === "liquid" ? "liquid" : "frosted";
+      setGlassStyleSetting(style);
+      applySeasonalTheme();
+      document.querySelectorAll("[data-glass-style]").forEach((item) => {
+        const active = item.dataset.glassStyle === style;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-pressed", String(active));
+      });
+    };
+  });
+  const seasonalEffects = $("#seasonalEffectsToggle");
+  if (seasonalEffects) seasonalEffects.onchange = () => {
+    setSeasonalEffectsEnabled(seasonalEffects.checked);
+    applySeasonalTheme();
+  };
 }
 async function copyText(value) {
   if (navigator.clipboard?.writeText) {
@@ -1301,8 +1354,38 @@ async function installApp() {
   if (platform.android) return toast("On Android: browser menu → Install app / Add to Home screen.");
   toast("Use your browser menu → Install ParkPulse.");
 }
+
+let liquidGlassMotionFrame = 0;
+const liquidGlassMotionMedia = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+
+function updateLiquidGlassMotion() {
+  liquidGlassMotionFrame = 0;
+  const root = document.documentElement;
+  if (liquidGlassMotionMedia?.matches) {
+    root.style.setProperty("--glass-scroll-x", "0px");
+    root.style.setProperty("--glass-scroll-y", "0px");
+    return;
+  }
+
+  const scrollY = window.scrollY || 0;
+  root.style.setProperty("--glass-scroll-x", `${(Math.sin(scrollY / 260) * 7).toFixed(2)}px`);
+  root.style.setProperty("--glass-scroll-y", `${(Math.cos(scrollY / 340) * 2.5).toFixed(2)}px`);
+}
+
+function queueLiquidGlassMotion() {
+  if (liquidGlassMotionFrame) return;
+  liquidGlassMotionFrame = requestAnimationFrame(updateLiquidGlassMotion);
+}
+
+function setupLiquidGlassMotion() {
+  updateLiquidGlassMotion();
+  window.addEventListener("scroll", queueLiquidGlassMotion, { passive: true });
+  liquidGlassMotionMedia?.addEventListener?.("change", queueLiquidGlassMotion);
+}
+
 async function init() {
   setTheme();
+  setupLiquidGlassMotion();
   setupPullToRefresh();
 setupSheetDismissGesture();
   if ("serviceWorker" in navigator) {

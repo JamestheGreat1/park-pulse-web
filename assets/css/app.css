@@ -834,7 +834,216 @@ body{
 .bell-solid{fill:currentColor;stroke:none}
 
 
-/* v1.7.16 — keep all eight accent choices in a balanced 4 × 2 grid. */
+/* v1.8 seasonal ambience preview
+   Seasonal decoration deliberately does not override --good/--warn/--bad or the user's accent. */
+:root{
+  --season-glow1:transparent;
+  --season-glow2:transparent;
+  --season-glow3:transparent;
+  --season-particle:#fff;
+  --season-particle-alt:#fff;
+  --season-opacity:.78;
+}
+:root[data-season-intensity="subtle"]{--season-opacity:.46}
+:root[data-season-intensity="normal"]{--season-opacity:.78}
+:root[data-season-intensity="extra"]{--season-opacity:1}
+
+.seasonal-layer{
+  position:fixed;
+  inset:0;
+  z-index:0;
+  overflow:hidden;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .45s ease;
+  background:
+    radial-gradient(circle at 9% 18%,var(--season-glow1),transparent 36%),
+    radial-gradient(circle at 92% 24%,var(--season-glow2),transparent 34%),
+    radial-gradient(circle at 58% 92%,var(--season-glow3),transparent 40%);
+}
+:root.season-active .seasonal-layer{opacity:var(--season-opacity)}
+.seasonal-layer:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  opacity:.24;
+  background-image:radial-gradient(circle at center,rgba(255,255,255,.16) 0 1px,transparent 1.6px);
+  background-size:74px 74px;
+  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),transparent 78%);
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),transparent 78%);
+}
+.seasonal-particle{
+  --particle-size:4px;
+  position:absolute;
+  left:var(--particle-left);
+  bottom:-8vh;
+  width:var(--particle-size);
+  height:var(--particle-size);
+  border-radius:50%;
+  background:var(--season-particle);
+  opacity:.38;
+  filter:blur(.2px);
+  box-shadow:0 0 10px color-mix(in srgb,var(--season-particle) 70%,transparent);
+  animation:season-rise var(--particle-duration) linear infinite;
+  animation-delay:var(--particle-delay);
+}
+.seasonal-particle:nth-child(3n){background:var(--season-particle-alt);opacity:.28}
+.seasonal-particle:nth-child(4n){--particle-size:2px}
+.seasonal-particle:nth-child(5n){--particle-size:6px;opacity:.22}
+:root[data-season-intensity="subtle"] .seasonal-particle:nth-child(n+13){display:none}
+:root[data-season-intensity="normal"] .seasonal-particle:nth-child(n+22){display:none}
+
+@keyframes season-rise{
+  0%{transform:translate3d(0,7vh,0) scale(.7);opacity:0}
+  12%{opacity:.36}
+  78%{opacity:.28}
+  100%{transform:translate3d(18px,-116vh,0) scale(1.08);opacity:0}
+}
+
+/* Halloween — midnight violet + restrained pumpkin embers. */
+:root[data-season="halloween"]{
+  --season-glow1:rgba(255,111,24,.25);
+  --season-glow2:rgba(116,54,207,.27);
+  --season-glow3:rgba(231,74,31,.14);
+  --season-particle:#ff9c43;
+  --season-particle-alt:#b77cff;
+}
+:root[data-season="halloween"] .seasonal-layer{
+  background-color:rgba(20,4,30,.10);
+}
+:root[data-season="halloween"] .seasonal-layer:before{
+  content:"";
+  position:absolute;
+  inset:-18%;
+  opacity:.16;
+  background:conic-gradient(from 215deg at 80% 20%,transparent,rgba(118,57,211,.26),transparent 22%,rgba(255,116,32,.18),transparent 46%);
+  filter:blur(50px);
+  animation:season-breathe 12s ease-in-out infinite alternate;
+}
+:root[data-season="halloween"] .seasonal-particle:nth-child(6n){
+  border-radius:1px;
+  transform:rotate(45deg);
+}
+
+/* Christmas — evergreen depth, cranberry warmth, soft snow + gold points. */
+:root[data-season="christmas"]{
+  --season-glow1:rgba(21,126,91,.24);
+  --season-glow2:rgba(184,39,60,.19);
+  --season-glow3:rgba(236,188,75,.16);
+  --season-particle:rgba(255,255,255,.95);
+  --season-particle-alt:#ffd66f;
+}
+:root[data-season="christmas"] .seasonal-layer{
+  background-color:rgba(2,29,24,.08);
+}
+:root[data-season="christmas"] .seasonal-particle{
+  animation-name:season-snow;
+  filter:none;
+  opacity:.48;
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(5n){
+  box-shadow:0 0 12px #ffd66f;
+}
+
+@keyframes season-snow{
+  0%{transform:translate3d(0,-8vh,0) rotate(0);opacity:0}
+  10%{opacity:.48}
+  100%{transform:translate3d(28px,116vh,0) rotate(160deg);opacity:.05}
+}
+
+/* Easter — pastel spring haze + tiny drifting petals. */
+:root[data-season="easter"]{
+  --season-glow1:rgba(255,155,201,.23);
+  --season-glow2:rgba(164,137,255,.22);
+  --season-glow3:rgba(119,225,183,.17);
+  --season-particle:#ffb6d9;
+  --season-particle-alt:#c8b5ff;
+}
+:root[data-season="easter"] .seasonal-layer{
+  background-color:rgba(162,197,255,.045);
+}
+:root[data-season="easter"] .seasonal-particle{
+  width:7px;
+  height:4px;
+  border-radius:70% 30% 70% 30%;
+  animation-name:season-petal;
+  filter:none;
+}
+@keyframes season-petal{
+  0%{transform:translate3d(-20px,-8vh,0) rotate(0);opacity:0}
+  10%{opacity:.35}
+  50%{transform:translate3d(24px,52vh,0) rotate(180deg)}
+  100%{transform:translate3d(-10px,112vh,0) rotate(360deg);opacity:0}
+}
+
+/* Fourth of July — navy stays dominant; red/blue sparkle lives in the far background. */
+:root[data-season="july4"]{
+  --season-glow1:rgba(42,116,255,.28);
+  --season-glow2:rgba(229,63,80,.22);
+  --season-glow3:rgba(255,255,255,.10);
+  --season-particle:#77b9ff;
+  --season-particle-alt:#ff7785;
+}
+:root[data-season="july4"] .seasonal-particle{
+  bottom:auto;
+  top:var(--particle-top);
+  border-radius:1px;
+  transform:rotate(45deg);
+  animation:season-twinkle 5.4s ease-in-out infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(7n){
+  box-shadow:
+    0 -8px 0 -1px var(--season-particle),
+    0 8px 0 -1px var(--season-particle),
+    8px 0 0 -1px var(--season-particle-alt),
+    -8px 0 0 -1px var(--season-particle-alt);
+}
+@keyframes season-twinkle{
+  0%,100%{opacity:.04;transform:scale(.45) rotate(45deg)}
+  45%{opacity:.48;transform:scale(1.15) rotate(45deg)}
+  60%{opacity:.2;transform:scale(.8) rotate(45deg)}
+}
+
+@keyframes season-breathe{
+  from{transform:scale(.96) translate3d(-1%,0,0)}
+  to{transform:scale(1.05) translate3d(1%,1%,0)}
+}
+
+/* Preview-only chrome. Access control belongs to Cloudflare Access; this is just a visual guardrail. */
+.season-preview-badge{
+  position:fixed;
+  z-index:95;
+  top:calc(env(safe-area-inset-top,0px) + 6px);
+  left:50%;
+  transform:translateX(-50%);
+  max-width:calc(100% - 24px);
+  padding:5px 10px;
+  border:1px solid rgba(255,213,99,.36);
+  border-radius:999px;
+  background:rgba(21,18,10,.76);
+  color:#ffe099;
+  box-shadow:0 8px 28px rgba(0,0,0,.28);
+  backdrop-filter:blur(18px) saturate(150%);
+  -webkit-backdrop-filter:blur(18px) saturate(150%);
+  font-size:.62rem;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+@media(max-width:640px){
+  .season-preview-badge{font-size:.56rem;padding:4px 8px}
+}
+@media(prefers-reduced-motion:reduce){
+  .seasonal-layer,.seasonal-layer:before,.seasonal-particle{animation:none!important;transition:none!important}
+  .seasonal-particle{display:none!important}
+}
+
+
+/* v1.8.0-preview.6 — balanced accent grid + distinct seasonal motion. */
 .accent-picker{
   display:grid!important;
   grid-template-columns:repeat(4,38px)!important;
@@ -853,3 +1062,3180 @@ body{
     max-width:none!important;
   }
 }
+
+/* Christmas: soft snowfall, with varied flake size/depth. */
+:root[data-season="christmas"] .seasonal-layer:after{opacity:.08}
+:root[data-season="christmas"] .seasonal-particle{
+  display:block;
+  bottom:auto;
+  top:-10vh;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:rgba(255,255,255,.94);
+  box-shadow:0 0 9px rgba(255,255,255,.28);
+  filter:none;
+  opacity:.56;
+  animation:season-snowfall var(--particle-duration) linear infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(3n){
+  width:3px;height:3px;opacity:.38;
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(4n){
+  width:7px;height:7px;opacity:.68;
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(5n){
+  background:#ffe6a8;
+  box-shadow:0 0 10px rgba(255,218,124,.38);
+}
+@keyframes season-snowfall{
+  0%{transform:translate3d(-10px,-10vh,0) rotate(0deg);opacity:0}
+  10%{opacity:.56}
+  50%{transform:translate3d(18px,52vh,0) rotate(100deg)}
+  100%{transform:translate3d(-6px,118vh,0) rotate(210deg);opacity:.12}
+}
+
+/* Halloween: stormy purple/orange atmosphere with intermittent lightning. */
+:root[data-season="halloween"]{
+  --season-glow1:rgba(110,65,210,.30);
+  --season-glow2:rgba(255,112,34,.12);
+  --season-glow3:rgba(70,55,130,.22);
+}
+:root[data-season="halloween"] .seasonal-particle{display:none!important}
+:root[data-season="halloween"] .seasonal-layer{
+  background-color:rgba(15,7,30,.16);
+}
+:root[data-season="halloween"] .seasonal-layer:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  opacity:0;
+  background:
+    radial-gradient(circle at 78% 8%,rgba(237,241,255,.92),transparent 24%),
+    linear-gradient(180deg,rgba(158,170,255,.22),transparent 56%);
+  mix-blend-mode:screen;
+  animation:halloween-sky-flash 10.8s linear infinite;
+}
+:root[data-season="halloween"] .seasonal-layer:after{
+  content:"";
+  position:absolute;
+  top:-3vh;
+  right:12vw;
+  width:112px;
+  height:320px;
+  opacity:0;
+  background:linear-gradient(180deg,#fff 0%,#dce0ff 48%,rgba(176,165,255,.18) 100%);
+  clip-path:polygon(53% 0,74% 0,58% 29%,77% 27%,39% 66%,52% 42%,32% 45%);
+  filter:drop-shadow(0 0 8px rgba(219,224,255,.85)) drop-shadow(0 0 24px rgba(132,112,255,.45));
+  -webkit-mask-image:none;
+  mask-image:none;
+  animation:halloween-bolt 10.8s linear infinite;
+}
+@keyframes halloween-sky-flash{
+  0%,68%,70.6%,72.2%,100%{opacity:0}
+  68.4%{opacity:.62}
+  69%{opacity:.14}
+  70.1%{opacity:.84}
+  71%{opacity:.2}
+}
+@keyframes halloween-bolt{
+  0%,68.2%,69.7%,70.8%,100%{opacity:0}
+  68.45%{opacity:.82}
+  70.05%{opacity:1}
+  70.45%{opacity:.18}
+}
+
+/* Easter: small blossoms drifting like a spring breeze. */
+:root[data-season="easter"] .seasonal-layer:after{opacity:.08}
+:root[data-season="easter"] .seasonal-particle{
+  --flower:#ffb8d7;
+  --flower-center:#ffe17b;
+  display:block;
+  bottom:auto;
+  top:-10vh;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 13%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 86% 42%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 72% 83%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 28% 83%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 14% 42%,var(--flower) 0 24%,transparent 26%),
+    radial-gradient(circle at 50% 50%,var(--flower-center) 0 20%,transparent 22%);
+  box-shadow:none;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.12));
+  opacity:.56;
+  animation:season-flower-fall var(--particle-duration) ease-in-out infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="easter"] .seasonal-particle:nth-child(3n){--flower:#c9b5ff}
+:root[data-season="easter"] .seasonal-particle:nth-child(4n){--flower:#fff0f7;--flower-center:#f2c65d}
+:root[data-season="easter"] .seasonal-particle:nth-child(5n){--flower:#ffc8a6}
+:root[data-season="easter"] .seasonal-particle:nth-child(6n){width:10px;height:10px;opacity:.42}
+@keyframes season-flower-fall{
+  0%{transform:translate3d(-18px,-10vh,0) rotate(0deg);opacity:0}
+  12%{opacity:.55}
+  46%{transform:translate3d(28px,48vh,0) rotate(170deg)}
+  72%{transform:translate3d(-14px,78vh,0) rotate(265deg)}
+  100%{transform:translate3d(18px,116vh,0) rotate(390deg);opacity:0}
+}
+
+/* Fourth of July: sparse red/white/blue/gold firework bursts in the upper sky. */
+:root[data-season="july4"] .seasonal-layer:after{opacity:.05}
+:root[data-season="july4"] .seasonal-particle{
+  display:none;
+  bottom:auto;
+  top:var(--particle-top);
+  width:64px;
+  height:64px;
+  margin-left:-32px;
+  margin-top:-32px;
+  border-radius:50%;
+  background:repeating-conic-gradient(from 0deg,currentColor 0 2deg,transparent 2deg 18deg);
+  -webkit-mask-image:radial-gradient(circle,transparent 0 18%,#000 20% 56%,transparent 59%);
+  mask-image:radial-gradient(circle,transparent 0 18%,#000 20% 56%,transparent 59%);
+  color:#ff6f7e;
+  box-shadow:none;
+  filter:drop-shadow(0 0 5px currentColor);
+  opacity:0;
+  transform-origin:center;
+  animation:season-firework var(--particle-duration) ease-out infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(4n+1){display:block}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){color:#73b8ff;width:76px;height:76px;margin-left:-38px;margin-top:-38px}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){color:#fff;width:54px;height:54px;margin-left:-27px;margin-top:-27px}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){color:#ffd56b}
+@keyframes season-firework{
+  0%,68%{opacity:0;transform:scale(.08) rotate(0deg)}
+  72%{opacity:.82;transform:scale(.55) rotate(7deg)}
+  78%{opacity:.62;transform:scale(1) rotate(13deg)}
+  86%{opacity:.18;transform:scale(1.16) rotate(18deg)}
+  100%{opacity:0;transform:scale(1.22) rotate(21deg)}
+}
+
+@media(prefers-reduced-motion:reduce){
+  :root[data-season="halloween"] .seasonal-layer:before,
+  :root[data-season="halloween"] .seasonal-layer:after{display:none!important}
+  :root[data-season="christmas"] .seasonal-particle,
+  :root[data-season="easter"] .seasonal-particle,
+  :root[data-season="july4"] .seasonal-particle{display:none!important}
+}
+
+
+/* v1.8.0-preview.7 — stronger seasonal signatures. */
+:root[data-season-intensity="subtle"]{--season-opacity:.58}
+:root[data-season-intensity="normal"]{--season-opacity:.88}
+:root[data-season-intensity="extra"]{--season-opacity:1}
+
+/* Christmas — denser, brighter snowfall. */
+:root[data-season="christmas"] .seasonal-particle{
+  display:block!important;
+  bottom:auto;
+  top:-12vh;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:rgba(255,255,255,.96);
+  opacity:.70;
+  box-shadow:0 0 10px rgba(255,255,255,.34);
+  filter:none;
+  animation:season-snowfall var(--particle-duration) linear infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(3n){width:4px;height:4px;opacity:.50}
+:root[data-season="christmas"] .seasonal-particle:nth-child(4n){width:8px;height:8px;opacity:.78}
+:root[data-season="christmas"] .seasonal-particle:nth-child(7n){width:10px;height:10px;opacity:.58}
+:root[data-season="christmas"] .seasonal-particle:nth-child(5n){
+  background:#fff4c7;
+  box-shadow:0 0 12px rgba(255,225,145,.48);
+}
+:root[data-season="christmas"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+19){display:none!important}
+:root[data-season="christmas"][data-season-intensity="normal"] .seasonal-particle:nth-child(n+33){display:none!important}
+@keyframes season-snowfall{
+  0%{transform:translate3d(-12px,-12vh,0) rotate(0deg);opacity:0}
+  8%{opacity:.72}
+  48%{transform:translate3d(22px,50vh,0) rotate(110deg)}
+  100%{transform:translate3d(-9px,118vh,0) rotate(225deg);opacity:.16}
+}
+
+/* Halloween — diagonal rain under intermittent lightning. */
+:root[data-season="halloween"] .seasonal-particle{
+  display:block!important;
+  bottom:auto;
+  top:-16vh;
+  width:2px;
+  height:26px;
+  border-radius:999px;
+  background:linear-gradient(180deg,rgba(205,214,255,0),rgba(205,214,255,.82));
+  box-shadow:none;
+  filter:none;
+  opacity:.52;
+  animation:halloween-rain calc(var(--particle-duration) * .48) linear infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="halloween"] .seasonal-particle:nth-child(3n){height:36px;opacity:.64}
+:root[data-season="halloween"] .seasonal-particle:nth-child(4n){height:18px;opacity:.36}
+:root[data-season="halloween"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+17){display:none!important}
+:root[data-season="halloween"][data-season-intensity="normal"] .seasonal-particle:nth-child(n+30){display:none!important}
+@keyframes halloween-rain{
+  0%{transform:translate3d(-18px,-18vh,0) rotate(13deg);opacity:0}
+  10%{opacity:.54}
+  100%{transform:translate3d(58px,122vh,0) rotate(13deg);opacity:.14}
+}
+
+/* Easter — drifting pastel Easter eggs. */
+:root[data-season="easter"] .seasonal-particle{
+  --egg-a:#ffb7d6;
+  --egg-b:#fff1a8;
+  display:block!important;
+  bottom:auto;
+  top:-12vh;
+  width:13px;
+  height:18px;
+  border-radius:50% 50% 46% 46% / 58% 58% 42% 42%;
+  background:
+    linear-gradient(180deg,
+      var(--egg-a) 0 28%,
+      var(--egg-b) 28% 38%,
+      var(--egg-a) 38% 62%,
+      rgba(255,255,255,.92) 62% 70%,
+      var(--egg-a) 70% 100%);
+  box-shadow:
+    inset 1px 1px rgba(255,255,255,.38),
+    0 2px 5px rgba(0,0,0,.16);
+  filter:none;
+  opacity:.68;
+  animation:easter-egg-drift var(--particle-duration) ease-in-out infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="easter"] .seasonal-particle:nth-child(3n){--egg-a:#c8b5ff;--egg-b:#bff0dd}
+:root[data-season="easter"] .seasonal-particle:nth-child(4n){--egg-a:#ffd0a9;--egg-b:#fff2c4}
+:root[data-season="easter"] .seasonal-particle:nth-child(5n){--egg-a:#bde3ff;--egg-b:#f7c5ee}
+:root[data-season="easter"] .seasonal-particle:nth-child(6n){width:10px;height:14px;opacity:.52}
+:root[data-season="easter"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+15){display:none!important}
+:root[data-season="easter"][data-season-intensity="normal"] .seasonal-particle:nth-child(n+27){display:none!important}
+@keyframes easter-egg-drift{
+  0%{transform:translate3d(-24px,-12vh,0) rotate(-10deg);opacity:0}
+  12%{opacity:.68}
+  45%{transform:translate3d(24px,48vh,0) rotate(150deg)}
+  75%{transform:translate3d(-14px,80vh,0) rotate(250deg)}
+  100%{transform:translate3d(20px,116vh,0) rotate(380deg);opacity:0}
+}
+
+/* Fourth of July — visible launch trails before each burst. */
+:root[data-season="july4"] .seasonal-particle{
+  display:none;
+  bottom:auto;
+  top:var(--particle-top);
+  width:68px;
+  height:68px;
+  margin-left:-34px;
+  margin-top:-34px;
+  border-radius:50%;
+  background:repeating-conic-gradient(from 0deg,currentColor 0 2deg,transparent 2deg 18deg);
+  -webkit-mask-image:radial-gradient(circle,transparent 0 18%,#000 20% 58%,transparent 61%);
+  mask-image:radial-gradient(circle,transparent 0 18%,#000 20% 58%,transparent 61%);
+  color:#ff6f7e;
+  box-shadow:none;
+  filter:drop-shadow(0 0 6px currentColor);
+  opacity:0;
+  transform-origin:center;
+  animation:season-firework var(--particle-duration) ease-out infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="july4"] .seasonal-particle::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:58%;
+  width:2px;
+  height:80px;
+  transform:translateX(-50%);
+  transform-origin:50% 100%;
+  background:linear-gradient(180deg,rgba(255,255,255,0),currentColor 68%,rgba(255,255,255,.88));
+  filter:drop-shadow(0 0 5px currentColor);
+  opacity:0;
+  animation:firework-trail var(--particle-duration) ease-out infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(4n+1){display:block}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){color:#73b8ff;width:78px;height:78px;margin-left:-39px;margin-top:-39px}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){color:#fff;width:58px;height:58px;margin-left:-29px;margin-top:-29px}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){color:#ffd56b}
+:root[data-season="july4"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+22){display:none}
+@keyframes firework-trail{
+  0%,44%{opacity:0;transform:translateX(-50%) translateY(92px) scaleY(.18)}
+  52%{opacity:.72;transform:translateX(-50%) translateY(48px) scaleY(.56)}
+  64%{opacity:.95;transform:translateX(-50%) translateY(3px) scaleY(1)}
+  70%,100%{opacity:0;transform:translateX(-50%) translateY(-4px) scaleY(.25)}
+}
+@keyframes season-firework{
+  0%,66%{opacity:0;transform:scale(.08) rotate(0deg)}
+  70%{opacity:.92;transform:scale(.48) rotate(6deg)}
+  78%{opacity:.76;transform:scale(1) rotate(13deg)}
+  88%{opacity:.24;transform:scale(1.18) rotate(18deg)}
+  100%{opacity:0;transform:scale(1.24) rotate(22deg)}
+}
+
+/* Reduced Motion keeps the seasonal palette but drops moving effects. */
+@media(prefers-reduced-motion:reduce){
+  :root[data-season="christmas"] .seasonal-particle,
+  :root[data-season="halloween"] .seasonal-particle,
+  :root[data-season="easter"] .seasonal-particle,
+  :root[data-season="july4"] .seasonal-particle{display:none!important}
+}
+
+
+/* v1.8.0-preview.8 — neutral frosted-glass A/B experiment. */
+:root[data-preview-surface="neutral"]{
+  --glass:rgba(118,126,140,.16);
+  --glass-strong:rgba(105,113,128,.30);
+  --border:rgba(235,240,248,.16);
+  --hair:rgba(235,240,248,.09);
+  --shadow:0 24px 80px rgba(0,0,0,.27);
+}
+:root[data-theme="light"][data-preview-surface="neutral"]{
+  --glass:rgba(244,246,249,.46);
+  --glass-strong:rgba(238,241,245,.68);
+  --border:rgba(255,255,255,.78);
+  --hair:rgba(40,50,65,.09);
+  --shadow:0 22px 64px rgba(55,65,80,.14);
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="neutral"]{
+    --glass:rgba(244,246,249,.46);
+    --glass-strong:rgba(238,241,245,.68);
+    --border:rgba(255,255,255,.78);
+    --hair:rgba(40,50,65,.09);
+    --shadow:0 22px 64px rgba(55,65,80,.14);
+  }
+}
+:root[data-preview-surface="neutral"] .liquid-glass,
+:root[data-preview-surface="neutral"] .glass-control{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.115),rgba(255,255,255,.026)),
+    linear-gradient(160deg,rgba(150,158,172,.055),rgba(90,98,112,.035)),
+    var(--glass)!important;
+  border-color:var(--border)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.15),
+    0 18px 48px rgba(0,0,0,.12),
+    var(--shadow)!important;
+  backdrop-filter:blur(28px) saturate(125%)!important;
+  -webkit-backdrop-filter:blur(28px) saturate(125%)!important;
+}
+:root[data-preview-surface="neutral"] .hero-card,
+:root[data-preview-surface="neutral"] .ride-card,
+:root[data-preview-surface="neutral"] .watch-card,
+:root[data-preview-surface="neutral"] .settings-group,
+:root[data-preview-surface="neutral"] .toolbar,
+:root[data-preview-surface="neutral"] .bottom-nav,
+:root[data-preview-surface="neutral"] .ride-sheet,
+:root[data-preview-surface="neutral"] .install-help-sheet{
+  border-color:var(--border)!important;
+}
+:root[data-preview-surface="neutral"] .ride-card.watching{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.025)),
+    var(--glass)!important;
+  border-color:var(--border)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.12),
+    0 12px 36px rgba(0,0,0,.12)!important;
+}
+:root[data-preview-surface="neutral"] .hero-card:after{
+  opacity:.20;
+}
+:root[data-preview-surface="neutral"] .settings-group,
+:root[data-preview-surface="neutral"] .ride-card,
+:root[data-preview-surface="neutral"] .watch-card,
+:root[data-preview-surface="neutral"] .toolbar{
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.10),
+    0 12px 34px rgba(0,0,0,.08)!important;
+}
+:root[data-preview-surface="neutral"] .search{
+  background:rgba(20,24,31,.16)!important;
+  border-color:var(--hair)!important;
+}
+:root[data-theme="light"][data-preview-surface="neutral"] .search{
+  background:rgba(255,255,255,.34)!important;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="neutral"] .search{
+    background:rgba(255,255,255,.34)!important;
+  }
+}
+/* Keep meaning/selection in text, icons and restrained control highlights—not card fills. */
+:root[data-preview-surface="neutral"] .park-chip.active,
+:root[data-preview-surface="neutral"] .filter-button.active,
+:root[data-preview-surface="neutral"] .nav-item.active,
+:root[data-preview-surface="neutral"] .mini-toggle.active{
+  background:rgba(255,255,255,.065)!important;
+  border-color:rgba(var(--blue-rgb),.26)!important;
+  box-shadow:inset 0 0 0 1px rgba(var(--blue-rgb),.08)!important;
+  color:var(--blue);
+}
+
+
+/* v1.8.0-preview.9 — deeper Liquid Glass study. */
+:root[data-preview-surface="neutral"]{
+  --glass-thin:rgba(132,138,150,.095);
+  --glass-mid:rgba(126,132,145,.135);
+  --glass-thick:rgba(116,122,136,.205);
+  --glass-edge:rgba(255,255,255,.18);
+  --glass-edge-soft:rgba(255,255,255,.085);
+  --glass-shadow:rgba(0,0,0,.18);
+}
+:root[data-theme="light"][data-preview-surface="neutral"]{
+  --glass-thin:rgba(255,255,255,.30);
+  --glass-mid:rgba(252,253,255,.42);
+  --glass-thick:rgba(249,250,253,.58);
+  --glass-edge:rgba(255,255,255,.84);
+  --glass-edge-soft:rgba(255,255,255,.48);
+  --glass-shadow:rgba(70,78,92,.12);
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="neutral"]{
+    --glass-thin:rgba(255,255,255,.30);
+    --glass-mid:rgba(252,253,255,.42);
+    --glass-thick:rgba(249,250,253,.58);
+    --glass-edge:rgba(255,255,255,.84);
+    --glass-edge-soft:rgba(255,255,255,.48);
+    --glass-shadow:rgba(70,78,92,.12);
+  }
+}
+
+/* Thin optical glass: lists/cards let the colorful background breathe through. */
+:root[data-preview-surface="neutral"] .ride-card,
+:root[data-preview-surface="neutral"] .watch-card{
+  position:relative;
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.105),rgba(255,255,255,.018) 42%,rgba(255,255,255,.035)),
+    var(--glass-thin)!important;
+  border:1px solid var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.17),
+    inset 1px 0 0 rgba(255,255,255,.055),
+    inset 0 -1px 0 rgba(0,0,0,.075),
+    0 16px 42px var(--glass-shadow)!important;
+  backdrop-filter:blur(22px) saturate(145%) contrast(102%)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(145%) contrast(102%)!important;
+}
+
+/* Medium glass: hero/settings/toolbars have a little more optical mass. */
+:root[data-preview-surface="neutral"] .hero-card,
+:root[data-preview-surface="neutral"] .settings-group,
+:root[data-preview-surface="neutral"] .toolbar{
+  position:relative;
+  background:
+    linear-gradient(148deg,rgba(255,255,255,.13),rgba(255,255,255,.022) 38%,rgba(255,255,255,.045)),
+    var(--glass-mid)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.20),
+    inset 1px 0 0 rgba(255,255,255,.065),
+    inset 0 -1px 0 rgba(0,0,0,.08),
+    0 20px 54px var(--glass-shadow)!important;
+  backdrop-filter:blur(30px) saturate(150%) contrast(102%)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(150%) contrast(102%)!important;
+}
+
+/* Thick glass: floating nav/sheets feel like heavier lenses. */
+:root[data-preview-surface="neutral"] .bottom-nav,
+:root[data-preview-surface="neutral"] .ride-sheet,
+:root[data-preview-surface="neutral"] .install-help-sheet{
+  background:
+    linear-gradient(150deg,rgba(255,255,255,.16),rgba(255,255,255,.028) 40%,rgba(255,255,255,.055)),
+    var(--glass-thick)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.24),
+    inset 1px 0 0 rgba(255,255,255,.075),
+    inset 0 -1px 0 rgba(0,0,0,.10),
+    0 24px 72px rgba(0,0,0,.22)!important;
+  backdrop-filter:blur(38px) saturate(155%) contrast(103%)!important;
+  -webkit-backdrop-filter:blur(38px) saturate(155%) contrast(103%)!important;
+}
+
+/* Specular reflection: light across the top-left edge instead of a flat tint. */
+:root[data-preview-surface="neutral"] .ride-card::before,
+:root[data-preview-surface="neutral"] .watch-card::before,
+:root[data-preview-surface="neutral"] .hero-card::before,
+:root[data-preview-surface="neutral"] .settings-group::before,
+:root[data-preview-surface="neutral"] .toolbar::before,
+:root[data-preview-surface="neutral"] .bottom-nav::before,
+:root[data-preview-surface="neutral"] .ride-sheet::before,
+:root[data-preview-surface="neutral"] .install-help-sheet::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  z-index:0;
+  background:
+    linear-gradient(118deg,
+      rgba(255,255,255,.16) 0%,
+      rgba(255,255,255,.055) 18%,
+      transparent 39%,
+      transparent 72%,
+      rgba(var(--blue-rgb),.035) 100%);
+  opacity:.72;
+}
+:root[data-preview-surface="neutral"] .ride-card>*,
+:root[data-preview-surface="neutral"] .watch-card>*,
+:root[data-preview-surface="neutral"] .hero-card>*,
+:root[data-preview-surface="neutral"] .settings-group>*,
+:root[data-preview-surface="neutral"] .toolbar>*,
+:root[data-preview-surface="neutral"] .bottom-nav>*,
+:root[data-preview-surface="neutral"] .ride-sheet>*,
+:root[data-preview-surface="neutral"] .install-help-sheet>*{
+  position:relative;
+  z-index:1;
+}
+
+/* Watching/selected state stays neutral; color moves to edges, icons and copy. */
+:root[data-preview-surface="neutral"] .ride-card.watching{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.11),rgba(255,255,255,.02)),
+    var(--glass-thin)!important;
+  border-color:rgba(var(--blue-rgb),.28)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.18),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.045),
+    0 16px 42px var(--glass-shadow)!important;
+}
+:root[data-preview-surface="neutral"] .park-chip.active,
+:root[data-preview-surface="neutral"] .filter-button.active,
+:root[data-preview-surface="neutral"] .nav-item.active,
+:root[data-preview-surface="neutral"] .mini-toggle.active{
+  background:rgba(255,255,255,.055)!important;
+  border-color:rgba(var(--blue-rgb),.30)!important;
+  color:var(--blue)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.11),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.055)!important;
+}
+
+/* Controls feel like smaller pieces of glass rather than colored pills. */
+:root[data-preview-surface="neutral"] .filter-button,
+:root[data-preview-surface="neutral"] .toolbar select,
+:root[data-preview-surface="neutral"] .settings-group select,
+:root[data-preview-surface="neutral"] .setting-action,
+:root[data-preview-surface="neutral"] .hero-watch,
+:root[data-preview-surface="neutral"] .sheet-close,
+:root[data-preview-surface="neutral"] .install-help-close{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.095),rgba(255,255,255,.025)),
+    rgba(120,126,138,.10)!important;
+  border-color:rgba(255,255,255,.12)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.13),
+    0 7px 20px rgba(0,0,0,.08)!important;
+  backdrop-filter:blur(18px) saturate(140%)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(140%)!important;
+}
+:root[data-preview-surface="neutral"] .glass-control:active,
+:root[data-preview-surface="neutral"] .filter-button:active,
+:root[data-preview-surface="neutral"] .park-chip:active,
+:root[data-preview-surface="neutral"] .setting-action:active,
+:root[data-preview-surface="neutral"] .hero-watch:active{
+  transform:scale(.975);
+}
+
+/* Background carries more of the color, with restrained spill onto glass edges. */
+:root[data-preview-surface="neutral"] body{
+  background:
+    radial-gradient(circle at 82% 4%,rgba(var(--blue2-rgb),.16),transparent 32rem),
+    radial-gradient(circle at 5% 48%,rgba(var(--blue-rgb),.085),transparent 30rem),
+    linear-gradient(160deg,var(--bg),var(--bg2))!important;
+}
+:root[data-preview-surface="neutral"] .ambient{opacity:.58}
+:root[data-preview-surface="neutral"] .ambient-two{opacity:.31}
+:root[data-preview-surface="neutral"] .ambient-three{opacity:.25}
+
+/* Halloween rain follows its visual slant: right to left. */
+@keyframes halloween-rain{
+  0%{transform:translate3d(46px,-18vh,0) rotate(-13deg);opacity:0}
+  10%{opacity:.58}
+  100%{transform:translate3d(-64px,122vh,0) rotate(-13deg);opacity:.16}
+}
+
+
+/* v1.8.0-preview.11 — subtler Halloween lightning: distant flashes only at the top. */
+:root[data-season="halloween"] .seasonal-layer:before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:30vh;
+  opacity:0;
+  background:
+    radial-gradient(ellipse at 76% 0%,rgba(235,239,255,.42),transparent 42%),
+    linear-gradient(180deg,rgba(160,170,235,.13),transparent 82%);
+  mix-blend-mode:screen;
+  filter:blur(1px);
+  animation:halloween-top-flash 14s linear infinite;
+}
+:root[data-season="halloween"] .seasonal-layer:after{
+  display:none!important;
+}
+@keyframes halloween-top-flash{
+  0%,72%,73.1%,74.2%,100%{opacity:0}
+  72.35%{opacity:.26}
+  72.70%{opacity:.08}
+  73.45%{opacity:.34}
+  73.80%{opacity:.06}
+}
+:root[data-season="halloween"][data-season-intensity="subtle"] .seasonal-layer:before{
+  filter:opacity(.72);
+}
+:root[data-season="halloween"][data-season-intensity="extra"] .seasonal-layer:before{
+  filter:opacity(1.12);
+}
+
+
+/* v1.8.0-preview.12 — align Halloween rain streaks with right-to-left wind. */
+@keyframes halloween-rain{
+  0%{transform:translate3d(46px,-18vh,0) rotate(13deg);opacity:0}
+  10%{opacity:.58}
+  100%{transform:translate3d(-64px,122vh,0) rotate(13deg);opacity:.16}
+}
+
+
+/* v1.8.0-preview.13 — stronger glass, windier rain, rocket-style fireworks. */
+
+/* A small glass bump: clearer edges and stronger lensing without adding navy tint. */
+:root[data-preview-surface="neutral"]{
+  --glass-thin:rgba(132,138,150,.105);
+  --glass-mid:rgba(126,132,145,.150);
+  --glass-thick:rgba(116,122,136,.225);
+  --glass-edge:rgba(255,255,255,.225);
+  --glass-edge-soft:rgba(255,255,255,.105);
+}
+:root[data-preview-surface="neutral"] .ride-card,
+:root[data-preview-surface="neutral"] .watch-card{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.22),
+    inset 1px 0 0 rgba(255,255,255,.075),
+    inset 0 -1px 0 rgba(0,0,0,.08),
+    0 17px 46px var(--glass-shadow)!important;
+  backdrop-filter:blur(26px) saturate(155%) contrast(103%)!important;
+  -webkit-backdrop-filter:blur(26px) saturate(155%) contrast(103%)!important;
+}
+:root[data-preview-surface="neutral"] .hero-card,
+:root[data-preview-surface="neutral"] .settings-group,
+:root[data-preview-surface="neutral"] .toolbar{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.25),
+    inset 1px 0 0 rgba(255,255,255,.085),
+    inset 0 -1px 0 rgba(0,0,0,.09),
+    0 22px 58px var(--glass-shadow)!important;
+  backdrop-filter:blur(34px) saturate(160%) contrast(103%)!important;
+  -webkit-backdrop-filter:blur(34px) saturate(160%) contrast(103%)!important;
+}
+:root[data-preview-surface="neutral"] .bottom-nav,
+:root[data-preview-surface="neutral"] .ride-sheet,
+:root[data-preview-surface="neutral"] .install-help-sheet{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.29),
+    inset 1px 0 0 rgba(255,255,255,.095),
+    inset 0 -1px 0 rgba(0,0,0,.11),
+    0 26px 78px rgba(0,0,0,.24)!important;
+  backdrop-filter:blur(42px) saturate(165%) contrast(104%)!important;
+  -webkit-backdrop-filter:blur(42px) saturate(165%) contrast(104%)!important;
+}
+:root[data-preview-surface="neutral"] .ride-card::before,
+:root[data-preview-surface="neutral"] .watch-card::before,
+:root[data-preview-surface="neutral"] .hero-card::before,
+:root[data-preview-surface="neutral"] .settings-group::before,
+:root[data-preview-surface="neutral"] .toolbar::before,
+:root[data-preview-surface="neutral"] .bottom-nav::before,
+:root[data-preview-surface="neutral"] .ride-sheet::before,
+:root[data-preview-surface="neutral"] .install-help-sheet::before{
+  background:
+    linear-gradient(118deg,
+      rgba(255,255,255,.205) 0%,
+      rgba(255,255,255,.075) 17%,
+      transparent 38%,
+      transparent 70%,
+      rgba(var(--blue-rgb),.045) 100%)!important;
+  opacity:.82;
+}
+
+/* Halloween: a touch denser, with a stronger right-to-left wind push. */
+:root[data-season="halloween"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+21){display:none!important}
+:root[data-season="halloween"][data-season-intensity="normal"] .seasonal-particle:nth-child(n+35){display:none!important}
+@keyframes halloween-rain{
+  0%{transform:translate3d(72px,-18vh,0) rotate(13deg);opacity:0}
+  9%{opacity:.62}
+  100%{transform:translate3d(-96px,122vh,0) rotate(13deg);opacity:.18}
+}
+
+/* Fourth of July: rocket trail first, then a looser irregular starburst. */
+:root[data-season="july4"] .seasonal-particle{
+  --burst-rotate:0deg;
+  display:none;
+  bottom:auto;
+  top:var(--particle-top);
+  width:4px;
+  height:4px;
+  margin:-2px 0 0 -2px;
+  border-radius:50%;
+  background:transparent!important;
+  -webkit-mask-image:none!important;
+  mask-image:none!important;
+  color:#ff6f7e;
+  box-shadow:none!important;
+  filter:none!important;
+  opacity:1!important;
+  animation:none!important;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(4n+1){display:block}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){color:#73b8ff;--burst-rotate:9deg}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){color:#fff;--burst-rotate:-7deg}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){color:#ffd56b;--burst-rotate:15deg}
+:root[data-season="july4"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+22){display:none}
+
+/* The rocket rises from below the eventual burst point. */
+:root[data-season="july4"] .seasonal-particle::before{
+  content:"";
+  position:absolute;
+  left:1px;
+  top:2px;
+  width:2px;
+  height:112px;
+  border-radius:999px;
+  transform-origin:50% 0;
+  background:linear-gradient(
+    180deg,
+    rgba(255,255,255,.96) 0%,
+    currentColor 18%,
+    color-mix(in srgb,currentColor 72%,transparent) 58%,
+    transparent 100%
+  );
+  box-shadow:0 0 6px currentColor;
+  opacity:0;
+  animation:firework-rocket var(--particle-duration) cubic-bezier(.2,.72,.2,1) infinite;
+  animation-delay:var(--particle-delay);
+}
+
+/* Uneven spark distances make the burst feel hand-thrown, not like a perfect circle. */
+:root[data-season="july4"] .seasonal-particle::after{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:currentColor;
+  opacity:0;
+  filter:drop-shadow(0 0 4px currentColor);
+  box-shadow:
+     1px -36px 0 -1px currentColor,
+    18px -28px 0 -1px currentColor,
+    36px -10px 0 -1px currentColor,
+    29px  17px 0 -1px currentColor,
+    11px  35px 0 -1px currentColor,
+   -13px  29px 0 -1px currentColor,
+   -34px  13px 0 -1px currentColor,
+   -27px -18px 0 -1px currentColor,
+   -10px -30px 0 -1px currentColor,
+    43px   5px 0 -2px rgba(255,255,255,.92),
+   -39px  -5px 0 -2px rgba(255,255,255,.78),
+     4px  45px 0 -2px currentColor;
+  animation:firework-irregular-burst var(--particle-duration) ease-out infinite;
+  animation-delay:var(--particle-delay);
+  transform:rotate(var(--burst-rotate)) scale(.08);
+}
+
+@keyframes firework-rocket{
+  0%,38%{
+    opacity:0;
+    transform:translateY(128px) scaleY(.12);
+  }
+  44%{
+    opacity:.28;
+    transform:translateY(106px) scaleY(.26);
+  }
+  55%{
+    opacity:.88;
+    transform:translateY(52px) scaleY(.72);
+  }
+  64%{
+    opacity:1;
+    transform:translateY(4px) scaleY(1);
+  }
+  68%,100%{
+    opacity:0;
+    transform:translateY(-4px) scaleY(.28);
+  }
+}
+@keyframes firework-irregular-burst{
+  0%,64%{
+    opacity:0;
+    transform:rotate(var(--burst-rotate)) scale(.06);
+  }
+  68%{
+    opacity:.95;
+    transform:rotate(var(--burst-rotate)) scale(.30);
+  }
+  76%{
+    opacity:.92;
+    transform:rotate(calc(var(--burst-rotate) + 5deg)) scale(.95);
+  }
+  86%{
+    opacity:.42;
+    transform:rotate(calc(var(--burst-rotate) + 9deg)) scale(1.16);
+  }
+  100%{
+    opacity:0;
+    transform:rotate(calc(var(--burst-rotate) + 12deg)) scale(1.28);
+  }
+}
+
+
+/* v1.8.0-preview.14 — bottom-launch fireworks + heavier Christmas snow. */
+
+/* Christmas: noticeably fuller snowfall at each preview intensity. */
+:root[data-season="christmas"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+25){display:none!important}
+:root[data-season="christmas"][data-season-intensity="normal"] .seasonal-particle:nth-child(n+44){display:none!important}
+:root[data-season="christmas"] .seasonal-particle:nth-child(9n){
+  width:11px;
+  height:11px;
+  opacity:.64;
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(11n){
+  width:3px;
+  height:3px;
+  opacity:.44;
+  box-shadow:0 0 7px rgba(255,255,255,.28);
+}
+
+/* Keep the larger particle pool from making the other seasons unintentionally denser. */
+:root[data-season="halloween"][data-season-intensity="extra"] .seasonal-particle:nth-child(n+41){display:none!important}
+:root[data-season="easter"][data-season-intensity="extra"] .seasonal-particle:nth-child(n+41){display:none!important}
+:root[data-season="july4"] .seasonal-particle:nth-child(n+41){display:none}
+
+/* Firework variants: each rocket has its own launch lean, speed and burst proportions. */
+:root[data-season="july4"] .seasonal-particle{
+  --firework-cycle:7.2s;
+  --trail-lean:-2deg;
+  --trail-start-x:0px;
+  --trail-end-x:0px;
+  --trail-length:82px;
+  --trail-width:2px;
+  --burst-rotate:0deg;
+  --burst-x:1;
+  --burst-y:1;
+  --burst-shadow:
+     1px -38px 0 -1px currentColor,
+    17px -29px 0 -1px currentColor,
+    37px -11px 0 -1px currentColor,
+    30px  16px 0 -1px currentColor,
+    12px  36px 0 -1px currentColor,
+   -12px  31px 0 -1px currentColor,
+   -35px  12px 0 -1px currentColor,
+   -28px -19px 0 -1px currentColor,
+    -9px -31px 0 -1px currentColor,
+    44px   7px 0 -2px rgba(255,255,255,.88),
+   -40px  -4px 0 -2px rgba(255,255,255,.76),
+     5px  46px 0 -2px currentColor;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){
+  --firework-cycle:6.5s;
+  --trail-lean:-5deg;
+  --trail-start-x:22px;
+  --trail-end-x:-3px;
+  --trail-length:96px;
+  --burst-rotate:8deg;
+  --burst-x:1.18;
+  --burst-y:.88;
+  --burst-shadow:
+     0px -44px 0 -1px currentColor,
+    13px -31px 0 -1px currentColor,
+    35px -18px 0 -1px currentColor,
+    42px   9px 0 -2px currentColor,
+    22px  28px 0 -1px currentColor,
+     5px  43px 0 -2px currentColor,
+   -18px  33px 0 -1px currentColor,
+   -39px  11px 0 -2px currentColor,
+   -31px -15px 0 -1px currentColor,
+   -12px -35px 0 -1px rgba(255,255,255,.84);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){
+  --firework-cycle:7.8s;
+  --trail-lean:4deg;
+  --trail-start-x:-28px;
+  --trail-end-x:5px;
+  --trail-length:72px;
+  --trail-width:3px;
+  --burst-rotate:-11deg;
+  --burst-x:.88;
+  --burst-y:1.20;
+  --burst-shadow:
+     2px -34px 0 -1px currentColor,
+    24px -37px 0 -2px currentColor,
+    31px -12px 0 -1px currentColor,
+    24px  20px 0 -1px currentColor,
+     7px  41px 0 -2px currentColor,
+   -17px  37px 0 -1px currentColor,
+   -31px  17px 0 -1px currentColor,
+   -36px  -9px 0 -2px currentColor,
+   -15px -26px 0 -1px currentColor,
+    41px   5px 0 -2px rgba(255,255,255,.90);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){
+  --firework-cycle:6.9s;
+  --trail-lean:-1deg;
+  --trail-start-x:10px;
+  --trail-end-x:-1px;
+  --trail-length:106px;
+  --burst-rotate:17deg;
+  --burst-x:1.06;
+  --burst-y:1.08;
+}
+
+/* Trail begins below the viewport, races up, and is gone before the explosion. */
+:root[data-season="july4"] .seasonal-particle::before{
+  content:"";
+  position:absolute;
+  left:1px;
+  top:1px;
+  width:var(--trail-width);
+  height:var(--trail-length);
+  border-radius:999px;
+  transform-origin:50% 0;
+  background:linear-gradient(
+    180deg,
+    rgba(255,255,255,.98) 0%,
+    currentColor 16%,
+    color-mix(in srgb,currentColor 78%,transparent) 52%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 7px currentColor,
+    0 18px 10px -4px color-mix(in srgb,currentColor 55%,transparent);
+  opacity:0;
+  animation:firework-bottom-launch var(--firework-cycle) cubic-bezier(.18,.76,.20,1) infinite;
+  animation-delay:var(--particle-delay);
+}
+
+/* The explosion uses several deliberately uneven spark maps. */
+:root[data-season="july4"] .seasonal-particle::after{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:var(--burst-shadow);
+  filter:drop-shadow(0 0 4px currentColor);
+  opacity:0;
+  animation:firework-shaped-burst var(--firework-cycle) ease-out infinite;
+  animation-delay:var(--particle-delay);
+  transform-origin:center;
+}
+
+@keyframes firework-bottom-launch{
+  0%,42%{
+    opacity:0;
+    transform:
+      translate3d(var(--trail-start-x),100vh,0)
+      rotate(var(--trail-lean))
+      scaleY(.22);
+  }
+  45%{
+    opacity:.34;
+  }
+  53%{
+    opacity:.92;
+    transform:
+      translate3d(calc((var(--trail-start-x) + var(--trail-end-x)) / 2),48vh,0)
+      rotate(var(--trail-lean))
+      scaleY(.72);
+  }
+  60%{
+    opacity:1;
+    transform:
+      translate3d(var(--trail-end-x),6vh,0)
+      rotate(var(--trail-lean))
+      scaleY(1);
+  }
+  62.5%{
+    opacity:.15;
+    transform:
+      translate3d(var(--trail-end-x),0,0)
+      rotate(var(--trail-lean))
+      scaleY(.38);
+  }
+  63%,100%{
+    opacity:0;
+    transform:
+      translate3d(var(--trail-end-x),-2vh,0)
+      rotate(var(--trail-lean))
+      scaleY(.08);
+  }
+}
+
+@keyframes firework-shaped-burst{
+  0%,62.5%{
+    opacity:0;
+    transform:
+      rotate(var(--burst-rotate))
+      scale(.04);
+  }
+  64%{
+    opacity:.96;
+    transform:
+      rotate(var(--burst-rotate))
+      scaleX(calc(var(--burst-x) * .25))
+      scaleY(calc(var(--burst-y) * .25));
+  }
+  73%{
+    opacity:.94;
+    transform:
+      rotate(calc(var(--burst-rotate) + 4deg))
+      scaleX(calc(var(--burst-x) * .94))
+      scaleY(calc(var(--burst-y) * .94));
+  }
+  84%{
+    opacity:.44;
+    transform:
+      rotate(calc(var(--burst-rotate) + 8deg))
+      scaleX(calc(var(--burst-x) * 1.14))
+      scaleY(calc(var(--burst-y) * 1.14));
+  }
+  100%{
+    opacity:0;
+    transform:
+      rotate(calc(var(--burst-rotate) + 12deg))
+      scaleX(calc(var(--burst-x) * 1.28))
+      scaleY(calc(var(--burst-y) * 1.28));
+  }
+}
+
+
+/* v1.8.0-preview.15 — Safari-safe firework transforms. */
+:root[data-season="july4"] .seasonal-particle{
+  --trail-mid-x:0px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){--trail-mid-x:9px}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){--trail-mid-x:-11px}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){--trail-mid-x:4px}
+
+@keyframes firework-bottom-launch{
+  0%,42%{
+    opacity:0;
+    transform:translate3d(var(--trail-start-x),100vh,0) rotate(var(--trail-lean)) scaleY(.22);
+  }
+  45%{opacity:.34}
+  53%{
+    opacity:.92;
+    transform:translate3d(var(--trail-mid-x),48vh,0) rotate(var(--trail-lean)) scaleY(.72);
+  }
+  60%{
+    opacity:1;
+    transform:translate3d(var(--trail-end-x),6vh,0) rotate(var(--trail-lean)) scaleY(1);
+  }
+  62.5%{
+    opacity:.15;
+    transform:translate3d(var(--trail-end-x),0,0) rotate(var(--trail-lean)) scaleY(.38);
+  }
+  63%,100%{
+    opacity:0;
+    transform:translate3d(var(--trail-end-x),-2vh,0) rotate(var(--trail-lean)) scaleY(.08);
+  }
+}
+
+@keyframes firework-shaped-burst{
+  0%,62.5%{
+    opacity:0;
+    transform:rotate(var(--burst-rotate)) scale(.04);
+  }
+  64%{
+    opacity:.96;
+    transform:rotate(var(--burst-rotate)) scale(.25) scaleX(var(--burst-x)) scaleY(var(--burst-y));
+  }
+  73%{
+    opacity:.94;
+    transform:rotate(var(--burst-rotate)) scale(.94) scaleX(var(--burst-x)) scaleY(var(--burst-y));
+  }
+  84%{
+    opacity:.44;
+    transform:rotate(var(--burst-rotate)) scale(1.14) scaleX(var(--burst-x)) scaleY(var(--burst-y));
+  }
+  100%{
+    opacity:0;
+    transform:rotate(var(--burst-rotate)) scale(1.28) scaleX(var(--burst-x)) scaleY(var(--burst-y));
+  }
+}
+
+
+/* v1.8.0-preview.16 — Minecraft-inspired July 4 fireworks.
+   Pixel spark ascent, discrete blocky explosions, twinkle/fade. */
+:root[data-season="july4"] .seasonal-particle{
+  --mc-cycle:6.8s;
+  --mc-lean:0px;
+  --mc-rotate:0deg;
+  --mc-burst-scale:1;
+  --mc-rocket-sparks:
+      0 12px 0 0 currentColor,
+      2px 25px 0 -1px currentColor,
+     -2px 39px 0 -1px rgba(255,255,255,.86),
+      3px 54px 0 -1px currentColor,
+     -3px 70px 0 -1px rgba(255,255,255,.58),
+      1px 88px 0 -1px currentColor;
+  --mc-burst:
+      0 -34px 0 -1px currentColor,
+     12px -28px 0 -1px currentColor,
+     27px -17px 0 -1px currentColor,
+     34px   0 0 -1px currentColor,
+     25px  20px 0 -1px currentColor,
+     10px  31px 0 -1px currentColor,
+    -10px  30px 0 -1px currentColor,
+    -27px  18px 0 -1px currentColor,
+    -34px   0 0 -1px currentColor,
+    -24px -19px 0 -1px currentColor,
+    -10px -30px 0 -1px currentColor;
+  display:none;
+  top:var(--particle-top);
+  bottom:auto;
+  width:4px;
+  height:4px;
+  margin:-2px 0 0 -2px;
+  border-radius:0;
+  background:transparent!important;
+  color:#ff6d7f;
+  opacity:1!important;
+  filter:none!important;
+  box-shadow:none!important;
+  animation:none!important;
+  -webkit-mask-image:none!important;
+  mask-image:none!important;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(4n+1){display:block}
+
+/* Blue: wider "burst" style. */
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){
+  color:#70b8ff;
+  --mc-cycle:6.2s;
+  --mc-lean:8px;
+  --mc-rotate:7deg;
+  --mc-burst-scale:1.08;
+  --mc-rocket-sparks:
+      0 10px 0 0 currentColor,
+     -2px 22px 0 -1px rgba(255,255,255,.92),
+      3px 35px 0 -1px currentColor,
+     -4px 49px 0 -1px currentColor,
+      2px 66px 0 -1px rgba(255,255,255,.62),
+     -1px 84px 0 -1px currentColor;
+  --mc-burst:
+      0 -38px 0 -1px currentColor,
+      7px -25px 0 -1px currentColor,
+     25px -31px 0 -1px currentColor,
+     21px -12px 0 -1px currentColor,
+     39px  -4px 0 -1px currentColor,
+     24px   9px 0 -1px currentColor,
+     33px  25px 0 -1px currentColor,
+     11px  22px 0 -1px currentColor,
+      2px  40px 0 -1px currentColor,
+    -12px  23px 0 -1px currentColor,
+    -31px  28px 0 -1px currentColor,
+    -24px   8px 0 -1px currentColor,
+    -41px  -5px 0 -1px currentColor,
+    -19px -14px 0 -1px currentColor,
+    -26px -31px 0 -1px currentColor,
+     -7px -25px 0 -1px currentColor;
+}
+
+/* White: star-ish shape. */
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){
+  color:#fff;
+  --mc-cycle:7.3s;
+  --mc-lean:-11px;
+  --mc-rotate:-9deg;
+  --mc-burst-scale:.96;
+  --mc-rocket-sparks:
+      1px 11px 0 0 rgba(255,255,255,.96),
+     -2px 24px 0 -1px currentColor,
+      2px 38px 0 -1px currentColor,
+     -1px 51px 0 -1px rgba(117,184,255,.74),
+      3px 68px 0 -1px currentColor,
+     -3px 86px 0 -1px rgba(255,255,255,.52);
+  --mc-burst:
+       0 -42px 0 -1px currentColor,
+       7 -16px 0 -1px currentColor,
+      32 -25px 0 -1px currentColor,
+      17  -7px 0 -1px currentColor,
+      40   4px 0 -1px currentColor,
+      16  11px 0 -1px currentColor,
+      24  35px 0 -1px currentColor,
+       5  19px 0 -1px currentColor,
+     -12  38px 0 -1px currentColor,
+     -12  15px 0 -1px currentColor,
+     -37  21px 0 -1px currentColor,
+     -19   2px 0 -1px currentColor,
+     -34 -22px 0 -1px currentColor,
+      -8 -18px 0 -1px currentColor;
+}
+
+/* Gold: compact ball with a little twinkle. */
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){
+  color:#ffd45f;
+  --mc-cycle:6.6s;
+  --mc-lean:4px;
+  --mc-rotate:13deg;
+  --mc-burst-scale:.88;
+  --mc-burst:
+      0 -29px 0 -1px currentColor,
+     12px -24px 0 -1px currentColor,
+     25px -12px 0 -1px currentColor,
+     28px   5px 0 -1px currentColor,
+     17px  23px 0 -1px currentColor,
+      0    30px 0 -1px currentColor,
+    -16px  23px 0 -1px currentColor,
+    -29px   6px 0 -1px currentColor,
+    -24px -13px 0 -1px currentColor,
+    -11px -25px 0 -1px currentColor;
+}
+
+/* Pixel rocket: a handful of discrete square sparks, not a beam. */
+:root[data-season="july4"] .seasonal-particle::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:4px;
+  height:4px;
+  border-radius:1px;
+  background:currentColor;
+  box-shadow:var(--mc-rocket-sparks);
+  filter:drop-shadow(0 0 3px currentColor);
+  opacity:0;
+  animation:mc-rocket-rise var(--mc-cycle) cubic-bezier(.18,.72,.24,1) infinite;
+  animation-delay:var(--particle-delay);
+}
+
+/* Blocky burst particles. */
+:root[data-season="july4"] .seasonal-particle::after{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:5px;
+  height:5px;
+  border-radius:1px;
+  background:currentColor;
+  box-shadow:var(--mc-burst);
+  filter:drop-shadow(0 0 3px currentColor);
+  opacity:0;
+  animation:mc-firework-pop var(--mc-cycle) steps(1,end) infinite;
+  animation-delay:var(--particle-delay);
+  transform-origin:center;
+}
+
+@keyframes mc-rocket-rise{
+  0%,43%{
+    opacity:0;
+    transform:translate3d(var(--mc-lean),96vh,0) scale(.75);
+  }
+  45%{opacity:.35}
+  50%{
+    opacity:.92;
+    transform:translate3d(calc(var(--mc-lean) * .7),58vh,0) scale(.9);
+  }
+  56%{
+    opacity:1;
+    transform:translate3d(calc(var(--mc-lean) * .35),27vh,0) scale(1);
+  }
+  61%{
+    opacity:.95;
+    transform:translate3d(0,4vh,0) scale(1);
+  }
+  62%,100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.7);
+  }
+}
+
+@keyframes mc-firework-pop{
+  0%,61%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(.08);
+  }
+  62%{
+    opacity:1;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * .38));
+  }
+  66%{
+    opacity:.96;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * .72));
+  }
+  71%{
+    opacity:.90;
+    transform:rotate(var(--mc-rotate)) scale(var(--mc-burst-scale));
+  }
+  76%{
+    opacity:.30;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * 1.08));
+  }
+  78%{
+    opacity:.82;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * 1.10));
+  }
+  82%{
+    opacity:.18;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * 1.13));
+  }
+  100%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * 1.15));
+  }
+}
+
+
+/* v1.8.0-preview.17 — Safari-safe Minecraft firework motion. */
+:root[data-season="july4"] .seasonal-particle{
+  --mc-mid1:0px;
+  --mc-mid2:0px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){
+  --mc-mid1:6px;
+  --mc-mid2:3px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){
+  --mc-mid1:-8px;
+  --mc-mid2:-4px;
+  --mc-burst:
+       0px -42px 0 -1px currentColor,
+       7px -16px 0 -1px currentColor,
+      32px -25px 0 -1px currentColor,
+      17px  -7px 0 -1px currentColor,
+      40px   4px 0 -1px currentColor,
+      16px  11px 0 -1px currentColor,
+      24px  35px 0 -1px currentColor,
+       5px  19px 0 -1px currentColor,
+     -12px  38px 0 -1px currentColor,
+     -12px  15px 0 -1px currentColor,
+     -37px  21px 0 -1px currentColor,
+     -19px   2px 0 -1px currentColor,
+     -34px -22px 0 -1px currentColor,
+      -8px -18px 0 -1px currentColor;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){
+  --mc-mid1:3px;
+  --mc-mid2:1px;
+}
+
+@keyframes mc-rocket-rise{
+  0%,43%{
+    opacity:0;
+    transform:translate3d(var(--mc-lean),96vh,0) scale(.75);
+  }
+  45%{opacity:.35}
+  50%{
+    opacity:.92;
+    transform:translate3d(var(--mc-mid1),58vh,0) scale(.9);
+  }
+  56%{
+    opacity:1;
+    transform:translate3d(var(--mc-mid2),27vh,0) scale(1);
+  }
+  61%{
+    opacity:.95;
+    transform:translate3d(0,4vh,0) scale(1);
+  }
+  62%,100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.7);
+  }
+}
+
+@keyframes mc-firework-pop{
+  0%,61%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(.08);
+  }
+  62%{
+    opacity:1;
+    transform:rotate(var(--mc-rotate)) scale(.38) scale(var(--mc-burst-scale));
+  }
+  66%{
+    opacity:.96;
+    transform:rotate(var(--mc-rotate)) scale(.72) scale(var(--mc-burst-scale));
+  }
+  71%{
+    opacity:.90;
+    transform:rotate(var(--mc-rotate)) scale(var(--mc-burst-scale));
+  }
+  76%{
+    opacity:.30;
+    transform:rotate(var(--mc-rotate)) scale(1.08) scale(var(--mc-burst-scale));
+  }
+  78%{
+    opacity:.82;
+    transform:rotate(var(--mc-rotate)) scale(1.10) scale(var(--mc-burst-scale));
+  }
+  82%{
+    opacity:.18;
+    transform:rotate(var(--mc-rotate)) scale(1.13) scale(var(--mc-burst-scale));
+  }
+  100%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(1.15) scale(var(--mc-burst-scale));
+  }
+}
+
+
+/* v1.8.0-preview.18 — smoother Minecraft-style rocket trails. */
+:root[data-season="july4"] .seasonal-particle{
+  --mc-x1:0px;
+  --mc-x2:0px;
+  --mc-x3:0px;
+  --mc-x4:0px;
+  --mc-rocket-sparks:
+      0px   8px 0 -1px rgba(255,255,255,.96),
+      1px  16px 0 -1px currentColor,
+     -1px  24px 0 -1px currentColor,
+      2px  33px 0 -1px rgba(255,255,255,.82),
+     -2px  42px 0 -1px currentColor,
+      1px  52px 0 -1px currentColor,
+     -1px  63px 0 -1px rgba(255,255,255,.68),
+      2px  74px 0 -1px currentColor,
+     -2px  86px 0 -1px currentColor,
+      1px  99px 0 -1px rgba(255,255,255,.48);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){
+  --mc-x1:7px;
+  --mc-x2:5px;
+  --mc-x3:3px;
+  --mc-x4:1px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){
+  --mc-x1:-9px;
+  --mc-x2:-7px;
+  --mc-x3:-4px;
+  --mc-x4:-2px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){
+  --mc-x1:4px;
+  --mc-x2:3px;
+  --mc-x3:2px;
+  --mc-x4:1px;
+}
+
+:root[data-season="july4"] .seasonal-particle::before{
+  width:3px;
+  height:3px;
+  border-radius:1px;
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  animation:mc-rocket-rise var(--mc-cycle) linear infinite!important;
+  animation-delay:var(--particle-delay)!important;
+  filter:drop-shadow(0 0 2px currentColor);
+}
+
+/* More animation samples + tighter sparks = continuous motion without losing the pixel look. */
+@keyframes mc-rocket-rise{
+  0%,39%{
+    opacity:0;
+    transform:translate3d(var(--mc-lean),100vh,0) scale(.76);
+  }
+  41%{
+    opacity:.20;
+    transform:translate3d(var(--mc-lean),94vh,0) scale(.80);
+  }
+  44%{
+    opacity:.52;
+    transform:translate3d(var(--mc-x1),82vh,0) scale(.84);
+  }
+  48%{
+    opacity:.82;
+    transform:translate3d(var(--mc-x1),66vh,0) scale(.88);
+  }
+  52%{
+    opacity:.96;
+    transform:translate3d(var(--mc-x2),49vh,0) scale(.92);
+  }
+  56%{
+    opacity:1;
+    transform:translate3d(var(--mc-x3),32vh,0) scale(.96);
+  }
+  59%{
+    opacity:1;
+    transform:translate3d(var(--mc-x4),18vh,0) scale(1);
+  }
+  61.5%{
+    opacity:.94;
+    transform:translate3d(0,6vh,0) scale(1);
+  }
+  62.5%{
+    opacity:.42;
+    transform:translate3d(0,1.5vh,0) scale(.92);
+  }
+  63%,100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.78);
+  }
+}
+
+
+/* v1.8.0-preview.19 — sparkling ascent + smooth Minecraft burst. */
+
+/* Sparkle the square rocket particles while preserving the smooth climb. */
+:root[data-season="july4"] .seasonal-particle::before{
+  animation:
+    mc-rocket-rise var(--mc-cycle) linear infinite,
+    mc-rocket-sparkle .34s ease-in-out infinite!important;
+  animation-delay:
+    var(--particle-delay),
+    var(--particle-delay)!important;
+  will-change:transform,opacity,filter;
+}
+
+/* Smooth burst expansion instead of step-snapping between keyframes. */
+:root[data-season="july4"] .seasonal-particle::after{
+  animation:mc-firework-pop var(--mc-cycle) cubic-bezier(.14,.72,.24,1) infinite!important;
+  animation-delay:var(--particle-delay)!important;
+  will-change:transform,opacity,filter;
+}
+
+@keyframes mc-rocket-sparkle{
+  0%,100%{
+    filter:drop-shadow(0 0 2px currentColor) brightness(.92);
+  }
+  22%{
+    filter:drop-shadow(0 0 3px currentColor) brightness(1.45);
+  }
+  48%{
+    filter:drop-shadow(0 0 2px currentColor) brightness(1.02);
+  }
+  72%{
+    filter:drop-shadow(0 0 4px currentColor) brightness(1.72);
+  }
+}
+
+/* The pop grows continuously, then gets one soft Minecraft-like twinkle before fading. */
+@keyframes mc-firework-pop{
+  0%,61%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(.08);
+    filter:drop-shadow(0 0 2px currentColor) brightness(1);
+  }
+  63%{
+    opacity:.72;
+    transform:rotate(var(--mc-rotate)) scale(.28);
+    filter:drop-shadow(0 0 3px currentColor) brightness(1.18);
+  }
+  67%{
+    opacity:1;
+    transform:rotate(var(--mc-rotate)) scale(.58);
+    filter:drop-shadow(0 0 4px currentColor) brightness(1.35);
+  }
+  72%{
+    opacity:.94;
+    transform:rotate(var(--mc-rotate)) scale(.88);
+    filter:drop-shadow(0 0 4px currentColor) brightness(1.15);
+  }
+  77%{
+    opacity:.82;
+    transform:rotate(var(--mc-rotate)) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 5px currentColor) brightness(1.08);
+  }
+  81%{
+    opacity:.38;
+    transform:rotate(var(--mc-rotate)) scale(1.07) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 3px currentColor) brightness(.92);
+  }
+  84%{
+    opacity:.68;
+    transform:rotate(var(--mc-rotate)) scale(1.10) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 5px currentColor) brightness(1.45);
+  }
+  89%{
+    opacity:.24;
+    transform:rotate(var(--mc-rotate)) scale(1.13) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 2px currentColor) brightness(.88);
+  }
+  100%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(1.16) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 1px currentColor) brightness(.82);
+  }
+}
+
+
+/* v1.8.0-preview.20 — slower sparkling launch + softer, less blocky bursts. */
+
+/* Give the rocket a little more hang time without making it sluggish. */
+:root[data-season="july4"] .seasonal-particle{--mc-cycle:7.7s}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){--mc-cycle:7.0s}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){--mc-cycle:8.2s}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){--mc-cycle:7.4s}
+
+/* Keep the sparkling particle trail, but stretch the climb over more of the cycle. */
+:root[data-season="july4"] .seasonal-particle::before{
+  animation:
+    mc-rocket-rise var(--mc-cycle) cubic-bezier(.24,.52,.24,1) infinite,
+    mc-rocket-sparkle .42s ease-in-out infinite!important;
+  animation-delay:
+    var(--particle-delay),
+    var(--particle-delay)!important;
+}
+
+@keyframes mc-rocket-rise{
+  0%,34%{
+    opacity:0;
+    transform:translate3d(var(--mc-lean),100vh,0) scale(.74);
+  }
+  37%{
+    opacity:.18;
+    transform:translate3d(var(--mc-lean),94vh,0) scale(.78);
+  }
+  41%{
+    opacity:.46;
+    transform:translate3d(var(--mc-x1),82vh,0) scale(.82);
+  }
+  46%{
+    opacity:.76;
+    transform:translate3d(var(--mc-x1),66vh,0) scale(.87);
+  }
+  51%{
+    opacity:.94;
+    transform:translate3d(var(--mc-x2),50vh,0) scale(.92);
+  }
+  56%{
+    opacity:1;
+    transform:translate3d(var(--mc-x3),34vh,0) scale(.96);
+  }
+  60%{
+    opacity:1;
+    transform:translate3d(var(--mc-x4),20vh,0) scale(1);
+  }
+  63%{
+    opacity:.96;
+    transform:translate3d(0,8vh,0) scale(1);
+  }
+  64.5%{
+    opacity:.44;
+    transform:translate3d(0,2vh,0) scale(.92);
+  }
+  65%,100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.80);
+  }
+}
+
+/* Soften the burst particles so the motion reads as polished fireworks, not pixel art. */
+:root[data-season="july4"] .seasonal-particle::after{
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  animation:mc-firework-pop var(--mc-cycle) cubic-bezier(.16,.82,.26,1) infinite!important;
+  animation-delay:var(--particle-delay)!important;
+  filter:drop-shadow(0 0 4px currentColor);
+}
+
+/* Same pop → bloom → twinkle → fade behavior, but continuous and restrained. */
+@keyframes mc-firework-pop{
+  0%,64%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(.10);
+    filter:drop-shadow(0 0 2px currentColor) brightness(1);
+  }
+  66%{
+    opacity:.50;
+    transform:rotate(var(--mc-rotate)) scale(.24);
+    filter:drop-shadow(0 0 3px currentColor) brightness(1.10);
+  }
+  69%{
+    opacity:.88;
+    transform:rotate(var(--mc-rotate)) scale(.47);
+    filter:drop-shadow(0 0 4px currentColor) brightness(1.22);
+  }
+  73%{
+    opacity:1;
+    transform:rotate(var(--mc-rotate)) scale(.72);
+    filter:drop-shadow(0 0 5px currentColor) brightness(1.28);
+  }
+  77%{
+    opacity:.92;
+    transform:rotate(var(--mc-rotate)) scale(.91);
+    filter:drop-shadow(0 0 5px currentColor) brightness(1.16);
+  }
+  81%{
+    opacity:.80;
+    transform:rotate(var(--mc-rotate)) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 4px currentColor) brightness(1.06);
+  }
+  85%{
+    opacity:.63;
+    transform:rotate(var(--mc-rotate)) scale(1.06) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 4px currentColor) brightness(1.16);
+  }
+  89%{
+    opacity:.46;
+    transform:rotate(var(--mc-rotate)) scale(1.10) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 3px currentColor) brightness(1.02);
+  }
+  94%{
+    opacity:.22;
+    transform:rotate(var(--mc-rotate)) scale(1.13) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 2px currentColor) brightness(.94);
+  }
+  100%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(1.16) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 1px currentColor) brightness(.88);
+  }
+}
+
+
+/* v1.8.0-preview.21 — real-particle July 4 engine.
+   Individual trail twinkles + radial sparks with subtle drift and gravity. */
+
+/* Retire the legacy pseudo-element firework particles. */
+:root[data-season="july4"] .seasonal-layer > .seasonal-particle{
+  display:none!important;
+}
+.fireworks-field{
+  position:absolute;
+  inset:0;
+  display:none;
+  overflow:hidden;
+  pointer-events:none;
+  z-index:2;
+}
+:root[data-season="july4"] .fireworks-field{display:block}
+:root[data-season="july4"][data-season-intensity="subtle"] .firework:nth-child(n+4){display:none}
+:root[data-season="july4"][data-season-intensity="normal"] .firework:nth-child(n+6){display:none}
+
+.firework{
+  position:absolute;
+  left:var(--fw-left);
+  top:var(--fw-top);
+  width:1px;
+  height:1px;
+  color:var(--fw-color);
+}
+.firework-rocket,
+.firework-burst{
+  position:absolute;
+  left:0;
+  top:0;
+  width:1px;
+  height:1px;
+}
+
+/* Smooth rocket group; the child sparks shimmer independently. */
+.firework-rocket{
+  opacity:0;
+  animation:fw-rocket-flight var(--fw-duration) cubic-bezier(.22,.55,.24,1) infinite;
+  animation-delay:var(--fw-delay);
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+.firework-trail-spark{
+  position:absolute;
+  left:var(--trail-x);
+  top:var(--trail-y);
+  width:var(--spark-size);
+  height:var(--spark-size);
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:0 0 4px currentColor;
+  animation:fw-trail-twinkle var(--twinkle-duration) ease-in-out infinite;
+  animation-delay:var(--twinkle-delay);
+  will-change:transform,opacity,filter;
+}
+.firework-trail-spark.star::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:2px;
+  height:2px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:
+    0 -5px 4px -1px rgba(255,255,255,.95),
+    0 5px 4px -1px rgba(255,255,255,.82),
+    -5px 0 4px -1px rgba(255,255,255,.88),
+    5px 0 4px -1px rgba(255,255,255,.88);
+  transform:translate(-50%,-50%) scale(.25);
+  opacity:0;
+  animation:fw-star-flash calc(var(--twinkle-duration) * 1.7) ease-in-out infinite;
+  animation-delay:var(--twinkle-delay);
+}
+
+/* Every burst spark moves separately instead of scaling one shared sprite. */
+.firework-burst-spark{
+  position:absolute;
+  left:0;
+  top:0;
+  width:0;
+  height:0;
+  opacity:0;
+  animation:fw-burst-flight var(--fw-duration) linear infinite;
+  animation-delay:var(--fw-delay);
+  will-change:transform,opacity;
+}
+.firework-burst-spark i{
+  position:absolute;
+  left:0;
+  top:0;
+  display:block;
+  width:var(--spark-size);
+  height:var(--spark-size);
+  margin:calc(var(--spark-size) / -2) 0 0 calc(var(--spark-size) / -2);
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:0 0 5px currentColor;
+  animation:fw-burst-twinkle var(--twinkle-duration) ease-in-out infinite;
+  animation-delay:var(--twinkle-delay);
+  will-change:transform,opacity,filter;
+}
+
+@keyframes fw-rocket-flight{
+  0%,33%{
+    opacity:0;
+    transform:translate3d(var(--rocket-x0),100vh,0) scale(.82);
+  }
+  35%{
+    opacity:.22;
+    transform:translate3d(var(--rocket-x0),96vh,0) scale(.86);
+  }
+  41%{
+    opacity:.72;
+    transform:translate3d(var(--rocket-x1),77vh,0) scale(.90);
+  }
+  48%{
+    opacity:.95;
+    transform:translate3d(var(--rocket-x1),57vh,0) scale(.94);
+  }
+  54%{
+    opacity:1;
+    transform:translate3d(var(--rocket-x2),39vh,0) scale(.97);
+  }
+  59%{
+    opacity:1;
+    transform:translate3d(var(--rocket-x3),23vh,0) scale(1);
+  }
+  63%{
+    opacity:.98;
+    transform:translate3d(0,10vh,0) scale(1);
+  }
+  65%{
+    opacity:.72;
+    transform:translate3d(0,3vh,0) scale(.96);
+  }
+  65.8%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.88);
+  }
+  66%,100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.82);
+  }
+}
+
+@keyframes fw-trail-twinkle{
+  0%,100%{
+    opacity:.44;
+    transform:scale(.72);
+    filter:brightness(.92) drop-shadow(0 0 1px currentColor);
+  }
+  26%{
+    opacity:.94;
+    transform:scale(1.04);
+    filter:brightness(1.32) drop-shadow(0 0 3px currentColor);
+  }
+  49%{
+    opacity:.58;
+    transform:scale(.82);
+    filter:brightness(1) drop-shadow(0 0 2px currentColor);
+  }
+  74%{
+    opacity:1;
+    transform:scale(1.24);
+    filter:brightness(1.62) drop-shadow(0 0 4px currentColor);
+  }
+}
+@keyframes fw-star-flash{
+  0%,52%,100%{opacity:0;transform:translate(-50%,-50%) scale(.20)}
+  59%{opacity:.88;transform:translate(-50%,-50%) scale(1.05)}
+  67%{opacity:.12;transform:translate(-50%,-50%) scale(.52)}
+}
+
+/* Mostly radial motion, but the last leg includes per-spark drift + gravity. */
+@keyframes fw-burst-flight{
+  0%,65%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.42);
+  }
+  66.5%{
+    opacity:.86;
+    transform:translate3d(var(--dx1),var(--dy1),0) scale(.78);
+  }
+  70%{
+    opacity:1;
+    transform:translate3d(var(--dx2),var(--dy2),0) scale(1);
+  }
+  76%{
+    opacity:.92;
+    transform:translate3d(var(--dx3),var(--dy3),0) scale(1.02);
+  }
+  84%{
+    opacity:.72;
+    transform:translate3d(var(--dx4),var(--dy4),0) scale(.96);
+  }
+  91%{
+    opacity:.36;
+    transform:translate3d(var(--dx4),var(--dy4),0) scale(.84);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(var(--dx4),var(--dy4),0) scale(.72);
+  }
+}
+
+@keyframes fw-burst-twinkle{
+  0%,100%{
+    opacity:.74;
+    transform:scale(.88);
+    filter:brightness(.95);
+  }
+  31%{
+    opacity:1;
+    transform:scale(1.08);
+    filter:brightness(1.30);
+  }
+  61%{
+    opacity:.80;
+    transform:scale(.94);
+    filter:brightness(1.02);
+  }
+  79%{
+    opacity:1;
+    transform:scale(1.14);
+    filter:brightness(1.48);
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .fireworks-field{display:none!important}
+}
+
+
+/* v1.8.0-preview.22 — continuous rocket motion, no positional waypoints. */
+
+/* One uninterrupted transform from below the viewport to the burst point.
+   Twinkle stays on child sparks, so it cannot interfere with rocket movement. */
+.firework-rocket{
+  animation:fw-rocket-flight-continuous var(--fw-duration) cubic-bezier(.22,.58,.28,1) infinite!important;
+  animation-delay:var(--fw-delay)!important;
+  will-change:transform,opacity;
+  transform:translate3d(var(--rocket-x0),100vh,0);
+}
+
+@keyframes fw-rocket-flight-continuous{
+  0%,31%{
+    opacity:0;
+    transform:translate3d(var(--rocket-x0),100vh,0) scale(.84);
+  }
+  34%{
+    opacity:.18;
+  }
+  39%{
+    opacity:.72;
+  }
+  48%{
+    opacity:.96;
+  }
+  58%{
+    opacity:1;
+  }
+  63%{
+    opacity:.98;
+  }
+  65%{
+    opacity:.62;
+  }
+  66%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(1);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(1);
+  }
+}
+
+
+/* v1.8.0-preview.23 — independent staggered July 4 trail sparks. */
+.firework-rocket{
+  display:contents;
+  animation:none!important;
+}
+
+.firework-trail-spark{
+  left:0!important;
+  top:0!important;
+  --trail-lag:0s;
+  opacity:0;
+  animation:
+    fw-independent-trail var(--fw-duration) cubic-bezier(.22,.58,.28,1) infinite,
+    fw-independent-glimmer var(--twinkle-duration) ease-in-out infinite!important;
+  animation-delay:
+    calc(var(--fw-delay) + var(--trail-lag)),
+    var(--twinkle-delay)!important;
+  will-change:transform,opacity,filter;
+}
+
+.firework-trail-spark:nth-child(1){--trail-lag:0s}
+.firework-trail-spark:nth-child(2){--trail-lag:.035s}
+.firework-trail-spark:nth-child(3){--trail-lag:.070s}
+.firework-trail-spark:nth-child(4){--trail-lag:.108s}
+.firework-trail-spark:nth-child(5){--trail-lag:.148s}
+.firework-trail-spark:nth-child(6){--trail-lag:.190s}
+.firework-trail-spark:nth-child(7){--trail-lag:.234s}
+.firework-trail-spark:nth-child(8){--trail-lag:.280s}
+.firework-trail-spark:nth-child(9){--trail-lag:.328s}
+.firework-trail-spark:nth-child(10){--trail-lag:.378s}
+.firework-trail-spark:nth-child(11){--trail-lag:.430s}
+
+.firework-trail-spark:first-child{
+  box-shadow:0 0 6px currentColor;
+}
+
+@keyframes fw-independent-trail{
+  0%,31%{
+    opacity:0;
+    transform:translate3d(calc(var(--rocket-x0) + var(--trail-x)),100vh,0) scale(.62);
+  }
+  34%{opacity:.24}
+  39%{opacity:.70}
+  48%{opacity:.96}
+  58%{opacity:.92}
+  63%{opacity:.76}
+  65%{opacity:.32}
+  66%{
+    opacity:0;
+    transform:translate3d(var(--trail-x),0,0) scale(.92);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(var(--trail-x),0,0) scale(.72);
+  }
+}
+
+@keyframes fw-independent-glimmer{
+  0%,100%{
+    filter:brightness(.82) drop-shadow(0 0 1px currentColor);
+  }
+  19%{
+    filter:brightness(1.48) drop-shadow(0 0 4px currentColor);
+  }
+  43%{
+    filter:brightness(.92) drop-shadow(0 0 2px currentColor);
+  }
+  68%{
+    filter:brightness(1.72) drop-shadow(0 0 5px currentColor);
+  }
+  82%{
+    filter:brightness(1.02) drop-shadow(0 0 2px currentColor);
+  }
+}
+
+.firework-trail-spark.star::after{
+  animation:fw-star-flash-soft calc(var(--twinkle-duration) * 1.8) ease-in-out infinite!important;
+  animation-delay:var(--twinkle-delay)!important;
+}
+
+@keyframes fw-star-flash-soft{
+  0%,56%,100%{opacity:0;transform:translate(-50%,-50%) scale(.18)}
+  63%{opacity:.82;transform:translate(-50%,-50%) scale(.92)}
+  72%{opacity:.12;transform:translate(-50%,-50%) scale(.44)}
+}
+
+
+/* v1.8.0-preview.24 — true emitted firework trail.
+   The head rises smoothly and leaves independent falling sparks behind. */
+
+/* Override the previous staggered-trail experiment: one smooth head again. */
+.firework-rocket{
+  display:block!important;
+  position:absolute!important;
+  left:0!important;
+  top:0!important;
+  width:1px!important;
+  height:1px!important;
+  opacity:0;
+  z-index:3;
+  animation:fw-emitter-head-flight var(--fw-duration) cubic-bezier(.22,.58,.28,1) infinite!important;
+  animation-delay:var(--fw-delay)!important;
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+.firework-rocket > .firework-trail-spark{
+  display:none!important;
+}
+.firework-head{
+  position:absolute;
+  left:-2px;
+  top:-2px;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:
+    0 0 4px currentColor,
+    0 0 9px currentColor;
+}
+
+@keyframes fw-emitter-head-flight{
+  0%,31%{
+    opacity:0;
+    transform:translate3d(var(--rocket-x0),100vh,0) scale(.82);
+  }
+  34%{opacity:.24}
+  40%{opacity:.78}
+  50%{opacity:.98}
+  59%{opacity:1}
+  64%{opacity:.92}
+  65.4%{opacity:.48}
+  66%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(1);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(1);
+  }
+}
+
+/* Sparks are emitted into the field, so they stay behind after the head moves on. */
+.firework-emitted-spark{
+  position:absolute;
+  width:var(--spark-size);
+  height:var(--spark-size);
+  margin-left:0;
+  margin-top:0;
+  border-radius:50%;
+  color:inherit;
+  pointer-events:none;
+  z-index:1;
+  opacity:0;
+  animation:fw-emitted-spark var(--spark-life) cubic-bezier(.18,.68,.28,1) forwards;
+  will-change:transform,opacity;
+}
+.firework-emitted-spark > i{
+  position:absolute;
+  inset:0;
+  display:block;
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:0 0 4px currentColor;
+  animation:fw-emitted-twinkle var(--spark-twinkle) ease-in-out infinite;
+  will-change:transform,opacity,filter;
+}
+.firework-emitted-spark.star::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:2px;
+  height:2px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:
+    0 -5px 4px -1px rgba(255,255,255,.96),
+    0 5px 4px -1px rgba(255,255,255,.82),
+    -5px 0 4px -1px rgba(255,255,255,.90),
+    5px 0 4px -1px rgba(255,255,255,.90);
+  transform:translate(-50%,-50%) scale(.18);
+  opacity:0;
+  animation:fw-emitted-star var(--spark-life) ease-in-out forwards;
+}
+
+@keyframes fw-emitted-spark{
+  0%{
+    opacity:.96;
+    transform:translate3d(0,0,0) scale(.72);
+  }
+  28%{
+    opacity:.92;
+    transform:translate3d(var(--spark-dx1),var(--spark-dy1),0) scale(1);
+  }
+  60%{
+    opacity:.68;
+    transform:translate3d(var(--spark-dx2),var(--spark-dy2),0) scale(.88);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(var(--spark-dx3),var(--spark-dy3),0) scale(.52);
+  }
+}
+
+@keyframes fw-emitted-twinkle{
+  0%,100%{
+    opacity:.48;
+    transform:scale(.72);
+    filter:brightness(.90) drop-shadow(0 0 1px currentColor);
+  }
+  19%{
+    opacity:1;
+    transform:scale(1.10);
+    filter:brightness(1.58) drop-shadow(0 0 4px currentColor);
+  }
+  42%{
+    opacity:.62;
+    transform:scale(.84);
+    filter:brightness(1.02) drop-shadow(0 0 2px currentColor);
+  }
+  68%{
+    opacity:.96;
+    transform:scale(1.20);
+    filter:brightness(1.72) drop-shadow(0 0 5px currentColor);
+  }
+  84%{
+    opacity:.56;
+    transform:scale(.80);
+    filter:brightness(.96) drop-shadow(0 0 2px currentColor);
+  }
+}
+
+@keyframes fw-emitted-star{
+  0%,26%,100%{
+    opacity:0;
+    transform:translate(-50%,-50%) scale(.16);
+  }
+  40%{
+    opacity:.92;
+    transform:translate(-50%,-50%) scale(1.08);
+  }
+  55%{
+    opacity:.12;
+    transform:translate(-50%,-50%) scale(.44);
+  }
+}
+
+.firework-burst{z-index:2}
+
+@media(prefers-reduced-motion:reduce){
+  .firework-emitted-spark{display:none!important}
+}
+
+
+/* v1.8.0-preview.25 — Fall / Thanksgiving leaves + public seasonal toggle. */
+:root[data-season="fall"]{
+  --season-glow1:rgba(210,116,42,.22);
+  --season-glow2:rgba(164,72,37,.16);
+  --season-glow3:rgba(228,167,70,.14);
+  --season-particle:#d9863b;
+  --season-particle-alt:#b95732;
+}
+:root[data-season="fall"] .seasonal-layer{
+  background-color:rgba(78,37,13,.035);
+}
+:root[data-season="fall"] .seasonal-layer:after{
+  opacity:.045;
+}
+:root[data-season="fall"] .seasonal-particle{
+  display:block;
+  bottom:auto;
+  top:-12vh;
+  width:10px;
+  height:7px;
+  border-radius:78% 12% 72% 18%;
+  background:#d8873a;
+  box-shadow:none;
+  filter:drop-shadow(0 2px 2px rgba(46,22,8,.20));
+  opacity:.72;
+  transform-origin:45% 50%;
+  animation:fall-leaf-drift var(--particle-duration) linear infinite;
+  animation-delay:var(--particle-delay);
+}
+:root[data-season="fall"] .seasonal-particle::after{
+  content:"";
+  position:absolute;
+  left:47%;
+  top:50%;
+  width:5px;
+  height:1px;
+  border-radius:999px;
+  background:rgba(79,39,15,.50);
+  transform:rotate(-35deg);
+  transform-origin:left center;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(3n){
+  width:8px;
+  height:6px;
+  background:#c85c35;
+  border-radius:70% 18% 78% 12%;
+  animation-name:fall-leaf-drift-alt;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(4n){
+  width:11px;
+  height:8px;
+  background:#e5ab45;
+  opacity:.66;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(5n){
+  width:7px;
+  height:10px;
+  background:#a94e2e;
+  opacity:.62;
+  border-radius:76% 16% 68% 20%;
+  animation-name:fall-leaf-drift-alt;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(7n){
+  background:#d06d2f;
+}
+:root[data-season="fall"][data-season-intensity="extra"] .seasonal-particle:nth-child(n+35){
+  display:none!important;
+}
+
+@keyframes fall-leaf-drift{
+  0%{
+    transform:translate3d(-14px,-10vh,0) rotate3d(.4,1,.2,0deg);
+    opacity:0;
+  }
+  8%{opacity:.72}
+  28%{
+    transform:translate3d(18px,27vh,0) rotate3d(.8,.4,.3,150deg);
+  }
+  52%{
+    transform:translate3d(-12px,55vh,0) rotate3d(.3,.8,.5,300deg);
+  }
+  74%{
+    transform:translate3d(26px,80vh,0) rotate3d(.7,.3,.8,430deg);
+    opacity:.66;
+  }
+  100%{
+    transform:translate3d(5px,118vh,0) rotate3d(.5,.9,.4,610deg);
+    opacity:0;
+  }
+}
+@keyframes fall-leaf-drift-alt{
+  0%{
+    transform:translate3d(18px,-10vh,0) rotate3d(.8,.3,.5,25deg);
+    opacity:0;
+  }
+  10%{opacity:.68}
+  32%{
+    transform:translate3d(-20px,31vh,0) rotate3d(.3,.9,.4,180deg);
+  }
+  58%{
+    transform:translate3d(14px,61vh,0) rotate3d(.7,.4,.7,335deg);
+  }
+  79%{
+    transform:translate3d(-18px,86vh,0) rotate3d(.4,.8,.2,470deg);
+    opacity:.60;
+  }
+  100%{
+    transform:translate3d(12px,118vh,0) rotate3d(.7,.5,.5,640deg);
+    opacity:0;
+  }
+}
+
+.setting-switch{
+  position:relative;
+  flex:0 0 48px;
+  width:48px;
+  height:28px;
+}
+.setting-switch input{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  margin:0;
+  opacity:0;
+  cursor:pointer;
+  z-index:2;
+}
+.setting-switch .switch{
+  display:block;
+}
+.setting-switch input:checked + .switch{
+  background:var(--blue2);
+}
+.setting-switch input:checked + .switch:after{
+  transform:translateX(20px);
+}
+.setting-switch input:focus-visible + .switch{
+  outline:2px solid var(--blue);
+  outline-offset:3px;
+}
+
+
+/* v1.8.0-preview.28 — denser Fall / Thanksgiving leaves. */
+:root[data-season="fall"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+21){
+  display:none!important;
+}
+:root[data-season="fall"][data-season-intensity="normal"] .seasonal-particle:nth-child(n+39){
+  display:none!important;
+}
+:root[data-season="fall"][data-season-intensity="extra"] .seasonal-particle{
+  display:block!important;
+}
+:root[data-season="fall"] .seasonal-particle{
+  opacity:.82;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(3n){
+  opacity:.76;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(4n){
+  opacity:.78;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(5n){
+  opacity:.72;
+}
+
+
+/* v1.8.0-preview.29 — Full Liquid Glass A/B/C study.
+   Lower-opacity lenses, stronger refraction, brighter optical edges. */
+:root[data-preview-surface="liquid"]{
+  --glass:rgba(126,136,153,.055);
+  --glass-strong:rgba(118,128,147,.105);
+  --glass-thin:rgba(136,146,163,.045);
+  --glass-mid:rgba(130,140,158,.070);
+  --glass-thick:rgba(120,131,151,.110);
+  --glass-edge:rgba(255,255,255,.285);
+  --glass-edge-soft:rgba(255,255,255,.145);
+  --glass-shadow:rgba(0,0,0,.13);
+  --border:rgba(255,255,255,.19);
+  --hair:rgba(255,255,255,.090);
+  --shadow:0 24px 76px rgba(0,0,0,.16);
+}
+:root[data-theme="light"][data-preview-surface="liquid"]{
+  --glass:rgba(255,255,255,.135);
+  --glass-strong:rgba(255,255,255,.225);
+  --glass-thin:rgba(255,255,255,.105);
+  --glass-mid:rgba(255,255,255,.155);
+  --glass-thick:rgba(255,255,255,.235);
+  --glass-edge:rgba(255,255,255,.88);
+  --glass-edge-soft:rgba(255,255,255,.58);
+  --glass-shadow:rgba(65,74,90,.09);
+  --border:rgba(255,255,255,.72);
+  --hair:rgba(50,60,75,.075);
+  --shadow:0 22px 62px rgba(70,82,100,.10);
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"]{
+    --glass:rgba(255,255,255,.135);
+    --glass-strong:rgba(255,255,255,.225);
+    --glass-thin:rgba(255,255,255,.105);
+    --glass-mid:rgba(255,255,255,.155);
+    --glass-thick:rgba(255,255,255,.235);
+    --glass-edge:rgba(255,255,255,.88);
+    --glass-edge-soft:rgba(255,255,255,.58);
+    --glass-shadow:rgba(65,74,90,.09);
+    --border:rgba(255,255,255,.72);
+    --hair:rgba(50,60,75,.075);
+    --shadow:0 22px 62px rgba(70,82,100,.10);
+  }
+}
+
+/* Generic glass gets almost-clear fill; the background does the coloring. */
+:root[data-preview-surface="liquid"] .liquid-glass,
+:root[data-preview-surface="liquid"] .glass-control{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.090),rgba(255,255,255,.010) 38%,rgba(var(--blue-rgb),.018) 100%),
+    var(--glass)!important;
+  border-color:var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.24),
+    inset 1px 0 0 rgba(255,255,255,.075),
+    inset 0 -1px 0 rgba(0,0,0,.055),
+    0 18px 46px var(--glass-shadow)!important;
+  backdrop-filter:blur(38px) saturate(185%) contrast(105%) brightness(1.025)!important;
+  -webkit-backdrop-filter:blur(38px) saturate(185%) contrast(105%) brightness(1.025)!important;
+}
+
+/* Thin lenses: ride/watch cards should visibly transmit the ambient color behind them. */
+:root[data-preview-surface="liquid"] .ride-card,
+:root[data-preview-surface="liquid"] .watch-card{
+  position:relative;
+  background:
+    linear-gradient(150deg,rgba(255,255,255,.085) 0%,rgba(255,255,255,.012) 34%,transparent 62%,rgba(var(--blue-rgb),.022) 100%),
+    var(--glass-thin)!important;
+  border:1px solid var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.28),
+    inset 1px 0 0 rgba(255,255,255,.075),
+    inset 0 -1px 0 rgba(0,0,0,.055),
+    0 15px 42px var(--glass-shadow)!important;
+  backdrop-filter:blur(34px) saturate(195%) contrast(105%) brightness(1.025)!important;
+  -webkit-backdrop-filter:blur(34px) saturate(195%) contrast(105%) brightness(1.025)!important;
+}
+
+/* Medium lenses keep enough optical mass for text-heavy surfaces. */
+:root[data-preview-surface="liquid"] .hero-card,
+:root[data-preview-surface="liquid"] .settings-group,
+:root[data-preview-surface="liquid"] .toolbar{
+  position:relative;
+  background:
+    linear-gradient(148deg,rgba(255,255,255,.105) 0%,rgba(255,255,255,.015) 36%,transparent 65%,rgba(var(--blue-rgb),.026) 100%),
+    var(--glass-mid)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.32),
+    inset 1px 0 0 rgba(255,255,255,.09),
+    inset 0 -1px 0 rgba(0,0,0,.060),
+    0 20px 54px var(--glass-shadow)!important;
+  backdrop-filter:blur(44px) saturate(205%) contrast(106%) brightness(1.03)!important;
+  -webkit-backdrop-filter:blur(44px) saturate(205%) contrast(106%) brightness(1.03)!important;
+}
+
+/* Thick lenses: navigation and sheets get the strongest "optical glass" treatment. */
+:root[data-preview-surface="liquid"] .bottom-nav,
+:root[data-preview-surface="liquid"] .ride-sheet,
+:root[data-preview-surface="liquid"] .install-help-sheet{
+  position:relative;
+  background:
+    linear-gradient(150deg,rgba(255,255,255,.135) 0%,rgba(255,255,255,.022) 36%,transparent 64%,rgba(var(--blue-rgb),.032) 100%),
+    var(--glass-thick)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.36),
+    inset 1px 0 0 rgba(255,255,255,.105),
+    inset 0 -1px 0 rgba(0,0,0,.075),
+    0 24px 72px rgba(0,0,0,.17)!important;
+  backdrop-filter:blur(54px) saturate(215%) contrast(107%) brightness(1.035)!important;
+  -webkit-backdrop-filter:blur(54px) saturate(215%) contrast(107%) brightness(1.035)!important;
+}
+
+/* Specular highlight/refraction layer: brighter, thinner and more lens-like. */
+:root[data-preview-surface="liquid"] .ride-card::before,
+:root[data-preview-surface="liquid"] .watch-card::before,
+:root[data-preview-surface="liquid"] .hero-card::before,
+:root[data-preview-surface="liquid"] .settings-group::before,
+:root[data-preview-surface="liquid"] .toolbar::before,
+:root[data-preview-surface="liquid"] .bottom-nav::before,
+:root[data-preview-surface="liquid"] .ride-sheet::before,
+:root[data-preview-surface="liquid"] .install-help-sheet::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  z-index:0;
+  background:
+    radial-gradient(120% 76% at 18% -8%,rgba(255,255,255,.22),transparent 42%),
+    linear-gradient(118deg,
+      rgba(255,255,255,.245) 0%,
+      rgba(255,255,255,.075) 12%,
+      transparent 29%,
+      transparent 73%,
+      rgba(var(--blue-rgb),.055) 100%)!important;
+  opacity:.92;
+}
+:root[data-preview-surface="liquid"] .ride-card>*,
+:root[data-preview-surface="liquid"] .watch-card>*,
+:root[data-preview-surface="liquid"] .hero-card>*,
+:root[data-preview-surface="liquid"] .settings-group>*,
+:root[data-preview-surface="liquid"] .toolbar>*,
+:root[data-preview-surface="liquid"] .bottom-nav>*,
+:root[data-preview-surface="liquid"] .ride-sheet>*,
+:root[data-preview-surface="liquid"] .install-help-sheet>*{
+  position:relative;
+  z-index:1;
+}
+
+/* Keep selected/watching states glassy: accent belongs on edges and icons, not opaque fills. */
+:root[data-preview-surface="liquid"] .ride-card.watching{
+  background:
+    linear-gradient(150deg,rgba(255,255,255,.095),rgba(255,255,255,.014) 44%,rgba(var(--blue-rgb),.030)),
+    var(--glass-thin)!important;
+  border-color:rgba(var(--blue-rgb),.34)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.30),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.055),
+    0 16px 44px var(--glass-shadow)!important;
+}
+:root[data-preview-surface="liquid"] .park-chip.active,
+:root[data-preview-surface="liquid"] .filter-button.active,
+:root[data-preview-surface="liquid"] .nav-item.active,
+:root[data-preview-surface="liquid"] .mini-toggle.active{
+  background:rgba(255,255,255,.040)!important;
+  border-color:rgba(var(--blue-rgb),.32)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.16),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.07)!important;
+  color:var(--blue);
+}
+
+:root[data-preview-surface="liquid"] .search{
+  background:rgba(20,24,31,.085)!important;
+  border-color:var(--glass-edge-soft)!important;
+  backdrop-filter:blur(34px) saturate(185%)!important;
+  -webkit-backdrop-filter:blur(34px) saturate(185%)!important;
+}
+:root[data-theme="light"][data-preview-surface="liquid"] .search{
+  background:rgba(255,255,255,.16)!important;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"] .search{
+    background:rgba(255,255,255,.16)!important;
+  }
+}
+
+
+/* v1.8.0-preview.30 — Apple-style refractive Liquid Glass.
+   Clearer centers, stronger lens rims, brighter speculars, subtle motion. */
+:root[data-preview-surface="liquid"]{
+  --glass:rgba(142,151,168,.070);
+  --glass-strong:rgba(132,142,160,.120);
+  --glass-thin:rgba(148,158,176,.060);
+  --glass-mid:rgba(140,151,170,.090);
+  --glass-thick:rgba(130,141,162,.145);
+  --glass-edge:rgba(255,255,255,.38);
+  --glass-edge-soft:rgba(255,255,255,.18);
+  --glass-shadow:rgba(0,0,0,.14);
+  --border:rgba(255,255,255,.23);
+  --hair:rgba(255,255,255,.105);
+  --shadow:0 25px 78px rgba(0,0,0,.17);
+}
+:root[data-theme="light"][data-preview-surface="liquid"]{
+  --glass:rgba(255,255,255,.16);
+  --glass-strong:rgba(255,255,255,.25);
+  --glass-thin:rgba(255,255,255,.13);
+  --glass-mid:rgba(255,255,255,.19);
+  --glass-thick:rgba(255,255,255,.29);
+  --glass-edge:rgba(255,255,255,.94);
+  --glass-edge-soft:rgba(255,255,255,.66);
+  --glass-shadow:rgba(62,72,88,.10);
+  --border:rgba(255,255,255,.78);
+  --hair:rgba(50,60,75,.08);
+  --shadow:0 23px 64px rgba(70,82,100,.11);
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"]{
+    --glass:rgba(255,255,255,.16);
+    --glass-strong:rgba(255,255,255,.25);
+    --glass-thin:rgba(255,255,255,.13);
+    --glass-mid:rgba(255,255,255,.19);
+    --glass-thick:rgba(255,255,255,.29);
+    --glass-edge:rgba(255,255,255,.94);
+    --glass-edge-soft:rgba(255,255,255,.66);
+    --glass-shadow:rgba(62,72,88,.10);
+    --border:rgba(255,255,255,.78);
+    --hair:rgba(50,60,75,.08);
+    --shadow:0 23px 64px rgba(70,82,100,.11);
+  }
+}
+
+:root[data-preview-surface="liquid"] .liquid-glass,
+:root[data-preview-surface="liquid"] .glass-control,
+:root[data-preview-surface="liquid"] .ride-card,
+:root[data-preview-surface="liquid"] .watch-card,
+:root[data-preview-surface="liquid"] .hero-card,
+:root[data-preview-surface="liquid"] .settings-group,
+:root[data-preview-surface="liquid"] .toolbar,
+:root[data-preview-surface="liquid"] .bottom-nav,
+:root[data-preview-surface="liquid"] .ride-sheet,
+:root[data-preview-surface="liquid"] .install-help-sheet{
+  --glass-interaction-shift:0px;
+  isolation:isolate;
+}
+
+/* Less blur is deliberate: this should look clear/wet, not frosted. */
+:root[data-preview-surface="liquid"] .liquid-glass,
+:root[data-preview-surface="liquid"] .glass-control{
+  background:
+    radial-gradient(110% 72% at 12% -12%,rgba(255,255,255,.11),transparent 48%),
+    linear-gradient(145deg,rgba(255,255,255,.068),rgba(255,255,255,.008) 42%,rgba(var(--blue-rgb),.020) 100%),
+    var(--glass)!important;
+  border-color:var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.34),
+    inset 1px 0 0 rgba(255,255,255,.10),
+    inset 0 -1px 0 rgba(0,0,0,.06),
+    inset 0 0 0 1px rgba(255,255,255,.035),
+    0 18px 48px var(--glass-shadow)!important;
+  backdrop-filter:blur(20px) saturate(195%) contrast(107%) brightness(1.035)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(195%) contrast(107%) brightness(1.035)!important;
+}
+
+/* Thin card lenses: clear center, crisp rim, background color stays readable through them. */
+:root[data-preview-surface="liquid"] .ride-card,
+:root[data-preview-surface="liquid"] .watch-card{
+  overflow:hidden;
+  background:
+    radial-gradient(110% 75% at 12% -10%,rgba(255,255,255,.105),transparent 48%),
+    linear-gradient(150deg,rgba(255,255,255,.060) 0%,rgba(255,255,255,.008) 36%,transparent 65%,rgba(var(--blue-rgb),.026) 100%),
+    var(--glass-thin)!important;
+  border:1px solid var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.42),
+    inset 1px 0 0 rgba(255,255,255,.12),
+    inset -1px 0 0 rgba(var(--blue-rgb),.035),
+    inset 0 -1px 0 rgba(0,0,0,.065),
+    inset 0 0 18px rgba(var(--blue-rgb),.012),
+    0 15px 42px var(--glass-shadow)!important;
+  backdrop-filter:blur(14px) saturate(205%) contrast(108%) brightness(1.04)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(205%) contrast(108%) brightness(1.04)!important;
+}
+
+/* Medium lenses: more optical depth without turning opaque. */
+:root[data-preview-surface="liquid"] .hero-card,
+:root[data-preview-surface="liquid"] .settings-group,
+:root[data-preview-surface="liquid"] .toolbar{
+  overflow:hidden;
+  background:
+    radial-gradient(115% 80% at 14% -12%,rgba(255,255,255,.13),transparent 50%),
+    linear-gradient(148deg,rgba(255,255,255,.080) 0%,rgba(255,255,255,.010) 39%,transparent 67%,rgba(var(--blue-rgb),.030) 100%),
+    var(--glass-mid)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.46),
+    inset 1px 0 0 rgba(255,255,255,.13),
+    inset -1px 0 0 rgba(var(--blue-rgb),.040),
+    inset 0 -1px 0 rgba(0,0,0,.07),
+    inset 0 0 24px rgba(var(--blue-rgb),.015),
+    0 20px 56px var(--glass-shadow)!important;
+  backdrop-filter:blur(18px) saturate(210%) contrast(109%) brightness(1.045)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(210%) contrast(109%) brightness(1.045)!important;
+}
+
+/* Thick lenses stay readable but still clearly transparent. */
+:root[data-preview-surface="liquid"] .bottom-nav,
+:root[data-preview-surface="liquid"] .ride-sheet,
+:root[data-preview-surface="liquid"] .install-help-sheet{
+  overflow:hidden;
+  background:
+    radial-gradient(120% 84% at 15% -14%,rgba(255,255,255,.16),transparent 51%),
+    linear-gradient(150deg,rgba(255,255,255,.100) 0%,rgba(255,255,255,.014) 39%,transparent 68%,rgba(var(--blue-rgb),.036) 100%),
+    var(--glass-thick)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.50),
+    inset 1px 0 0 rgba(255,255,255,.15),
+    inset -1px 0 0 rgba(var(--blue-rgb),.05),
+    inset 0 -1px 0 rgba(0,0,0,.085),
+    inset 0 0 30px rgba(var(--blue-rgb),.018),
+    0 24px 74px rgba(0,0,0,.18)!important;
+  backdrop-filter:blur(25px) saturate(220%) contrast(110%) brightness(1.05)!important;
+  -webkit-backdrop-filter:blur(25px) saturate(220%) contrast(110%) brightness(1.05)!important;
+}
+
+/* Moving caustic/specular sheet. Scroll only shifts this compositor layer. */
+:root[data-preview-surface="liquid"] .ride-card::before,
+:root[data-preview-surface="liquid"] .watch-card::before,
+:root[data-preview-surface="liquid"] .hero-card::before,
+:root[data-preview-surface="liquid"] .settings-group::before,
+:root[data-preview-surface="liquid"] .toolbar::before,
+:root[data-preview-surface="liquid"] .bottom-nav::before,
+:root[data-preview-surface="liquid"] .ride-sheet::before,
+:root[data-preview-surface="liquid"] .install-help-sheet::before{
+  content:"";
+  position:absolute;
+  inset:-7%;
+  border-radius:inherit;
+  pointer-events:none;
+  z-index:0;
+  background:
+    radial-gradient(52% 28% at 18% 4%,rgba(255,255,255,.40),rgba(255,255,255,.10) 32%,transparent 72%),
+    radial-gradient(46% 30% at 88% 96%,rgba(var(--blue-rgb),.125),transparent 72%),
+    linear-gradient(118deg,
+      rgba(255,255,255,.16) 0%,
+      rgba(255,255,255,.055) 12%,
+      transparent 28%,
+      transparent 72%,
+      rgba(var(--blue-rgb),.065) 100%)!important;
+  opacity:.84;
+  transform:translate3d(calc(var(--glass-scroll-x,0px) + var(--glass-interaction-shift)),var(--glass-scroll-y,0px),0) scale(1.06);
+  transform-origin:center;
+  transition:transform .32s cubic-bezier(.2,.7,.2,1),opacity .28s ease;
+  will-change:transform,opacity;
+}
+
+/* Refractive inner rim. Supported browsers intensify only the edge, not the center. */
+:root[data-preview-surface="liquid"] .ride-card::after,
+:root[data-preview-surface="liquid"] .watch-card::after,
+:root[data-preview-surface="liquid"] .hero-card::after,
+:root[data-preview-surface="liquid"] .settings-group::after,
+:root[data-preview-surface="liquid"] .toolbar::after,
+:root[data-preview-surface="liquid"] .bottom-nav::after,
+:root[data-preview-surface="liquid"] .ride-sheet::after,
+:root[data-preview-surface="liquid"] .install-help-sheet::after{
+  content:"";
+  position:absolute;
+  inset:1px;
+  width:auto;
+  height:auto;
+  left:1px;
+  right:1px;
+  top:1px;
+  bottom:1px;
+  border-radius:inherit;
+  padding:1px;
+  pointer-events:none;
+  z-index:0;
+  box-sizing:border-box;
+  background:
+    linear-gradient(135deg,
+      rgba(255,255,255,.62) 0%,
+      rgba(255,255,255,.16) 18%,
+      rgba(255,255,255,.025) 38%,
+      rgba(var(--blue-rgb),.060) 68%,
+      rgba(255,255,255,.22) 100%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  opacity:.92;
+  backdrop-filter:saturate(245%) contrast(112%) brightness(1.08) blur(1.2px);
+  -webkit-backdrop-filter:saturate(245%) contrast(112%) brightness(1.08) blur(1.2px);
+}
+
+:root[data-preview-surface="liquid"] .ride-card>*,
+:root[data-preview-surface="liquid"] .watch-card>*,
+:root[data-preview-surface="liquid"] .hero-card>*,
+:root[data-preview-surface="liquid"] .settings-group>*,
+:root[data-preview-surface="liquid"] .toolbar>*,
+:root[data-preview-surface="liquid"] .bottom-nav>*,
+:root[data-preview-surface="liquid"] .ride-sheet>*,
+:root[data-preview-surface="liquid"] .install-help-sheet>*{
+  position:relative;
+  z-index:1;
+}
+
+/* Wet-glass interaction: move the highlight, not the entire component. */
+@media(hover:hover){
+  :root[data-preview-surface="liquid"] .ride-card:hover,
+  :root[data-preview-surface="liquid"] .watch-card:hover,
+  :root[data-preview-surface="liquid"] .hero-card:hover,
+  :root[data-preview-surface="liquid"] .toolbar:hover,
+  :root[data-preview-surface="liquid"] .settings-group:hover{
+    --glass-interaction-shift:6px;
+  }
+  :root[data-preview-surface="liquid"] .ride-card:hover::before,
+  :root[data-preview-surface="liquid"] .watch-card:hover::before,
+  :root[data-preview-surface="liquid"] .hero-card:hover::before,
+  :root[data-preview-surface="liquid"] .toolbar:hover::before,
+  :root[data-preview-surface="liquid"] .settings-group:hover::before{
+    opacity:.98;
+  }
+}
+:root[data-preview-surface="liquid"] .ride-card:active,
+:root[data-preview-surface="liquid"] .watch-card:active,
+:root[data-preview-surface="liquid"] .hero-card:active,
+:root[data-preview-surface="liquid"] .bottom-nav:active{
+  --glass-interaction-shift:-3px;
+}
+:root[data-preview-surface="liquid"] .toolbar:focus-within,
+:root[data-preview-surface="liquid"] .settings-group:focus-within,
+:root[data-preview-surface="liquid"] .ride-sheet:focus-within{
+  --glass-interaction-shift:4px;
+}
+
+/* Watching stays transparent; selection is communicated by a brighter refractive edge. */
+:root[data-preview-surface="liquid"] .ride-card.watching{
+  background:
+    radial-gradient(110% 75% at 12% -10%,rgba(255,255,255,.11),transparent 48%),
+    linear-gradient(150deg,rgba(255,255,255,.066),rgba(255,255,255,.008) 44%,rgba(var(--blue-rgb),.038)),
+    var(--glass-thin)!important;
+  border-color:rgba(var(--blue-rgb),.40)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.45),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.07),
+    inset 0 0 18px rgba(var(--blue-rgb),.016),
+    0 16px 44px var(--glass-shadow)!important;
+}
+
+:root[data-preview-surface="liquid"] .search{
+  background:rgba(18,23,31,.065)!important;
+  border-color:var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.13),
+    inset 0 0 0 1px rgba(255,255,255,.025)!important;
+  backdrop-filter:blur(12px) saturate(195%) contrast(106%)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(195%) contrast(106%)!important;
+}
+:root[data-theme="light"][data-preview-surface="liquid"] .search{
+  background:rgba(255,255,255,.13)!important;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"] .search{
+    background:rgba(255,255,255,.13)!important;
+  }
+}
+
+/* Light mode needs less highlight intensity because the environment is already bright. */
+:root[data-theme="light"][data-preview-surface="liquid"] .ride-card::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .watch-card::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .hero-card::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .settings-group::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .toolbar::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .bottom-nav::before{
+  opacity:.58;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"] .ride-card::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .watch-card::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .hero-card::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .settings-group::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .toolbar::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .bottom-nav::before{
+    opacity:.58;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  :root[data-preview-surface="liquid"] .ride-card::before,
+  :root[data-preview-surface="liquid"] .watch-card::before,
+  :root[data-preview-surface="liquid"] .hero-card::before,
+  :root[data-preview-surface="liquid"] .settings-group::before,
+  :root[data-preview-surface="liquid"] .toolbar::before,
+  :root[data-preview-surface="liquid"] .bottom-nav::before,
+  :root[data-preview-surface="liquid"] .ride-sheet::before,
+  :root[data-preview-surface="liquid"] .install-help-sheet::before{
+    transform:scale(1.06)!important;
+    transition:none!important;
+  }
+}
+
+
+/* v1.8.0-preview.31 — Liquid Glass is material-only.
+   Restore layout-sensitive positioning inherited from the base UI. */
+:root[data-preview-surface="liquid"] .bottom-nav{
+  position:fixed!important;
+  left:50%!important;
+  transform:translateX(-50%)!important;
+}
+:root[data-preview-surface="liquid"] .ride-sheet{
+  position:fixed!important;
+  left:50%!important;
+}
+:root[data-preview-surface="liquid"] .install-help-sheet{
+  position:fixed!important;
+}
+
+/* Desktop geometry must remain identical to Original/Frosted. */
+@media(min-width:1024px){
+  :root[data-preview-surface="liquid"] .bottom-nav{
+    top:16px!important;
+    bottom:auto!important;
+    width:auto!important;
+    height:52px!important;
+    min-height:52px!important;
+    grid-template-columns:repeat(3,auto)!important;
+    padding:5px!important;
+    border-radius:19px!important;
+  }
+}
+
+/* Phone geometry must remain identical to the base mobile dock. */
+@media(max-width:640px){
+  :root[data-preview-surface="liquid"] .bottom-nav{
+    top:auto!important;
+    bottom:calc(8px + var(--safe-bottom))!important;
+    width:min(460px,calc(100% - 20px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)))!important;
+    height:var(--nav-h)!important;
+    min-height:var(--nav-h)!important;
+    grid-template-columns:repeat(3,1fr)!important;
+    padding:7px!important;
+    border-radius:25px!important;
+  }
+}
+
+
+/* v1.8.0-preview.32 — black canvas + colorless Liquid Glass + instant color response. */
+
+/* Full Liquid Glass gets a true-black dark canvas. Accent/season layers provide the color. */
+:root[data-preview-surface="liquid"][data-theme="dark"]{
+  --bg:#000;
+  --bg2:#000;
+  --glass:rgba(255,255,255,.040);
+  --glass-strong:rgba(255,255,255,.080);
+  --glass-thin:rgba(255,255,255,.030);
+  --glass-mid:rgba(255,255,255,.050);
+  --glass-thick:rgba(255,255,255,.085);
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="liquid"][data-theme="system"]{
+    --bg:#000;
+    --bg2:#000;
+    --glass:rgba(255,255,255,.040);
+    --glass-strong:rgba(255,255,255,.080);
+    --glass-thin:rgba(255,255,255,.030);
+    --glass-mid:rgba(255,255,255,.050);
+    --glass-thick:rgba(255,255,255,.085);
+  }
+}
+
+:root[data-preview-surface="liquid"][data-theme="dark"] html,
+:root[data-preview-surface="liquid"][data-theme="dark"] body{
+  background-color:#000!important;
+}
+:root[data-preview-surface="liquid"][data-theme="dark"] body{
+  background:
+    radial-gradient(circle at 84% 4%,rgba(var(--blue2-rgb),.145),transparent 34rem),
+    radial-gradient(circle at 8% 54%,rgba(var(--blue-rgb),.075),transparent 30rem),
+    #000!important;
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="liquid"][data-theme="system"] html,
+  :root[data-preview-surface="liquid"][data-theme="system"] body{
+    background-color:#000!important;
+  }
+  :root[data-preview-surface="liquid"][data-theme="system"] body{
+    background:
+      radial-gradient(circle at 84% 4%,rgba(var(--blue2-rgb),.145),transparent 34rem),
+      radial-gradient(circle at 8% 54%,rgba(var(--blue-rgb),.075),transparent 30rem),
+      #000!important;
+  }
+}
+
+/* Neutral lenses: no built-in blue/gray tint. Accent color is opt-in at the refractive edges. */
+:root[data-preview-surface="liquid"] .search{
+  background:rgba(0,0,0,.055)!important;
+}
+
+/* Color changes must snap. Only transforms/opacity keep motion easing. */
+:root[data-preview-surface="liquid"] .ride-card,
+:root[data-preview-surface="liquid"] .watch-card,
+:root[data-preview-surface="liquid"] .park-chip,
+:root[data-preview-surface="liquid"] .nav-item,
+:root[data-preview-surface="liquid"] .filter-button,
+:root[data-preview-surface="liquid"] .setting-action,
+:root[data-preview-surface="liquid"] .mini-toggle,
+:root[data-preview-surface="liquid"] .icon-button,
+:root[data-preview-surface="liquid"] .watch-button,
+:root[data-preview-surface="liquid"] .liquid-glass,
+:root[data-preview-surface="liquid"] .glass-control{
+  transition-property:transform,opacity!important;
+}
+
+/* One-frame repaint state used when accent/theme/season/surface changes. */
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-card,
+:root.glass-color-snap[data-preview-surface="liquid"] .watch-card,
+:root.glass-color-snap[data-preview-surface="liquid"] .hero-card,
+:root.glass-color-snap[data-preview-surface="liquid"] .settings-group,
+:root.glass-color-snap[data-preview-surface="liquid"] .toolbar,
+:root.glass-color-snap[data-preview-surface="liquid"] .bottom-nav,
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-sheet,
+:root.glass-color-snap[data-preview-surface="liquid"] .install-help-sheet,
+:root.glass-color-snap[data-preview-surface="liquid"] .seasonal-layer,
+:root.glass-color-snap[data-preview-surface="liquid"] .ambient{
+  transition:none!important;
+}
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-card::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .watch-card::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .hero-card::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .settings-group::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .toolbar::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .bottom-nav::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-sheet::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .install-help-sheet::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-card::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .watch-card::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .hero-card::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .settings-group::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .toolbar::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .bottom-nav::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-sheet::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .install-help-sheet::after{
+  transition:none!important;
+}
+
+
+/* v1.8.0-preview.34 — darker Neutral Frosted Glass in dark mode. */
+:root[data-preview-surface="neutral"][data-theme="dark"]{
+  --glass:rgba(46,52,62,.23);
+  --glass-strong:rgba(38,44,54,.38);
+  --glass-thin:rgba(56,62,72,.145);
+  --glass-mid:rgba(48,54,65,.205);
+  --glass-thick:rgba(40,46,57,.305);
+  --glass-edge:rgba(255,255,255,.20);
+  --glass-edge-soft:rgba(255,255,255,.095);
+  --glass-shadow:rgba(0,0,0,.23);
+  --border:rgba(235,240,248,.14);
+  --hair:rgba(235,240,248,.075);
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="neutral"][data-theme="system"]{
+    --glass:rgba(46,52,62,.23);
+    --glass-strong:rgba(38,44,54,.38);
+    --glass-thin:rgba(56,62,72,.145);
+    --glass-mid:rgba(48,54,65,.205);
+    --glass-thick:rgba(40,46,57,.305);
+    --glass-edge:rgba(255,255,255,.20);
+    --glass-edge-soft:rgba(255,255,255,.095);
+    --glass-shadow:rgba(0,0,0,.23);
+    --border:rgba(235,240,248,.14);
+    --hair:rgba(235,240,248,.075);
+  }
+}
+:root[data-preview-surface="neutral"][data-theme="dark"] .search{
+  background:rgba(7,9,13,.24)!important;
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="neutral"][data-theme="system"] .search{
+    background:rgba(7,9,13,.24)!important;
+  }
+}
+
+
+/* v1.8.0-preview.34 — preserve Liquid Glass compositor layers across page changes. */
+:root[data-preview-surface="liquid"] .view-panel.active{
+  animation:none!important;
+}
+:root[data-preview-surface="liquid"] .view-panel{
+  transform:none;
+}
+
+
+/* 1.8 production — public Frosted/Liquid glass choice. */
+:root[data-preview-surface="neutral"][data-theme="dark"]{
+  --bg:#000;--bg2:#000;
+  --glass:rgba(52,52,54,.24);--glass-strong:rgba(42,42,45,.40);
+  --glass-thin:rgba(60,60,63,.15);--glass-mid:rgba(51,51,54,.215);--glass-thick:rgba(43,43,47,.32);
+  --glass-edge:rgba(255,255,255,.20);--glass-edge-soft:rgba(255,255,255,.095);
+  --glass-shadow:rgba(0,0,0,.24);--border:rgba(255,255,255,.14);--hair:rgba(255,255,255,.075);
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="neutral"][data-theme="system"]{
+    --bg:#000;--bg2:#000;
+    --glass:rgba(52,52,54,.24);--glass-strong:rgba(42,42,45,.40);
+    --glass-thin:rgba(60,60,63,.15);--glass-mid:rgba(51,51,54,.215);--glass-thick:rgba(43,43,47,.32);
+    --glass-edge:rgba(255,255,255,.20);--glass-edge-soft:rgba(255,255,255,.095);
+    --glass-shadow:rgba(0,0,0,.24);--border:rgba(255,255,255,.14);--hair:rgba(255,255,255,.075);
+  }
+}
+:root[data-preview-surface="neutral"][data-theme="dark"] body{
+  background:radial-gradient(circle at 82% 4%,rgba(var(--blue2-rgb),.16),transparent 32rem),radial-gradient(circle at 5% 48%,rgba(var(--blue-rgb),.085),transparent 30rem),#000!important;
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="neutral"][data-theme="system"] body{
+    background:radial-gradient(circle at 82% 4%,rgba(var(--blue2-rgb),.16),transparent 32rem),radial-gradient(circle at 5% 48%,rgba(var(--blue-rgb),.085),transparent 30rem),#000!important;
+  }
+}
+:root[data-preview-surface="neutral"] .liquid-glass,
+:root[data-preview-surface="neutral"] .glass-control{
+  background:linear-gradient(145deg,rgba(255,255,255,.105),rgba(255,255,255,.026)),linear-gradient(160deg,rgba(255,255,255,.026),rgba(0,0,0,.035)),var(--glass)!important;
+}
+:root[data-preview-surface="neutral"][data-theme="dark"] .search{background:rgba(0,0,0,.25)!important}
+@media(prefers-color-scheme:dark){:root[data-preview-surface="neutral"][data-theme="system"] .search{background:rgba(0,0,0,.25)!important}}
+
+.glass-style-picker{display:grid!important;grid-template-columns:repeat(2,minmax(74px,1fr));gap:4px!important;padding:4px;border:1px solid var(--hair);border-radius:14px;background:rgba(255,255,255,.035);flex:0 0 auto}
+.glass-style-picker button{border:0;min-height:36px;padding:7px 12px;border-radius:10px;background:transparent;color:var(--muted);font-size:.78rem;font-weight:800;transition:transform .12s ease}
+.glass-style-picker button.active{color:var(--text);background:rgba(255,255,255,.10);box-shadow:inset 0 1px rgba(255,255,255,.16),0 4px 14px rgba(0,0,0,.10)}
+:root[data-preview-surface="liquid"] .glass-style-picker button.active{background:rgba(255,255,255,.055);box-shadow:inset 0 0 0 1px rgba(var(--blue-rgb),.22)}
+@media(max-width:420px){.glass-style-setting{align-items:center}.glass-style-picker{grid-template-columns:repeat(2,minmax(66px,1fr))}.glass-style-picker button{padding-inline:9px}}
+

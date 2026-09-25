@@ -4484,3 +4484,18 @@ body{
     transform:translate(-50%,-50%)!important;
   }
 }
+
+
+/* v1.8.4 — hide desktop ride-sheet scrollbars without disabling scroll */
+@media (min-width:1024px){
+  .ride-sheet{
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+    overflow-x:hidden!important;
+  }
+  .ride-sheet::-webkit-scrollbar{
+    width:0;
+    height:0;
+    display:none;
+  }
+}

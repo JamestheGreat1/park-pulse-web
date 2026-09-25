@@ -6,7 +6,7 @@ This branch is the protected test bed for ParkPulse features before they move to
 
 `preview/seasonal-overlays`
 
-Preview version: `1.9.0-preview.1`
+Preview version: `1.9.0-preview.2`
 
 Production `main` remains unchanged until the preview work is explicitly approved.
 
@@ -72,7 +72,7 @@ The preview build routes API and push requests through the preview Worker, which
 ## Preview deployment files
 
 - `wrangler.jsonc` — preview Worker + static assets
-- `preview-worker.js` — routes API paths through the `parkpulse-api` service binding
+- `preview-worker.js` — proxies API paths server-side to the production ParkPulse API
 - `assets/js/config.js` — uses the preview origin as `WORKER_BASE`
 
-The production branch does not need these preview-only routing files.
+The production branch does not need these preview-only routing files. The preview badge intentionally says **Feature Preview** rather than naming a seasonal test.

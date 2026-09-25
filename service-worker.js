@@ -1,4 +1,4 @@
-const CACHE_NAME = "parkpulse-1.7.14-accent-depth-shell";
+const CACHE_NAME = "parkpulse-1.7.14-final-shell";
 const VERSION = "1.7.14";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
   ...["app", "api", "data", "store", "push", "config"].map(name => `./assets/js/${name}.js?v=${VERSION}`),

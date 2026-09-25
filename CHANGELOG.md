@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.8 — 2026-09-25
+
+- Tightened desktop ride-sheet spacing and reduced the modal to a denser 640px layout while keeping viewport-capped scrolling.
+- Shortened the desktop wait-history chart and compacted the stats, trend, and watch-control sections so the sheet reads more like a desktop form.
+- Removed the duplicate divider below wait history so watch controls use one clean separator per section.
+- Removed the mobile Liquid Glass inner overlay layers from scrollable ride sheets to eliminate dark bands and doubled-looking lines while preserving the outer glass treatment.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.7 — 2026-09-25
 
 - Resized desktop ride sheets to a more compact 680px modal so they fit normal monitor layouts more comfortably.

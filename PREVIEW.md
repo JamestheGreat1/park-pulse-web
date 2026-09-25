@@ -17,9 +17,9 @@ This build intentionally keeps the PWA small. After testing a broader native-app
 The preview now tests only:
 
 - **Next Up** — one useful ride recommendation at a time, with **View ride** and **Show another**.
-- **Recommendation explanations** — short, factual context based on must-dos, favorites, live waits, and the existing historical comparison.
+- **Recommendation explanations** — short, factual context on Best Now results and ride sheets.
 
-Ride cards stay simple: **Favorite + Alert** only.
+Ride cards stay simple: **Favorite + Alert** only. **For Me** was also removed: Favorites now acts as a filter, so **Favorites + Best Now** already gives a personalized list without a second overlapping sort mode.
 
 No new backend schema or Worker logic is required for these features.
 
@@ -44,6 +44,11 @@ The preview Worker routes API, health, and push requests through the `PARKPULSE_
 - Confirm “% below/better than typical” only appears when ParkPulse has an eligible baseline.
 - Confirm the top Best Now / For me cards get compact explanation copy.
 - Confirm ride sheets show the same factual ParkPulse context.
+
+### Favorites + sorting
+- Confirm the sort menu contains only **Best now**, **Lowest wait**, and **A–Z**.
+- Confirm **Favorites + Best now** shows only favorites while preserving Best Now ordering.
+- Confirm an old saved `personal` sort automatically falls back to Best Now.
 
 ### Ride-card simplicity
 - Confirm each ride card has only **Favorite** and **Alert** controls.

@@ -413,3 +413,16 @@ test('desktop wait-target controls stay grouped', () => {
   assert.match(finalDesktop, /justify-content:end/);
   assert.match(finalDesktop, /min-width:68px/);
 });
+
+
+test('mobile ride sheets override glass overflow and remain scrollable', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('mobile ride sheets must stay vertically scrollable');
+  assert.ok(marker >= 0);
+  const mobile = css.slice(marker);
+  assert.match(mobile, /@media \(max-width:1023px\)/);
+  assert.match(mobile, /overflow-y:auto!important/);
+  assert.match(mobile, /overflow-x:hidden!important/);
+  assert.match(mobile, /-webkit-overflow-scrolling:touch/);
+  assert.match(mobile, /padding-bottom:calc\(34px \+ env\(safe-area-inset-bottom,0px\)\)!important/);
+});

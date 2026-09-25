@@ -2,6 +2,7 @@ const PREVIEW_HOSTS = new Set(["preview.useparkpulse.com", "localhost", "127.0.0
 const PREVIEW_WORKERS_SUFFIX = "-park-pulse-web.jamesp5297.workers.dev";
 const PREVIEW_SEASON_KEY = "parkpulse.preview.season";
 const PREVIEW_INTENSITY_KEY = "parkpulse.preview.seasonIntensity";
+const PREVIEW_SURFACE_KEY = "parkpulse.preview.surface";
 
 export const SEASONS = [
   { id: "auto", label: "Automatic", emoji: "✦" },
@@ -16,6 +17,11 @@ export const INTENSITIES = [
   { id: "subtle", label: "Subtle" },
   { id: "normal", label: "Normal" },
   { id: "extra", label: "Extra" }
+];
+
+export const SURFACES = [
+  { id: "neutral", label: "Neutral frosted glass" },
+  { id: "navy", label: "Current navy glass" }
 ];
 
 function safeGet(key, fallback) {
@@ -95,6 +101,11 @@ export function previewIntensitySetting() {
   return INTENSITIES.some((item) => item.id === value) ? value : "normal";
 }
 
+export function previewSurfaceSetting() {
+  const value = safeGet(PREVIEW_SURFACE_KEY, "neutral");
+  return SURFACES.some((item) => item.id === value) ? value : "neutral";
+}
+
 export function activeSeason(now = new Date()) {
   const forced = requestedPreviewSeason();
   const selected = forced || (isSeasonPreviewEnabled() ? previewSeasonSetting() : "auto");
@@ -133,10 +144,12 @@ function ensurePreviewBadge() {
 export function applySeasonalTheme() {
   const season = activeSeason();
   const intensity = isSeasonPreviewEnabled() ? previewIntensitySetting() : "normal";
+  const surface = isSeasonPreviewEnabled() ? previewSurfaceSetting() : "navy";
   const root = document.documentElement;
 
   root.dataset.season = season;
   root.dataset.seasonIntensity = intensity;
+  root.dataset.previewSurface = surface;
   root.classList.toggle("season-active", season !== "none");
 
   ensureSeasonalLayer();
@@ -148,7 +161,7 @@ export function applySeasonalTheme() {
     badge.textContent = `PREVIEW · ${meta.emoji} ${meta.label} · ${intensity}${forced ? " · URL override" : ""}`;
   }
 
-  return { season, intensity };
+  return { season, intensity, surface };
 }
 
 export function seasonalPreviewControlsMarkup() {
@@ -156,6 +169,7 @@ export function seasonalPreviewControlsMarkup() {
 
   const season = previewSeasonSetting();
   const intensity = previewIntensitySetting();
+  const surface = previewSurfaceSetting();
   const urlOverride = requestedPreviewSeason();
 
   return `
@@ -167,6 +181,9 @@ export function seasonalPreviewControlsMarkup() {
       </label>
       <label class="setting-row"><div><strong>Intensity</strong><small>Testing-only control. Public seasonal effects will use the approved default.</small></div>
         <select id="seasonIntensitySelect">${INTENSITIES.map((item) => `<option value="${item.id}" ${intensity === item.id ? "selected" : ""}>${item.label}</option>`).join("")}</select>
+      </label>
+      <label class="setting-row"><div><strong>Glass style</strong><small>Compare neutral frosted surfaces against the current navy treatment.</small></div>
+        <select id="previewSurfaceSelect">${SURFACES.map((item) => `<option value="${item.id}" ${surface === item.id ? "selected" : ""}>${item.label}</option>`).join("")}</select>
       </label>
     </section>
   `;
@@ -188,6 +205,13 @@ export function bindSeasonalPreviewControls(onChange) {
   const intensity = document.querySelector("#seasonIntensitySelect");
   if (intensity) intensity.onchange = () => {
     safeSet(PREVIEW_INTENSITY_KEY, intensity.value);
+    applySeasonalTheme();
+    onChange?.();
+  };
+
+  const surface = document.querySelector("#previewSurfaceSelect");
+  if (surface) surface.onchange = () => {
+    safeSet(PREVIEW_SURFACE_KEY, surface.value);
     applySeasonalTheme();
     onChange?.();
   };

@@ -4661,6 +4661,9 @@ body{
   color:var(--muted);
   line-height:1.45;
 }
+.park-day-no-next .secondary-button{
+  margin-top:14px;
+}
 .park-day-page-stats{
   margin:0 0 26px;
 }

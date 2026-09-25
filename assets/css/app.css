@@ -3052,3 +3052,48 @@ body{
   .fireworks-field{display:none!important}
 }
 
+
+/* v1.8.0-preview.22 — continuous rocket motion, no positional waypoints. */
+
+/* One uninterrupted transform from below the viewport to the burst point.
+   Twinkle stays on child sparks, so it cannot interfere with rocket movement. */
+.firework-rocket{
+  animation:fw-rocket-flight-continuous var(--fw-duration) cubic-bezier(.22,.58,.28,1) infinite!important;
+  animation-delay:var(--fw-delay)!important;
+  will-change:transform,opacity;
+  transform:translate3d(var(--rocket-x0),100vh,0);
+}
+
+@keyframes fw-rocket-flight-continuous{
+  0%,31%{
+    opacity:0;
+    transform:translate3d(var(--rocket-x0),100vh,0) scale(.84);
+  }
+  34%{
+    opacity:.18;
+  }
+  39%{
+    opacity:.72;
+  }
+  48%{
+    opacity:.96;
+  }
+  58%{
+    opacity:1;
+  }
+  63%{
+    opacity:.98;
+  }
+  65%{
+    opacity:.62;
+  }
+  66%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(1);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(1);
+  }
+}
+

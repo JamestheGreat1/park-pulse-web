@@ -2417,3 +2417,95 @@ body{
   }
 }
 
+
+/* v1.8.0-preview.17 — Safari-safe Minecraft firework motion. */
+:root[data-season="july4"] .seasonal-particle{
+  --mc-mid1:0px;
+  --mc-mid2:0px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){
+  --mc-mid1:6px;
+  --mc-mid2:3px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){
+  --mc-mid1:-8px;
+  --mc-mid2:-4px;
+  --mc-burst:
+       0px -42px 0 -1px currentColor,
+       7px -16px 0 -1px currentColor,
+      32px -25px 0 -1px currentColor,
+      17px  -7px 0 -1px currentColor,
+      40px   4px 0 -1px currentColor,
+      16px  11px 0 -1px currentColor,
+      24px  35px 0 -1px currentColor,
+       5px  19px 0 -1px currentColor,
+     -12px  38px 0 -1px currentColor,
+     -12px  15px 0 -1px currentColor,
+     -37px  21px 0 -1px currentColor,
+     -19px   2px 0 -1px currentColor,
+     -34px -22px 0 -1px currentColor,
+      -8px -18px 0 -1px currentColor;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){
+  --mc-mid1:3px;
+  --mc-mid2:1px;
+}
+
+@keyframes mc-rocket-rise{
+  0%,43%{
+    opacity:0;
+    transform:translate3d(var(--mc-lean),96vh,0) scale(.75);
+  }
+  45%{opacity:.35}
+  50%{
+    opacity:.92;
+    transform:translate3d(var(--mc-mid1),58vh,0) scale(.9);
+  }
+  56%{
+    opacity:1;
+    transform:translate3d(var(--mc-mid2),27vh,0) scale(1);
+  }
+  61%{
+    opacity:.95;
+    transform:translate3d(0,4vh,0) scale(1);
+  }
+  62%,100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.7);
+  }
+}
+
+@keyframes mc-firework-pop{
+  0%,61%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(.08);
+  }
+  62%{
+    opacity:1;
+    transform:rotate(var(--mc-rotate)) scale(.38) scale(var(--mc-burst-scale));
+  }
+  66%{
+    opacity:.96;
+    transform:rotate(var(--mc-rotate)) scale(.72) scale(var(--mc-burst-scale));
+  }
+  71%{
+    opacity:.90;
+    transform:rotate(var(--mc-rotate)) scale(var(--mc-burst-scale));
+  }
+  76%{
+    opacity:.30;
+    transform:rotate(var(--mc-rotate)) scale(1.08) scale(var(--mc-burst-scale));
+  }
+  78%{
+    opacity:.82;
+    transform:rotate(var(--mc-rotate)) scale(1.10) scale(var(--mc-burst-scale));
+  }
+  82%{
+    opacity:.18;
+    transform:rotate(var(--mc-rotate)) scale(1.13) scale(var(--mc-burst-scale));
+  }
+  100%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(1.15) scale(var(--mc-burst-scale));
+  }
+}

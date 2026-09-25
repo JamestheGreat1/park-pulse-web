@@ -1,8 +1,7 @@
 const PREVIEW_HOSTS = new Set(["preview.useparkpulse.com", "localhost", "127.0.0.1"]);
 const PREVIEW_WORKERS_SUFFIX = "-park-pulse-web.jamesp5297.workers.dev";
-const PREVIEW_SEASON_KEY = "parkpulse.preview.season";
-const PREVIEW_INTENSITY_KEY = "parkpulse.preview.seasonIntensity";
-const PREVIEW_SURFACE_KEY = "parkpulse.preview.surface";
+const LEGACY_PREVIEW_SURFACE_KEY = "parkpulse.preview.surface";
+const GLASS_STYLE_KEY = "parkpulse.glassStyle";
 const SEASONAL_EFFECTS_KEY = "parkpulse.seasonalEffects";
 
 export const SEASONS = [
@@ -15,16 +14,9 @@ export const SEASONS = [
   { id: "july4", label: "Fourth of July", emoji: "🎆" }
 ];
 
-export const INTENSITIES = [
-  { id: "subtle", label: "Subtle" },
-  { id: "normal", label: "Normal" },
-  { id: "extra", label: "Extra" }
-];
-
-export const SURFACES = [
-  { id: "neutral", label: "Neutral frosted glass" },
-  { id: "liquid", label: "Full Liquid Glass" },
-  { id: "navy", label: "Current navy glass" }
+export const GLASS_STYLES = [
+  { id: "frosted", label: "Frosted" },
+  { id: "liquid", label: "Liquid" }
 ];
 
 function safeGet(key, fallback) {
@@ -42,6 +34,23 @@ export function seasonalEffectsEnabled() {
 
 export function setSeasonalEffectsEnabled(enabled) {
   safeSet(SEASONAL_EFFECTS_KEY, enabled ? "on" : "off");
+}
+
+export function glassStyleSetting() {
+  const saved = safeGet(GLASS_STYLE_KEY, "");
+  if (saved === "frosted" || saved === "liquid") return saved;
+  const legacy = safeGet(LEGACY_PREVIEW_SURFACE_KEY, "");
+  const migrated = legacy === "liquid" ? "liquid" : "frosted";
+  safeSet(GLASS_STYLE_KEY, migrated);
+  return migrated;
+}
+
+export function setGlassStyleSetting(style) {
+  safeSet(GLASS_STYLE_KEY, style === "liquid" ? "liquid" : "frosted");
+}
+
+function glassSurface() {
+  return glassStyleSetting() === "liquid" ? "liquid" : "neutral";
 }
 
 export function isSeasonPreviewEnabled() {
@@ -112,26 +121,9 @@ function requestedPreviewSeason() {
   return SEASONS.some((item) => item.id === requested) ? requested : null;
 }
 
-export function previewSeasonSetting() {
-  const value = safeGet(PREVIEW_SEASON_KEY, "auto");
-  return SEASONS.some((item) => item.id === value) ? value : "auto";
-}
-
-export function previewIntensitySetting() {
-  const value = safeGet(PREVIEW_INTENSITY_KEY, "normal");
-  return INTENSITIES.some((item) => item.id === value) ? value : "normal";
-}
-
-export function previewSurfaceSetting() {
-  const value = safeGet(PREVIEW_SURFACE_KEY, "neutral");
-  return SURFACES.some((item) => item.id === value) ? value : "neutral";
-}
-
 export function activeSeason(now = new Date()) {
   if (!seasonalEffectsEnabled()) return "none";
-  const forced = requestedPreviewSeason();
-  const selected = forced || (isSeasonPreviewEnabled() ? previewSeasonSetting() : "auto");
-  return selected === "auto" ? automaticSeason(now) : selected;
+  return requestedPreviewSeason() || automaticSeason(now);
 }
 
 
@@ -345,8 +337,8 @@ function ensurePreviewBadge() {
 
 export function applySeasonalTheme() {
   const season = activeSeason();
-  const intensity = isSeasonPreviewEnabled() ? previewIntensitySetting() : "normal";
-  const surface = isSeasonPreviewEnabled() ? previewSurfaceSetting() : "navy";
+  const intensity = "normal";
+  const surface = glassSurface();
   const root = document.documentElement;
   const effectsEnabled = seasonalEffectsEnabled();
   const visualLayerChanged =
@@ -381,57 +373,4 @@ export function applySeasonalTheme() {
   }
 
   return { season, intensity, surface };
-}
-
-export function seasonalPreviewControlsMarkup() {
-  if (!isSeasonPreviewEnabled()) return "";
-
-  const season = previewSeasonSetting();
-  const intensity = previewIntensitySetting();
-  const surface = previewSurfaceSetting();
-  const urlOverride = requestedPreviewSeason();
-
-  return `
-    <div class="settings-section-title preview-only-title">Preview lab</div>
-    <section class="settings-group liquid-glass preview-settings">
-      <div class="setting-row preview-warning"><div><strong>Seasonal preview</strong><small>Only available on the protected preview site. Production users never see these controls.</small></div><span class="preview-lock">PRIVATE</span></div>
-      <label class="setting-row"><div><strong>Overlay</strong><small>${urlOverride ? `URL override active: ${urlOverride}` : "Force a season without changing the calendar."}</small></div>
-        <select id="seasonPreviewSelect">${SEASONS.map((item) => `<option value="${item.id}" ${season === item.id ? "selected" : ""}>${item.emoji} ${item.label}</option>`).join("")}</select>
-      </label>
-      <label class="setting-row"><div><strong>Intensity</strong><small>Testing-only control. Public seasonal effects will use the approved default.</small></div>
-        <select id="seasonIntensitySelect">${INTENSITIES.map((item) => `<option value="${item.id}" ${intensity === item.id ? "selected" : ""}>${item.label}</option>`).join("")}</select>
-      </label>
-      <label class="setting-row"><div><strong>Glass style</strong><small>Compare frosted, full Liquid Glass, and the original navy treatment.</small></div>
-        <select id="previewSurfaceSelect">${SURFACES.map((item) => `<option value="${item.id}" ${surface === item.id ? "selected" : ""}>${item.label}</option>`).join("")}</select>
-      </label>
-    </section>
-  `;
-}
-
-export function bindSeasonalPreviewControls(onChange) {
-  if (!isSeasonPreviewEnabled()) return;
-
-  const season = document.querySelector("#seasonPreviewSelect");
-  if (season) season.onchange = () => {
-    safeSet(PREVIEW_SEASON_KEY, season.value);
-    const url = new URL(location.href);
-    url.searchParams.delete("season");
-    history.replaceState({}, "", url);
-    applySeasonalTheme();
-    onChange?.();
-  };
-
-  const intensity = document.querySelector("#seasonIntensitySelect");
-  if (intensity) intensity.onchange = () => {
-    safeSet(PREVIEW_INTENSITY_KEY, intensity.value);
-    applySeasonalTheme();
-    onChange?.();
-  };
-
-  const surface = document.querySelector("#previewSurfaceSelect");
-  if (surface) surface.onchange = () => {
-    safeSet(PREVIEW_SURFACE_KEY, surface.value);
-    applySeasonalTheme();
-    onChange?.();
-  };
 }

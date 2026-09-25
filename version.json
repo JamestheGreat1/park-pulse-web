@@ -1,5 +1,5 @@
 {
-  "version": "1.8.0-preview.35",
+  "version": "1.8.0",
   "released": "2026-09-25",
-  "channel": "liquid-glass-preview"
+  "channel": "stable"
 }

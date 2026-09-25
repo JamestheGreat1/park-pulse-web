@@ -271,15 +271,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
   }
   #view-explore .section-heading{
     grid-column:1/-1;
-    width:min(100%,1040px);
-    justify-self:center;
     margin-top:8px;
     margin-bottom:14px;
   }
   #view-explore .ride-list{
     grid-column:1/-1;
-    width:min(100%,1040px);
-    justify-self:center;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:12px;
   }
@@ -4469,4 +4465,21 @@ body{
 }
 @media(prefers-reduced-motion:reduce){
   .diagnostics-chevron{transition:none}
+}
+
+
+/* v1.8.4 — force desktop ride sheets to remain truly centered */
+@media (min-width:1024px){
+  .ride-sheet{
+    top:50%!important;
+    bottom:auto!important;
+    max-height:min(82dvh,760px)!important;
+    transform:translate(-50%,-50%)!important;
+    border-radius:30px;
+    overflow:auto;
+  }
+  .ride-sheet.sheet-dragging,
+  .ride-sheet.sheet-dismissing{
+    transform:translate(-50%,-50%)!important;
+  }
 }

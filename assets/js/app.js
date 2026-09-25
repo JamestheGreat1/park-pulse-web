@@ -659,12 +659,10 @@ function selectView(name) {
 }
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
-  const personal = state.sort === "personal";
   let list = rides.filter((r) =>
     (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) &&
     (!state.openOnly || (r.isOpen && !isRideStale(r))) &&
-    (!state.favoritesOnly || state.favorites.includes(String(r.id))) &&
-    (!personal || state.favorites.includes(String(r.id)))
+    (!state.favoritesOnly || state.favorites.includes(String(r.id)))
   );
   const staleRank = (ride) => isRideStale(ride) ? 1 : 0;
   if (state.sort === "wait") list.sort((a,b) => staleRank(a) - staleRank(b) || (a.isOpen === b.isOpen ? (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) : a.isOpen ? -1 : 1));
@@ -705,11 +703,9 @@ function rideCard(ride, state = store.snapshot, index = 0) {
 }
 function rideListMarkup(state = store.snapshot) {
   const rides = sortedRides(rideData.ridesForPark(state.selectedParkId), state);
-  if (rides.length) return rides.map((ride, index) => rideCard(ride, state, index)).join("");
-  const emptyCopy = state.sort === "personal" && !state.query
-    ? "No favorites in this park yet. Tap the star on a ride to add one."
-    : rideData.error || "No rides match that search.";
-  return `<div class="empty liquid-glass">${escapeHtml(emptyCopy)}</div>`;
+  return rides.length
+    ? rides.map((ride, index) => rideCard(ride, state, index)).join("")
+    : `<div class="empty liquid-glass">${escapeHtml(rideData.error || "No rides match that search.")}</div>`;
 }
 function bindRideCards(root = views.explore) {
   root.querySelectorAll('[data-favorite]').forEach(button => {
@@ -745,7 +741,7 @@ function renderExplore() {
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="Search rides in ${escapeHtml(parkName(state.selectedParkId))}" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
       <button class="filter-button ${state.favoritesOnly ? "active" : ""}" type="button" data-toggle-favorites aria-pressed="${state.favoritesOnly}">Favorites</button>
-      <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="personal" ${state.sort === "personal" ? "selected" : ""}>For me</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
+      <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
     ${nextUpMarkup(state)}
     <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>

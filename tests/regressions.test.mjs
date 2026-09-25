@@ -143,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.0-preview.7`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.0-preview.7' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.0-preview.8`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.0-preview.8' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -343,4 +343,26 @@ test('timezone formatters are reused without changing Eastern date parts', () =>
 
 test('no single-selector helper is used with forEach anywhere in the app', () => {
   assert.doesNotMatch(app, /(?<!\$)\$\([^;\n]*\)\.forEach/g);
+});
+
+
+test('Park Day stays nested under Explore without adding a fourth bottom tab', () => {
+  const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(index, /id="view-parkday"/);
+  assert.match(index, /id="parkDayShortcut"/);
+  const nav = index.slice(index.indexOf('<nav class="bottom-nav'), index.indexOf('</nav>') + 6);
+  assert.equal((nav.match(/data-view-target=/g) || []).length, 3);
+  assert.doesNotMatch(nav, /data-view-target="parkday"/);
+
+  const selectBlock = app.slice(app.indexOf('function selectView('), app.indexOf('function sortedRides('));
+  assert.match(selectBlock, /name === "parkday" \? "explore" : name/);
+});
+
+test('Park Day screen exposes only lightweight day-session controls', () => {
+  const block = app.slice(app.indexOf('function renderParkDay('), app.indexOf('function updateParkDayShortcut('));
+  assert.match(block, /Must-dos left/);
+  assert.match(block, /Ridden/);
+  assert.match(block, /Active watches/);
+  assert.match(block, /End Park Day/);
+  assert.doesNotMatch(block, /reservation|timeline|schedule|itinerary slot/i);
 });

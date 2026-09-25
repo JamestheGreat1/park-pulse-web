@@ -6,7 +6,7 @@ import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, 
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
+const views = { explore: $("#view-explore"), parkday: $("#view-parkday"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const installHelpSheet = $("#installHelpSheet");
@@ -172,8 +172,7 @@ function firstRunVisible() {
 }
 function dismissFirstRun() {
   try { localStorage.setItem(FIRST_RUN_KEY, "seen"); } catch {}
-  renderExplore();
-  bindDynamic();
+  render();
 }
 
 function platformInfo() {
@@ -497,7 +496,7 @@ function nextUpMarkup(state = store.snapshot) {
   const stats = parkDayStats(state);
   if (!ride) {
     return `<section class="next-up-card liquid-glass park-day-active">
-      <div class="next-up-head"><div><span class="eyebrow">Park Day</span><h3>No strong Next Up pick right now</h3><p>ParkPulse will keep looking as waits and ride status change.</p></div><button class="next-up-end" type="button" data-end-park-day>End Park Day</button></div>
+      <div class="next-up-head"><div><span class="eyebrow">Park Day</span><h3>No strong Next Up pick right now</h3><p>ParkPulse will keep looking as waits and ride status change.</p></div><button class="next-up-end" type="button" data-view-jump="parkday">Open Park Day →</button></div>
       <div class="park-day-stats"><span><b>${stats?.mustDoLeft || 0}</b> must-dos left</span><span><b>${stats?.watching || 0}</b> watched</span><span><b>${stats?.ridden || 0}</b> ridden</span></div>
     </section>`;
   }
@@ -510,7 +509,7 @@ function nextUpMarkup(state = store.snapshot) {
   return `<section class="next-up-card liquid-glass ${parkDay ? "park-day-active" : ""}">
     <div class="next-up-head">
       <div><span class="eyebrow">${parkDay ? "Park Day · " : ""}${escapeHtml(label)}</span><h3>${parkDay && current ? "You’re heading to" : "What should I ride next?"}</h3><p>${escapeHtml(reason)}</p></div>
-      ${parkDay ? '<button class="next-up-end" type="button" data-end-park-day>End Park Day</button>' : ""}
+      ${parkDay ? '<button class="next-up-end" type="button" data-view-jump="parkday">Open Park Day →</button>' : ""}
     </div>
     <div class="next-up-ride-row">
       <button class="next-up-ride" type="button" data-open-ride="${ride.id}">
@@ -554,6 +553,124 @@ function markRideRidden(id) {
   nextUpOffset = 0;
   store.completeParkDayRide(id);
   toast(ride ? `${ride.name} marked ridden` : "Ride marked ridden");
+}
+
+
+function parkDayListRow(ride, { note = "", completed = false } = {}) {
+  if (!ride) return "";
+  const status = rideStatus(ride);
+  return `<button class="park-day-list-row ${completed ? "completed" : ""}" type="button" data-open-ride="${ride.id}">
+    <span class="park-day-row-check" aria-hidden="true">${completed ? "✓" : "→"}</span>
+    <span class="park-day-row-copy">
+      <span class="ride-land">${escapeHtml(ride.land)}</span>
+      <strong>${escapeHtml(ride.name)}</strong>
+      ${note ? `<small>${escapeHtml(note)}</small>` : ""}
+    </span>
+    <span class="park-day-row-status"><b class="${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</b><small>${escapeHtml(status.label)}</small></span>
+  </button>`;
+}
+
+function renderParkDay() {
+  const state = store.snapshot;
+  const parkDay = activeParkDay(state);
+  if (!views.parkday) return;
+
+  if (!parkDay) {
+    views.parkday.innerHTML = `
+      <div class="park-day-page-head">
+        <button class="park-day-back" type="button" data-view-jump="explore" aria-label="Back to Explore">← <span>Explore</span></button>
+        <span class="eyebrow">Park Day Lite</span>
+        <h2>No Park Day running</h2>
+        <p>Pick a Next Up ride from Explore and ParkPulse will start a lightweight day session automatically.</p>
+      </div>
+      <section class="park-day-empty liquid-glass">
+        <span aria-hidden="true">✦</span>
+        <h3>Nothing to manage yet</h3>
+        <p>No itinerary, no schedule. Park Day only keeps track of what you’re doing next, what you still want to ride, and what you’ve already done.</p>
+        <button class="primary-button" type="button" data-view-jump="explore">Find a ride</button>
+      </section>`;
+    return;
+  }
+
+  const stats = parkDayStats(state);
+  const { ride: nextRide, current } = nextUpRide(state);
+  const completed = new Set((parkDay.completedRideIds || []).map(String));
+  const parkRideIds = new Set(rideData.ridesForPark(state.selectedParkId).map(ride => String(ride.id)));
+  const mustDoRides = state.mustDo
+    .filter(id => parkRideIds.has(String(id)) && !completed.has(String(id)))
+    .map(id => rideData.rideById(id))
+    .filter(Boolean);
+  const riddenRides = [...completed]
+    .filter(id => parkRideIds.has(String(id)))
+    .map(id => rideData.rideById(id))
+    .filter(Boolean);
+  const watchedRules = state.rules.filter(rule => Number(rule.parkId) === Number(state.selectedParkId));
+  const watchedRides = watchedRules
+    .map(rule => ({ rule, ride: rideData.rideById(rule.rideId) }))
+    .filter(item => item.ride);
+  const nextStatus = nextRide ? rideStatus(nextRide) : null;
+
+  views.parkday.innerHTML = `
+    <div class="park-day-page-head">
+      <button class="park-day-back" type="button" data-view-jump="explore" aria-label="Back to Explore">← <span>Explore</span></button>
+      <span class="eyebrow">Park Day Lite</span>
+      <h2>${escapeHtml(parkName(state.selectedParkId))}</h2>
+      <p>Your day at a glance. Just the useful stuff — no itinerary required.</p>
+    </div>
+
+    <section class="park-day-hero liquid-glass">
+      <div class="park-day-hero-label"><span class="eyebrow">Next Up</span>${current ? '<span class="park-day-current">Locked in</span>' : '<span class="park-day-current">Suggested</span>'}</div>
+      ${nextRide ? `
+        <button class="park-day-next-ride" type="button" data-open-ride="${nextRide.id}">
+          <div><span class="ride-land">${escapeHtml(nextRide.land)}</span><h3>${escapeHtml(nextRide.name)}</h3><p>${escapeHtml(recommendationReason(nextRide, state))}</p></div>
+          <div class="park-day-next-wait"><b class="${nextStatus.stale ? "stale" : nextRide.isOpen ? "open" : "closed"}">${escapeHtml(nextStatus.wait)}</b><span>${escapeHtml(nextStatus.label)}</span></div>
+        </button>
+        <div class="park-day-hero-actions">
+          ${current
+            ? `<button class="primary-button" type="button" data-mark-ridden="${nextRide.id}">Mark ridden</button><button class="secondary-button" type="button" data-next-up-another>Pick another</button>`
+            : `<button class="primary-button" type="button" data-next-up-go="${nextRide.id}">Make this Next Up</button><button class="secondary-button" type="button" data-next-up-another>Show another</button>`}
+        </div>`
+        : `<div class="park-day-no-next"><strong>No strong pick right now</strong><p>ParkPulse will keep looking as ride status and waits change.</p></div>`}
+    </section>
+
+    <div class="park-day-stats park-day-page-stats">
+      <span><b>${stats?.mustDoLeft || 0}</b> must-dos left</span>
+      <span><b>${stats?.watching || 0}</b> watched</span>
+      <span><b>${stats?.ridden || 0}</b> ridden</span>
+    </div>
+
+    <section class="park-day-section">
+      <div class="park-day-section-head"><div><span class="eyebrow">Still on the list</span><h3>Must-dos left</h3></div><span>${mustDoRides.length}</span></div>
+      <div class="park-day-list liquid-glass">
+        ${mustDoRides.length ? mustDoRides.map(ride => parkDayListRow(ride, { note: recommendationReason(ride, state) })).join("") : '<div class="park-day-list-empty">You’re caught up on must-dos for this park.</div>'}
+      </div>
+    </section>
+
+    <section class="park-day-section">
+      <div class="park-day-section-head"><div><span class="eyebrow">Today</span><h3>Ridden</h3></div><span>${riddenRides.length}</span></div>
+      <div class="park-day-list liquid-glass">
+        ${riddenRides.length ? riddenRides.map(ride => parkDayListRow(ride, { note: "Marked ridden today", completed: true })).join("") : '<div class="park-day-list-empty">Nothing marked ridden yet.</div>'}
+      </div>
+    </section>
+
+    <section class="park-day-section">
+      <div class="park-day-section-head"><div><span class="eyebrow">ParkPulse is watching</span><h3>Active watches</h3></div><span>${watchedRides.length}</span></div>
+      <div class="park-day-list liquid-glass">
+        ${watchedRides.length ? watchedRides.map(({ rule, ride }) => parkDayListRow(ride, {
+          note: [rule.reopen ? "Reopening" : null, rule.threshold ? `≤ ${rule.threshold} min` : null].filter(Boolean).join(" · ") || "Status watch"
+        })).join("") : '<div class="park-day-list-empty">No ride watches in this park right now.</div>'}
+      </div>
+    </section>
+
+    <button class="park-day-end-button" type="button" data-end-park-day>End Park Day</button>`;
+}
+
+function updateParkDayShortcut() {
+  const shortcut = $("#parkDayShortcut");
+  if (!shortcut) return;
+  const parkDay = activeParkDay();
+  shortcut.classList.toggle("hidden", !parkDay);
+  shortcut.setAttribute("aria-hidden", String(!parkDay));
 }
 
 function rideStatus(ride) {
@@ -700,8 +817,9 @@ function selectView(name) {
   if (liquid) root.classList.add("glass-color-snap");
 
   for (const [key, el] of Object.entries(views)) el.classList.toggle("active", key === name);
+  const navName = name === "parkday" ? "explore" : name;
   document.querySelectorAll(".nav-item").forEach((button) => {
-    const active = button.dataset.viewTarget === name;
+    const active = button.dataset.viewTarget === navName;
     button.classList.toggle("active", active);
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
@@ -967,16 +1085,19 @@ function renderRideDataUpdate() {
   renderRideResults();
   renderRefreshCopy();
   renderParkHours();
+  renderParkDay();
   renderWatching();
   renderSettings();
   updateWatchBadge();
+  updateParkDayShortcut();
   setTheme();
   bindDynamic();
 }
 function render() {
   store.pruneExpired(false);
-  renderExplore(); renderWatching(); renderSettings();
+  renderExplore(); renderParkDay(); renderWatching(); renderSettings();
   updateWatchBadge();
+  updateParkDayShortcut();
   setTheme(); bindDynamic();
 }
 function bindDynamic() {
@@ -984,7 +1105,13 @@ function bindDynamic() {
   document.querySelectorAll('[data-next-up-go]').forEach((b) => b.onclick = () => setRideAsNextUp(b.dataset.nextUpGo));
   document.querySelectorAll('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
   document.querySelectorAll('[data-mark-ridden]').forEach((b) => b.onclick = () => markRideRidden(b.dataset.markRidden));
-  document.querySelectorAll('[data-end-park-day]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.endParkDay(); toast("Park Day ended"); });
+  document.querySelectorAll('[data-end-park-day]').forEach((b) => b.onclick = () => {
+    nextUpOffset = 0;
+    const wasParkDayView = store.snapshot.activeView === "parkday";
+    store.endParkDay();
+    if (wasParkDayView) selectView("explore");
+    toast("Park Day ended");
+  });
   bindRideCards();
   $$('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));

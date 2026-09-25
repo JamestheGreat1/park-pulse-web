@@ -68,6 +68,9 @@ CREATE INDEX IF NOT EXISTS idx_ride_history_ride_time
 CREATE INDEX IF NOT EXISTS idx_ride_history_park_time
   ON ride_history(park_id, observed_at);
 
+CREATE INDEX IF NOT EXISTS idx_ride_history_observed_at
+  ON ride_history(observed_at);
+
 
 CREATE TABLE IF NOT EXISTS ride_baseline (
   ride_key TEXT NOT NULL,
@@ -108,4 +111,12 @@ CREATE TABLE IF NOT EXISTS notification_ride_state (
   source TEXT NOT NULL,
   source_updated_at TEXT,
   updated_at INTEGER NOT NULL
+);
+
+
+-- Lightweight operational metadata so health/status endpoints never need to scan ride_history.
+CREATE TABLE IF NOT EXISTS worker_state (
+  state_key TEXT PRIMARY KEY,
+  updated_at INTEGER NOT NULL,
+  payload TEXT NOT NULL DEFAULT '{}'
 );

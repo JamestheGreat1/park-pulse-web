@@ -486,3 +486,17 @@ test('wait graph keeps average line without duplicate average text', () => {
   assert.match(chart, /history-average-line/);
   assert.doesNotMatch(chart, /history-average-label|avg \$\{average\}m/);
 });
+
+
+test('scaled desktop viewports keep threshold controls centered and clear of glass rim', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('robust ride-sheet threshold geometry');
+  assert.ok(marker >= 0);
+  const final = css.slice(marker);
+  assert.match(final, /ride-sheet::after\{[^}]*display:none!important/s);
+  assert.match(final, /@media \(min-width:700px\)/);
+  assert.match(final, /#watchForm \.threshold-controls\{[^}]*grid-template-columns:44px 72px 38px 44px!important/s);
+  assert.match(final, /width:222px!important/);
+  assert.match(final, /max-width:calc\(100% - 48px\)!important/);
+  assert.match(final, /margin:10px auto 0!important/);
+});

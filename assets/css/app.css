@@ -4468,18 +4468,34 @@ body{
 }
 
 
-/* v1.8.4 — desktop ride sheets are full-content centered modals */
+/* v1.8.7 — compact, scrollable desktop ride sheets */
 @media (min-width:1024px){
   .ride-sheet{
     top:50%!important;
     bottom:auto!important;
-    width:min(760px,calc(100vw - 64px))!important;
-    max-height:none!important;
+    width:min(680px,calc(100vw - 72px))!important;
+    max-height:calc(100dvh - 72px)!important;
     height:auto!important;
     transform:translate(-50%,-50%)!important;
-    border-radius:30px;
-    overflow:visible!important;
-    overscroll-behavior:auto!important;
+    border-radius:28px;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    overscroll-behavior:contain!important;
+    scroll-padding-bottom:24px;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(255,255,255,.24) transparent;
+  }
+  .ride-sheet::-webkit-scrollbar{
+    width:8px;
+  }
+  .ride-sheet::-webkit-scrollbar-track{
+    background:transparent;
+  }
+  .ride-sheet::-webkit-scrollbar-thumb{
+    background:rgba(255,255,255,.20);
+    border-radius:999px;
+    border:2px solid transparent;
+    background-clip:padding-box;
   }
   .ride-sheet.sheet-dragging,
   .ride-sheet.sheet-dismissing{

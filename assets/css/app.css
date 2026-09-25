@@ -832,3 +832,24 @@ body{
 
 /* v1.7.14 final polish — watched rides use a solid bell, matching favorites */
 .bell-solid{fill:currentColor;stroke:none}
+
+
+/* v1.7.16 — keep all eight accent choices in a balanced 4 × 2 grid. */
+.accent-picker{
+  display:grid!important;
+  grid-template-columns:repeat(4,38px)!important;
+  grid-auto-rows:38px;
+  justify-content:end!important;
+  align-items:center!important;
+  gap:7px!important;
+  width:max-content;
+  max-width:none!important;
+  flex:none!important;
+}
+@media(max-width:640px){
+  .accent-picker{
+    grid-template-columns:repeat(4,38px)!important;
+    gap:6px!important;
+    max-width:none!important;
+  }
+}

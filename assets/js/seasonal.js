@@ -108,7 +108,7 @@ function ensureSeasonalLayer() {
   layer = document.createElement("div");
   layer.className = "seasonal-layer";
   layer.setAttribute("aria-hidden", "true");
-  layer.innerHTML = Array.from({ length: 28 }, (_, index) =>
+  layer.innerHTML = Array.from({ length: 40 }, (_, index) =>
     `<span class="seasonal-particle" style="--particle-index:${index};--particle-left:${(index * 37 + 11) % 101}%;--particle-top:${(index * 29 + 7) % 88}%;--particle-delay:-${(index * 1.37).toFixed(2)}s;--particle-duration:${(11 + (index % 7) * 1.9).toFixed(1)}s"></span>`
   ).join("");
   document.body.prepend(layer);

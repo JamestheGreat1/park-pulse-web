@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.0-preview.6";
-import { store } from "./store.js?v=1.9.0-preview.6";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.0-preview.6";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.0-preview.6";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.0-preview.6";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.0-preview.7";
+import { store } from "./store.js?v=1.9.0-preview.7";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.0-preview.7";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.0-preview.7";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.0-preview.7";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.0-preview.6";
+const APP_VERSION = "1.9.0-preview.7";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -980,11 +980,11 @@ function render() {
   setTheme(); bindDynamic();
 }
 function bindDynamic() {
-  $('[data-park]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
-  $('[data-next-up-go]').forEach((b) => b.onclick = () => setRideAsNextUp(b.dataset.nextUpGo));
-  $('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
-  $('[data-mark-ridden]').forEach((b) => b.onclick = () => markRideRidden(b.dataset.markRidden));
-  $('[data-end-park-day]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.endParkDay(); toast("Park Day ended"); });
+  document.querySelectorAll('[data-park]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
+  document.querySelectorAll('[data-next-up-go]').forEach((b) => b.onclick = () => setRideAsNextUp(b.dataset.nextUpGo));
+  document.querySelectorAll('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
+  document.querySelectorAll('[data-mark-ridden]').forEach((b) => b.onclick = () => markRideRidden(b.dataset.markRidden));
+  document.querySelectorAll('[data-end-park-day]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.endParkDay(); toast("Park Day ended"); });
   bindRideCards();
   $$('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
@@ -1105,7 +1105,7 @@ function openQuickActions(id, trigger = null) {
   document.body.classList.add("quick-actions-open");
 
   $('[data-close-quick-actions]', menu).onclick = closeQuickActions;
-  $('[data-quick-action]', menu).forEach(button => {
+  menu.querySelectorAll('[data-quick-action]').forEach(button => {
     button.onclick = async () => {
       const action = button.dataset.quickAction;
       if (action === "favorite") store.toggleFavorite(id);

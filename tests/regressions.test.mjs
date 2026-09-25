@@ -143,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.0-preview.8`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.0-preview.8' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.0-preview.9`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.0-preview.9' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -365,4 +365,18 @@ test('Park Day screen exposes only lightweight day-session controls', () => {
   assert.match(block, /Active watches/);
   assert.match(block, /End Park Day/);
   assert.doesNotMatch(block, /reservation|timeline|schedule|itinerary slot/i);
+});
+
+
+test('Park Day ride rows are wired like Explore ride rows', () => {
+  const bind = app.slice(app.indexOf('function bindDynamic('), app.indexOf('async function copyText('));
+  assert.match(bind, /bindRideCards\(views\.explore\)/);
+  assert.match(bind, /bindRideCards\(views\.parkday\)/);
+});
+
+test('Park Day heading keeps the label above the park name and empty state stays actionable', () => {
+  const renderBlock = app.slice(app.indexOf('function renderParkDay('), app.indexOf('function updateParkDayShortcut('));
+  assert.match(renderBlock, /<span class="eyebrow">Park Day Lite<\/span>\s*<h2>/);
+  assert.match(renderBlock, /data-view-jump="explore">Browse rides<\/button>/);
+  assert.match(renderBlock, />Waiting<\/span>/);
 });

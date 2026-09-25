@@ -16,7 +16,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Best Now** compares the current wait with what is normally expected for that ride around the same time of day.
 - **Wait comparisons** quickly show when something is running better or worse than typical.
 - **Favorites** let you save rides without turning on notifications.
-- **Next Up** suggests one useful open ride at a time using current waits, normal wait context, favorites, and must-dos.
+- **Next Up** suggests one useful open ride at a time using current waits, normal wait context, and your favorites.
 - **Wait history** shows how a ride has moved today, over the past 7 days, or over the past 30 days.
 - **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both. Watched rides use a solid bell so they’re easy to spot at a glance.
 - **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
@@ -71,7 +71,7 @@ Tap the **star** on a ride to add it to Favorites.
 
 Favorites stay on that device and do not create notifications.
 
-If there is something you absolutely want to ride, open it and turn on **Must-do ride**. Must-dos are considered by **Next Up**, while the **Favorites** filter keeps your saved rides easy to narrow down.
+If there is something you really care about, favorite it. The **Favorites** filter keeps those rides easy to narrow down, while **Next Up** can give favorites a little extra weight when the current wait also looks good.
 
 That keeps the personalization useful without turning ParkPulse into a spreadsheet wearing Mickey ears.
 

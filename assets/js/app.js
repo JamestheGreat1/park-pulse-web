@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.26";
-import { store } from "./store.js?v=1.8.0-preview.26";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.26";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.26";
-import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.26";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.27";
+import { store } from "./store.js?v=1.8.0-preview.27";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.27";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.27";
+import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.27";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.8.0-preview.26";
+const APP_VERSION = "1.8.0-preview.27";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -801,7 +801,7 @@ function bindDynamic() {
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
   $$('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
-  $("button[data-accent-choice]").forEach((button) => {
+  document.querySelectorAll("button[data-accent-choice]").forEach((button) => {
     button.onclick = () => store.update((s) => { s.accent = button.dataset.accentChoice; }, "accent");
   });
   const seasonalEffects = $("#seasonalEffectsToggle");

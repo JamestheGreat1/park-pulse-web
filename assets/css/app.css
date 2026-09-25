@@ -1680,3 +1680,37 @@ body{
   100%{transform:translate3d(-64px,122vh,0) rotate(-13deg);opacity:.16}
 }
 
+
+/* v1.8.0-preview.11 — subtler Halloween lightning: distant flashes only at the top. */
+:root[data-season="halloween"] .seasonal-layer:before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:30vh;
+  opacity:0;
+  background:
+    radial-gradient(ellipse at 76% 0%,rgba(235,239,255,.42),transparent 42%),
+    linear-gradient(180deg,rgba(160,170,235,.13),transparent 82%);
+  mix-blend-mode:screen;
+  filter:blur(1px);
+  animation:halloween-top-flash 14s linear infinite;
+}
+:root[data-season="halloween"] .seasonal-layer:after{
+  display:none!important;
+}
+@keyframes halloween-top-flash{
+  0%,72%,73.1%,74.2%,100%{opacity:0}
+  72.35%{opacity:.26}
+  72.70%{opacity:.08}
+  73.45%{opacity:.34}
+  73.80%{opacity:.06}
+}
+:root[data-season="halloween"][data-season-intensity="subtle"] .seasonal-layer:before{
+  filter:opacity(.72);
+}
+:root[data-season="halloween"][data-season-intensity="extra"] .seasonal-layer:before{
+  filter:opacity(1.12);
+}
+

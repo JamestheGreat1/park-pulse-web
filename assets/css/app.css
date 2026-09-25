@@ -1721,3 +1721,197 @@ body{
   10%{opacity:.58}
   100%{transform:translate3d(-64px,122vh,0) rotate(13deg);opacity:.16}
 }
+
+
+/* v1.8.0-preview.13 — stronger glass, windier rain, rocket-style fireworks. */
+
+/* A small glass bump: clearer edges and stronger lensing without adding navy tint. */
+:root[data-preview-surface="neutral"]{
+  --glass-thin:rgba(132,138,150,.105);
+  --glass-mid:rgba(126,132,145,.150);
+  --glass-thick:rgba(116,122,136,.225);
+  --glass-edge:rgba(255,255,255,.225);
+  --glass-edge-soft:rgba(255,255,255,.105);
+}
+:root[data-preview-surface="neutral"] .ride-card,
+:root[data-preview-surface="neutral"] .watch-card{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.22),
+    inset 1px 0 0 rgba(255,255,255,.075),
+    inset 0 -1px 0 rgba(0,0,0,.08),
+    0 17px 46px var(--glass-shadow)!important;
+  backdrop-filter:blur(26px) saturate(155%) contrast(103%)!important;
+  -webkit-backdrop-filter:blur(26px) saturate(155%) contrast(103%)!important;
+}
+:root[data-preview-surface="neutral"] .hero-card,
+:root[data-preview-surface="neutral"] .settings-group,
+:root[data-preview-surface="neutral"] .toolbar{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.25),
+    inset 1px 0 0 rgba(255,255,255,.085),
+    inset 0 -1px 0 rgba(0,0,0,.09),
+    0 22px 58px var(--glass-shadow)!important;
+  backdrop-filter:blur(34px) saturate(160%) contrast(103%)!important;
+  -webkit-backdrop-filter:blur(34px) saturate(160%) contrast(103%)!important;
+}
+:root[data-preview-surface="neutral"] .bottom-nav,
+:root[data-preview-surface="neutral"] .ride-sheet,
+:root[data-preview-surface="neutral"] .install-help-sheet{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.29),
+    inset 1px 0 0 rgba(255,255,255,.095),
+    inset 0 -1px 0 rgba(0,0,0,.11),
+    0 26px 78px rgba(0,0,0,.24)!important;
+  backdrop-filter:blur(42px) saturate(165%) contrast(104%)!important;
+  -webkit-backdrop-filter:blur(42px) saturate(165%) contrast(104%)!important;
+}
+:root[data-preview-surface="neutral"] .ride-card::before,
+:root[data-preview-surface="neutral"] .watch-card::before,
+:root[data-preview-surface="neutral"] .hero-card::before,
+:root[data-preview-surface="neutral"] .settings-group::before,
+:root[data-preview-surface="neutral"] .toolbar::before,
+:root[data-preview-surface="neutral"] .bottom-nav::before,
+:root[data-preview-surface="neutral"] .ride-sheet::before,
+:root[data-preview-surface="neutral"] .install-help-sheet::before{
+  background:
+    linear-gradient(118deg,
+      rgba(255,255,255,.205) 0%,
+      rgba(255,255,255,.075) 17%,
+      transparent 38%,
+      transparent 70%,
+      rgba(var(--blue-rgb),.045) 100%)!important;
+  opacity:.82;
+}
+
+/* Halloween: a touch denser, with a stronger right-to-left wind push. */
+:root[data-season="halloween"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+21){display:none!important}
+:root[data-season="halloween"][data-season-intensity="normal"] .seasonal-particle:nth-child(n+35){display:none!important}
+@keyframes halloween-rain{
+  0%{transform:translate3d(72px,-18vh,0) rotate(13deg);opacity:0}
+  9%{opacity:.62}
+  100%{transform:translate3d(-96px,122vh,0) rotate(13deg);opacity:.18}
+}
+
+/* Fourth of July: rocket trail first, then a looser irregular starburst. */
+:root[data-season="july4"] .seasonal-particle{
+  --burst-rotate:0deg;
+  display:none;
+  bottom:auto;
+  top:var(--particle-top);
+  width:4px;
+  height:4px;
+  margin:-2px 0 0 -2px;
+  border-radius:50%;
+  background:transparent!important;
+  -webkit-mask-image:none!important;
+  mask-image:none!important;
+  color:#ff6f7e;
+  box-shadow:none!important;
+  filter:none!important;
+  opacity:1!important;
+  animation:none!important;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(4n+1){display:block}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){color:#73b8ff;--burst-rotate:9deg}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){color:#fff;--burst-rotate:-7deg}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){color:#ffd56b;--burst-rotate:15deg}
+:root[data-season="july4"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+22){display:none}
+
+/* The rocket rises from below the eventual burst point. */
+:root[data-season="july4"] .seasonal-particle::before{
+  content:"";
+  position:absolute;
+  left:1px;
+  top:2px;
+  width:2px;
+  height:112px;
+  border-radius:999px;
+  transform-origin:50% 0;
+  background:linear-gradient(
+    180deg,
+    rgba(255,255,255,.96) 0%,
+    currentColor 18%,
+    color-mix(in srgb,currentColor 72%,transparent) 58%,
+    transparent 100%
+  );
+  box-shadow:0 0 6px currentColor;
+  opacity:0;
+  animation:firework-rocket var(--particle-duration) cubic-bezier(.2,.72,.2,1) infinite;
+  animation-delay:var(--particle-delay);
+}
+
+/* Uneven spark distances make the burst feel hand-thrown, not like a perfect circle. */
+:root[data-season="july4"] .seasonal-particle::after{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:currentColor;
+  opacity:0;
+  filter:drop-shadow(0 0 4px currentColor);
+  box-shadow:
+     1px -36px 0 -1px currentColor,
+    18px -28px 0 -1px currentColor,
+    36px -10px 0 -1px currentColor,
+    29px  17px 0 -1px currentColor,
+    11px  35px 0 -1px currentColor,
+   -13px  29px 0 -1px currentColor,
+   -34px  13px 0 -1px currentColor,
+   -27px -18px 0 -1px currentColor,
+   -10px -30px 0 -1px currentColor,
+    43px   5px 0 -2px rgba(255,255,255,.92),
+   -39px  -5px 0 -2px rgba(255,255,255,.78),
+     4px  45px 0 -2px currentColor;
+  animation:firework-irregular-burst var(--particle-duration) ease-out infinite;
+  animation-delay:var(--particle-delay);
+  transform:rotate(var(--burst-rotate)) scale(.08);
+}
+
+@keyframes firework-rocket{
+  0%,38%{
+    opacity:0;
+    transform:translateY(128px) scaleY(.12);
+  }
+  44%{
+    opacity:.28;
+    transform:translateY(106px) scaleY(.26);
+  }
+  55%{
+    opacity:.88;
+    transform:translateY(52px) scaleY(.72);
+  }
+  64%{
+    opacity:1;
+    transform:translateY(4px) scaleY(1);
+  }
+  68%,100%{
+    opacity:0;
+    transform:translateY(-4px) scaleY(.28);
+  }
+}
+@keyframes firework-irregular-burst{
+  0%,64%{
+    opacity:0;
+    transform:rotate(var(--burst-rotate)) scale(.06);
+  }
+  68%{
+    opacity:.95;
+    transform:rotate(var(--burst-rotate)) scale(.30);
+  }
+  76%{
+    opacity:.92;
+    transform:rotate(calc(var(--burst-rotate) + 5deg)) scale(.95);
+  }
+  86%{
+    opacity:.42;
+    transform:rotate(calc(var(--burst-rotate) + 9deg)) scale(1.16);
+  }
+  100%{
+    opacity:0;
+    transform:rotate(calc(var(--burst-rotate) + 12deg)) scale(1.28);
+  }
+}
+

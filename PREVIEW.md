@@ -77,3 +77,8 @@ The production branch does not need these preview-only routing files. The previe
 ## Cloudflare Preview binding note
 
 Worker Previews do not inherit top-level bindings. Preview-specific service bindings must also be declared inside `previews.services`. The `PARKPULSE_API` binding is therefore listed both at the top level and under `previews`.
+
+
+## Condensed Status
+
+Settings now keeps only four always-visible status rows: **System**, **Notifications**, **History**, and **App version**. Detailed Worker, source, API-key, alert-engine, history, baseline, and copy-diagnostics information lives under **Show diagnostics**.

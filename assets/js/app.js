@@ -839,6 +839,39 @@ function renderSettings() {
   const historyTone = historyDiagnosticsAvailable
     ? analyticsState.historyCollecting ? "good" : "bad"
     : backendState?.ok === false ? "bad" : "";
+
+  const systemLabel = backendState?.ok === true ? "Online" : backendState?.ok === false ? "Unavailable" : "Checking";
+  const systemTone = backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : "";
+  const systemCopy = `Ride data ${refreshCopy} · ${rideData.sourceSummary || "Waiting for source"}`;
+
+  const notificationsReady = backendState?.ok === true &&
+    backendState?.vapidConfigured === true &&
+    notificationEngine?.status === "running";
+  const notificationsLabel = backendState?.ok === false
+    ? "Unavailable"
+    : notificationsReady
+      ? "Ready"
+      : !backendState?.vapidConfigured && backendState?.ok === true
+        ? "Needs setup"
+        : notificationEngine?.status === "waiting"
+          ? "Starting"
+          : backendState?.ok === true
+            ? "Needs attention"
+            : "Checking";
+  const notificationsTone = notificationsReady ? "good" : ["Unavailable","Needs setup","Needs attention"].includes(notificationsLabel) ? "bad" : "";
+  const notificationsCopy = backendState?.ok === true
+    ? `Push ${backendState?.vapidConfigured ? "ready" : "not configured"} · Alerts ${notificationEngine?.status === "running" ? "running" : notificationEngine?.status || "checking"}`
+    : "Push + ride alert status";
+
+  const baselineCopy = analyticsState?.ok
+    ? `${analyticsState.baselineRides}/${analyticsState.totalRides} baselines`
+    : "Baselines checking";
+  const historySummaryCopy = `${historyLabel} · ${baselineCopy}`;
+  const historySummaryLabel = historyDiagnosticsAvailable
+    ? analyticsState.historyCollecting ? "Healthy" : "Needs attention"
+    : backendState?.ok === false ? "Unavailable" : "Checking";
+  const historySummaryTone = historySummaryLabel === "Healthy" ? "good" : ["Needs attention","Unavailable"].includes(historySummaryLabel) ? "bad" : "";
+
   views.settings.innerHTML = `
     <div class="page-heading"><span class="eyebrow">ParkPulse</span><h2>Settings</h2><p>The useful stuff, plus a few ways to make ParkPulse yours.</p></div>
     <section class="settings-group liquid-glass">
@@ -853,18 +886,24 @@ function renderSettings() {
       <div class="setting-row glass-style-setting"><div><strong>Glass style</strong><small>Choose a softer frosted look or the clearer refractive Liquid Glass effect.</small></div><div class="glass-style-picker" role="group" aria-label="Glass style"><button type="button" data-glass-style="frosted" aria-pressed="${glassStyleSetting() === "frosted"}" class="${glassStyleSetting() === "frosted" ? "active" : ""}">Frosted</button><button type="button" data-glass-style="liquid" aria-pressed="${glassStyleSetting() === "liquid"}" class="${glassStyleSetting() === "liquid" ? "active" : ""}">Liquid</button></div></div>
       <label class="setting-row seasonal-effects-setting"><div><strong>Seasonal effects</strong><small>Automatically adds subtle holiday ambience when the season rolls around.</small></div><span class="setting-switch"><input id="seasonalEffectsToggle" type="checkbox" ${seasonalEffectsEnabled() ? "checked" : ""} aria-label="Seasonal effects"><span class="switch"></span></span></label>
     </section>
-    <div class="settings-section-title">Status & diagnostics</div>
-    <section class="settings-group liquid-glass status-diagnostics">
-      <div class="setting-row"><div><strong>Worker</strong><small>Backend + notification status</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
-      <div class="setting-row"><div><strong>Ride data</strong><small>Last time ParkPulse got fresh ride data</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
-      <div class="setting-row"><div><strong>Data source</strong><small>Powered by <a class="data-source-link" href="https://themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki</a> and <a class="data-source-link" href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times.com</a></small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
-      <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Used by the Worker — never stored in the app.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
-      <div class="setting-row"><div><strong>Push server</strong><small>Background notification setup</small></div><span class="health-pill ${backendState?.vapidConfigured ? "good" : "bad"}">${backendState?.vapidConfigured ? "Ready" : "Needs setup"}</span></div>
-      <div class="setting-row"><div><strong>Ride alert engine</strong><small>${escapeHtml(alertEngineCopy)}</small></div><span class="health-pill ${alertEngineTone}">${escapeHtml(alertEngineLabel)}</span></div>
-      <div class="setting-row"><div><strong>History collection</strong><small>${escapeHtml(historyCopy)}</small></div><span class="health-pill ${historyTone}">${escapeHtml(historyLabel)}</span></div>
-      <div class="setting-row"><div><strong>Trend baselines</strong><small>${analyticsState?.themeParksApiKeyConfigured === false ? "Historical backfill is paused because the ThemeParks API key is missing." : "History used for Best Now + crowd estimates"}</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : backendState?.ok === true ? "Retrying…" : backendState?.ok === false ? "Unavailable" : "Checking…"}</span></div>
-      <div class="setting-row"><div><strong>App version</strong><small>What you’re currently running</small></div><span class="setting-value">v${APP_VERSION}</span></div>
-      <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status. No secrets or push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
+    <div class="settings-section-title">Status</div>
+    <section class="settings-group liquid-glass status-diagnostics status-summary">
+      <div class="setting-row"><div><strong>System</strong><small>${escapeHtml(systemCopy)}</small></div><span class="health-pill ${systemTone}">${escapeHtml(systemLabel)}</span></div>
+      <div class="setting-row"><div><strong>Notifications</strong><small>${escapeHtml(notificationsCopy)}</small></div><span class="health-pill ${notificationsTone}">${escapeHtml(notificationsLabel)}</span></div>
+      <div class="setting-row"><div><strong>History</strong><small>${escapeHtml(historySummaryCopy)}</small></div><span class="health-pill ${historySummaryTone}">${escapeHtml(historySummaryLabel)}</span></div>
+      <div class="setting-row"><div><strong>App version</strong><small>Current ParkPulse build</small></div><span class="setting-value">v${APP_VERSION}</span></div>
+      <details class="diagnostics-details">
+        <summary><span><strong>Show diagnostics</strong><small>Data source, API, alert engine, and history details</small></span><span class="diagnostics-chevron" aria-hidden="true">›</span></summary>
+        <div class="diagnostics-expanded">
+          <div class="setting-row"><div><strong>Worker</strong><small>Backend + notification status</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
+          <div class="setting-row"><div><strong>Data source</strong><small>Powered by <a class="data-source-link" href="https://themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki</a> and <a class="data-source-link" href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times.com</a></small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
+          <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Used by the Worker — never stored in the app.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
+          <div class="setting-row"><div><strong>Ride alert engine</strong><small>${escapeHtml(alertEngineCopy)}</small></div><span class="health-pill ${alertEngineTone}">${escapeHtml(alertEngineLabel)}</span></div>
+          <div class="setting-row"><div><strong>History collection</strong><small>${escapeHtml(historyCopy)}</small></div><span class="health-pill ${historyTone}">${escapeHtml(historyLabel)}</span></div>
+          <div class="setting-row"><div><strong>Trend baselines</strong><small>${analyticsState?.themeParksApiKeyConfigured === false ? "Historical backfill is paused because the ThemeParks API key is missing." : "History used for Best Now + crowd estimates"}</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : backendState?.ok === true ? "Retrying…" : backendState?.ok === false ? "Unavailable" : "Checking…"}</span></div>
+          <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status. No secrets or push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
+        </div>
+      </details>
     </section>
     <section class="settings-group liquid-glass"><div class="about-row"><strong>Data</strong><p>ThemeParks.wiki is the main live feed. Queue-Times only steps in when a ride is missing. If the data is stale, ParkPulse says so instead of pretending it’s live.</p><a href="https://www.themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki ↗</a> · <a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times ↗</a></div></section>
     <p class="fine-print">ParkPulse is an independent project and is not affiliated with or endorsed by Disney.</p>`;

@@ -206,26 +206,23 @@ test('favorites persist independently of notification watches', () => {
   assert.equal(vm.runInContext('new Store().snapshot.mustDo[0]', context), 'mk:test');
 });
 
-test('personalized ordering never promotes a stale or closed must-do above fresh open rides', () => {
+test('Favorites narrows Best Now without changing its ordering logic', () => {
   const code = app.slice(app.indexOf('function sortedRides('), app.indexOf('function rideCard('));
   const context = vm.createContext({ isRideStale: r => !!r.stale, rideComparison: r => ({ratio:r.ratio}) });
   vm.runInContext(code, context);
   const rides = [
-    {id:'stale',name:'Stale',isOpen:true,stale:true,ratio:0.1,waitTime:5},
-    {id:'closed',name:'Closed',isOpen:false,ratio:0.1,waitTime:0},
-    {id:'favorite',name:'Favorite',isOpen:true,ratio:0.9,waitTime:30},
-    {id:'best',name:'Best',isOpen:true,ratio:0.5,waitTime:20}
+    {id:'best',name:'Best',isOpen:true,ratio:0.5,waitTime:20},
+    {id:'favorite-good',name:'Favorite Good',isOpen:true,ratio:0.7,waitTime:25},
+    {id:'favorite-ok',name:'Favorite OK',isOpen:true,ratio:0.9,waitTime:15},
+    {id:'favorite-closed',name:'Favorite Closed',isOpen:false,ratio:0.1,waitTime:0}
   ];
   context.rides = rides;
-  context.state = {query:'',openOnly:false,favoritesOnly:false,sort:'personal',favorites:['favorite'],mustDo:['closed','stale']};
-  assert.equal(vm.runInContext('sortedRides(rides,state).map(r=>r.id).join(",")',context),'favorite,best,closed,stale');
-  context.state.sort='recommended';
-  assert.equal(vm.runInContext('sortedRides(rides,state)[0].id',context),'best');
-  context.state.favoritesOnly=true;
-  assert.equal(vm.runInContext('sortedRides(rides,state).length',context),1);
+  context.state = {query:'',openOnly:false,favoritesOnly:true,sort:'recommended',favorites:['favorite-good','favorite-ok','favorite-closed'],mustDo:[]};
+  assert.equal(
+    vm.runInContext('sortedRides(rides,state).map(r=>r.id).join(",")',context),
+    'favorite-good,favorite-ok,favorite-closed'
+  );
 });
-
-
 
 test('ride cards bind Favorite and Alert without quick actions', () => {
   const block = app.slice(app.indexOf('function bindRideCards('), app.indexOf('function renderRideResults('));
@@ -332,4 +329,18 @@ test('preview keeps Park Day and quick actions native-only', () => {
   assert.doesNotMatch(app, /Park Day Lite|data-quick-actions|openQuickActions|quickAction/);
   assert.match(app, /What should I ride next\?/);
   assert.match(app, /recommendationReason/);
+});
+
+
+test('removed For Me sort migrates back to Best Now', () => {
+  const saved = new Map([['parkpulse.rideWatcher.v1', JSON.stringify({sort:'personal'})]]);
+  const context = vm.createContext({
+    EventTarget, Event, structuredClone, Date, Number, JSON,
+    CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
+    window: { PARKPULSE_CONFIG: {} },
+    localStorage: { getItem: k => saved.get(k) || null, setItem: (k,v) => saved.set(k,v) }
+  });
+  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  vm.runInContext(code, context);
+  assert.equal(vm.runInContext('store.snapshot.sort', context), 'recommended');
 });

@@ -1,4 +1,4 @@
-import { workerBase } from "./api.js?v=1.8.1";
+import { workerBase } from "./api.js?v=1.8.2";
 
 function base64ToBytes(value) {
   const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, "=").replace(/-/g, "+").replace(/_/g, "/");
@@ -115,7 +115,7 @@ export async function backendHealth(){
     const response=await request(`${workerBase}/health`,{cache:"no-store"});
     if(!response.ok) return {ok:false,status:response.status};
     const data = await response.json();
-    return { ...data, previewProxy: response.headers.get("X-ParkPulse-Preview-API") === "service-binding" };
+    return data;
   }catch{
     return {ok:false,reason:"network"};
   }

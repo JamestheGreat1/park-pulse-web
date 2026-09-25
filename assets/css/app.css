@@ -3097,3 +3097,90 @@ body{
   }
 }
 
+
+/* v1.8.0-preview.23 — independent staggered July 4 trail sparks. */
+.firework-rocket{
+  display:contents;
+  animation:none!important;
+}
+
+.firework-trail-spark{
+  left:0!important;
+  top:0!important;
+  --trail-lag:0s;
+  opacity:0;
+  animation:
+    fw-independent-trail var(--fw-duration) cubic-bezier(.22,.58,.28,1) infinite,
+    fw-independent-glimmer var(--twinkle-duration) ease-in-out infinite!important;
+  animation-delay:
+    calc(var(--fw-delay) + var(--trail-lag)),
+    var(--twinkle-delay)!important;
+  will-change:transform,opacity,filter;
+}
+
+.firework-trail-spark:nth-child(1){--trail-lag:0s}
+.firework-trail-spark:nth-child(2){--trail-lag:.035s}
+.firework-trail-spark:nth-child(3){--trail-lag:.070s}
+.firework-trail-spark:nth-child(4){--trail-lag:.108s}
+.firework-trail-spark:nth-child(5){--trail-lag:.148s}
+.firework-trail-spark:nth-child(6){--trail-lag:.190s}
+.firework-trail-spark:nth-child(7){--trail-lag:.234s}
+.firework-trail-spark:nth-child(8){--trail-lag:.280s}
+.firework-trail-spark:nth-child(9){--trail-lag:.328s}
+.firework-trail-spark:nth-child(10){--trail-lag:.378s}
+.firework-trail-spark:nth-child(11){--trail-lag:.430s}
+
+.firework-trail-spark:first-child{
+  box-shadow:0 0 6px currentColor;
+}
+
+@keyframes fw-independent-trail{
+  0%,31%{
+    opacity:0;
+    transform:translate3d(calc(var(--rocket-x0) + var(--trail-x)),100vh,0) scale(.62);
+  }
+  34%{opacity:.24}
+  39%{opacity:.70}
+  48%{opacity:.96}
+  58%{opacity:.92}
+  63%{opacity:.76}
+  65%{opacity:.32}
+  66%{
+    opacity:0;
+    transform:translate3d(var(--trail-x),0,0) scale(.92);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(var(--trail-x),0,0) scale(.72);
+  }
+}
+
+@keyframes fw-independent-glimmer{
+  0%,100%{
+    filter:brightness(.82) drop-shadow(0 0 1px currentColor);
+  }
+  19%{
+    filter:brightness(1.48) drop-shadow(0 0 4px currentColor);
+  }
+  43%{
+    filter:brightness(.92) drop-shadow(0 0 2px currentColor);
+  }
+  68%{
+    filter:brightness(1.72) drop-shadow(0 0 5px currentColor);
+  }
+  82%{
+    filter:brightness(1.02) drop-shadow(0 0 2px currentColor);
+  }
+}
+
+.firework-trail-spark.star::after{
+  animation:fw-star-flash-soft calc(var(--twinkle-duration) * 1.8) ease-in-out infinite!important;
+  animation-delay:var(--twinkle-delay)!important;
+}
+
+@keyframes fw-star-flash-soft{
+  0%,56%,100%{opacity:0;transform:translate(-50%,-50%) scale(.18)}
+  63%{opacity:.82;transform:translate(-50%,-50%) scale(.92)}
+  72%{opacity:.12;transform:translate(-50%,-50%) scale(.44)}
+}
+

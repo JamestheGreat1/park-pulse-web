@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.7 — 2026-09-25
+
+- Resized desktop ride sheets to a more compact 680px modal so they fit normal monitor layouts more comfortably.
+- Re-enabled vertical scrolling on desktop with a subtle thin scrollbar when the ride sheet is taller than the available viewport.
+- Kept the modal centered and preserved the separate mobile scrolling behavior.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.6 — 2026-09-25
 
 - Removed a stray horizontal Liquid Glass seam that could appear near the bottom of scrollable ride sheets on iPhone/iPad.

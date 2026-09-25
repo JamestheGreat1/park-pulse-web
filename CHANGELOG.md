@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.9 — 2026-09-25
+
+- Softened desktop ride-card glass highlights so wide light-mode cards no longer show a harsh diagonal/dark shading band.
+- Reduced the desktop Liquid Glass inner-rim intensity and hover shift while preserving the frosted/refractive look.
+- Verified seasonal effects use the same rendering path on desktop and mobile; no desktop-only seasonal suppression was found.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.8 — 2026-09-25
 
 - Tightened desktop ride-sheet spacing and reduced the modal to a denser 640px layout while keeping viewport-capped scrolling.

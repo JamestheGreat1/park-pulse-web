@@ -1704,7 +1704,7 @@ setupSheetDismissGesture();
   });
   store.addEventListener("change", (e) => {
     if (["rules", "expired", "rule-migration"].includes(e.detail.reason)) rulesSynced = false;
-    if (["park", "park-day"].includes(e.detail.reason)) nextUpOffset = 0;
+    if (e.detail.reason === "park") nextUpOffset = 0;
     if (e.detail.reason === "search") renderRideResults();
     else if (e.detail.reason !== "view") render();
   });

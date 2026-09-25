@@ -227,39 +227,20 @@ test('personalized ordering never promotes a stale or closed must-do above fresh
 
 
 
-test('ride card bindings always use the multi-element selector helper', () => {
+test('ride cards bind Favorite and Alert without quick actions', () => {
   const block = app.slice(app.indexOf('function bindRideCards('), app.indexOf('function renderRideResults('));
   assert.match(block, /querySelectorAll\('\[data-favorite\]'\)/);
   assert.match(block, /querySelectorAll\('\[data-open-ride\]'\)/);
-  assert.match(block, /querySelectorAll\('\[data-quick-actions\]'\)/);
-  assert.doesNotMatch(block, /\$\('\[data-(favorite|open-ride|quick-actions)\]'.*\.forEach/);
+  assert.doesNotMatch(block, /data-quick-actions|quick-action/);
+  assert.doesNotMatch(block, /\$\('\[data-(favorite|open-ride)\]'.*\.forEach/);
 });
 
-test('Park Day Lite keeps session progress separate from favorites and watches', () => {
-  const saved = new Map();
-  const context = vm.createContext({ EventTarget, Event, structuredClone, Date, Number, JSON,
-    CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
-    window: {}, localStorage: { getItem: k => saved.get(k), setItem: (k,v) => saved.set(k,v) } });
-  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
-  vm.runInContext(code + ';store.startParkDay(6, Date.now()+3600000);store.setParkDayCurrent("mk:test",6);store.completeParkDayRide("mk:test");', context);
-  let state = JSON.parse(saved.values().next().value);
-  assert.equal(state.parkDay.active, true);
-  assert.equal(state.parkDay.currentRideId, null);
-  assert.deepEqual(state.parkDay.completedRideIds, ['mk:test']);
-  assert.deepEqual(state.favorites, []);
-  assert.deepEqual(state.rules, []);
-  vm.runInContext('store.uncompleteParkDayRide("mk:test");store.endParkDay();', context);
-  state = JSON.parse(saved.values().next().value);
-  assert.equal(state.parkDay.active, false);
-  assert.deepEqual(state.parkDay.completedRideIds, []);
-});
-
-test('Next Up skips stale, closed, source-missing, and already-ridden rides', () => {
-  const code = app.slice(app.indexOf('function activeParkDay('), app.indexOf('function rideStatus('));
+test('Next Up skips stale, closed, and source-missing rides', () => {
+  const code = app.slice(app.indexOf('function recommendationScore('), app.indexOf('function rideStatus('));
   const rides = [
     {id:'must',name:'Must Do',parkId:6,isOpen:true,waitTime:45},
     {id:'best',name:'Best Value',parkId:6,isOpen:true,waitTime:15},
-    {id:'done',name:'Already Rode',parkId:6,isOpen:true,waitTime:5},
+    {id:'open',name:'Open Ride',parkId:6,isOpen:true,waitTime:5},
     {id:'closed',name:'Closed',parkId:6,isOpen:false,waitTime:0},
     {id:'stale',name:'Stale',parkId:6,isOpen:true,waitTime:5,stale:true},
     {id:'missing',name:'Missing',parkId:6,isOpen:true,waitTime:5,sourceMissing:true}
@@ -269,17 +250,14 @@ test('Next Up skips stale, closed, source-missing, and already-ridden rides', ()
     store:{snapshot:{}},
     rideData:{ridesForPark:()=>rides,rideById:id=>rides.find(r=>r.id===id)},
     isRideStale:r=>Boolean(r.stale),
-    rideComparison:r=>r.id==='best'?{ratio:.5,percentDelta:-50}:r.id==='must'?{ratio:1,percentDelta:0}:null
+    rideComparison:r=>r.id==='best'?{ratio:.5,percentDelta:-50}:r.id==='must'?{ratio:1,percentDelta:0}:null,
+    rideStatus:r=>({stale:false,wait:String(r.waitTime),label:'Operating'}),
+    escapeHtml:value=>String(value),
+    nextUpOffset:0
   });
   vm.runInContext(code, context);
-  context.state = {
-    selectedParkId:6,
-    mustDo:['must'],
-    favorites:[],
-    rules:[],
-    parkDay:{active:true,expiresAt:Date.now()+3600000,currentRideId:null,completedRideIds:['done']}
-  };
-  assert.deepEqual(vm.runInContext('recommendationCandidates(state).map(r=>r.id)', context), ['must','best']);
+  context.state = {selectedParkId:6,mustDo:['must'],favorites:[],rules:[]};
+  assert.deepEqual(vm.runInContext('recommendationCandidates(state).map(r=>r.id)', context), ['must','best','open']);
 });
 
 test('history keeps zero waits, null waits, and closures distinct and bounds queries', async () => {
@@ -346,37 +324,12 @@ test('no single-selector helper is used with forEach anywhere in the app', () =>
 });
 
 
-test('Park Day stays nested under Explore without adding a fourth bottom tab', () => {
+
+
+test('preview keeps Park Day and quick actions native-only', () => {
   const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(index, /id="view-parkday"/);
-  assert.match(index, /id="parkDayShortcut"/);
-  const nav = index.slice(index.indexOf('<nav class="bottom-nav'), index.indexOf('</nav>') + 6);
-  assert.equal((nav.match(/data-view-target=/g) || []).length, 3);
-  assert.doesNotMatch(nav, /data-view-target="parkday"/);
-
-  const selectBlock = app.slice(app.indexOf('function selectView('), app.indexOf('function sortedRides('));
-  assert.match(selectBlock, /name === "parkday" \? "explore" : name/);
-});
-
-test('Park Day screen exposes only lightweight day-session controls', () => {
-  const block = app.slice(app.indexOf('function renderParkDay('), app.indexOf('function updateParkDayShortcut('));
-  assert.match(block, /Must-dos left/);
-  assert.match(block, /Ridden/);
-  assert.match(block, /Active watches/);
-  assert.match(block, /End Park Day/);
-  assert.doesNotMatch(block, /reservation|timeline|schedule|itinerary slot/i);
-});
-
-
-test('Park Day ride rows are wired like Explore ride rows', () => {
-  const bind = app.slice(app.indexOf('function bindDynamic('), app.indexOf('async function copyText('));
-  assert.match(bind, /bindRideCards\(views\.explore\)/);
-  assert.match(bind, /bindRideCards\(views\.parkday\)/);
-});
-
-test('Park Day heading keeps the label above the park name and empty state stays actionable', () => {
-  const renderBlock = app.slice(app.indexOf('function renderParkDay('), app.indexOf('function updateParkDayShortcut('));
-  assert.match(renderBlock, /<span class="eyebrow">Park Day Lite<\/span>\s*<h2>/);
-  assert.match(renderBlock, /data-view-jump="explore">Browse rides<\/button>/);
-  assert.match(renderBlock, />Waiting<\/span>/);
+  assert.doesNotMatch(index, /view-parkday|parkDayShortcut/);
+  assert.doesNotMatch(app, /Park Day Lite|data-quick-actions|openQuickActions|quickAction/);
+  assert.match(app, /What should I ride next\?/);
+  assert.match(app, /recommendationReason/);
 });

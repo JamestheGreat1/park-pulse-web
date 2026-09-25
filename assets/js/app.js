@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.4";
-import { store } from "./store.js?v=1.8.0-preview.4";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.4";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.4";
-import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls } from "./seasonal.js?v=1.8.0-preview.4";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.5";
+import { store } from "./store.js?v=1.8.0-preview.5";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.5";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.5";
+import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls } from "./seasonal.js?v=1.8.0-preview.5";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.8.0-preview.4";
+const APP_VERSION = "1.8.0-preview.5";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -799,7 +799,7 @@ function bindDynamic() {
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
   $$('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
-  $("button[data-accent-choice]").forEach((button) => {
+  $$("button[data-accent-choice]").forEach((button) => {
     button.onclick = () => store.update((s) => { s.accent = button.dataset.accentChoice; }, "accent");
   });
   bindSeasonalPreviewControls(() => {

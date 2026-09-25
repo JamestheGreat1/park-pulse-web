@@ -4514,3 +4514,11 @@ body{
     padding-bottom:calc(34px + env(safe-area-inset-bottom,0px))!important;
   }
 }
+
+
+/* v1.8.6 — remove mobile Liquid Glass ride-sheet seam */
+@media (max-width:1023px){
+  :root[data-preview-surface="liquid"] .ride-sheet::after{
+    display:none!important;
+  }
+}

@@ -426,3 +426,14 @@ test('mobile ride sheets override glass overflow and remain scrollable', () => {
   assert.match(mobile, /-webkit-overflow-scrolling:touch/);
   assert.match(mobile, /padding-bottom:calc\(34px \+ env\(safe-area-inset-bottom,0px\)\)!important/);
 });
+
+
+test('mobile Liquid Glass ride sheet hides the inner-rim seam', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('remove mobile Liquid Glass ride-sheet seam');
+  assert.ok(marker >= 0);
+  const mobile = css.slice(marker);
+  assert.match(mobile, /@media \(max-width:1023px\)/);
+  assert.match(mobile, /:root\[data-preview-surface="liquid"\] \.ride-sheet::after/);
+  assert.match(mobile, /display:none!important/);
+});

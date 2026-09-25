@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.7.2";
+const VERSION = "1.7.3";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -100,7 +100,6 @@ export default {
 
     try {
       if (request.method === "GET" && url.pathname === "/health") {
-        await ensureNotificationSchema(env).catch(() => {});
         const notificationEngine = await getNotificationHealth(env);
         return json({
           ok: true,
@@ -1082,6 +1081,7 @@ async function fetchCurrentRideSnapshot(env) {
 }
 
 async function runManualRefresh(env) {
+  await ensureNotificationSchema(env);
   const snapshot = await fetchCurrentRideSnapshot(env);
 
   await writeCurrentRideSnapshot(env, snapshot.rides);
@@ -1238,6 +1238,13 @@ async function runRideWatch(env) {
   console.log("Alert job: saving history and checkpoint");
   await writeCurrentRideSnapshot(env, current);
   await writeCurrentRideSnapshot(env, current, true);
+  await env.DB.prepare(
+    `INSERT INTO worker_state(state_key,updated_at,payload)
+     VALUES('alert-engine',?,?)
+     ON CONFLICT(state_key) DO UPDATE SET
+       updated_at=excluded.updated_at,
+       payload=excluded.payload`
+  ).bind(Date.now(), JSON.stringify({ checkpointRides: current.length, cadenceMinutes: 5 })).run();
   console.log("Alert job: complete");
 }
 
@@ -1622,25 +1629,27 @@ async function getAnalyticsStatus(env) {
   const now = Date.now();
 
   try {
-    const [metaResult, history30d, historyRecent] = await Promise.all([
-      env.DB.prepare(
-        "SELECT ride_key,status,slot_count,refreshed_at,last_error FROM ride_baseline_meta"
-      ).all(),
-      env.DB.prepare(
-        `SELECT COUNT(*) AS sample_count,
-                COUNT(DISTINCT ride_key) AS ride_count,
-                MAX(observed_at) AS latest_observation
-         FROM ride_history
-         WHERE observed_at >= ?`
-      ).bind(now - 31 * 24 * 60 * 60 * 1000).first(),
-      env.DB.prepare(
-        `SELECT COUNT(*) AS sample_count,
-                COUNT(DISTINCT ride_key) AS ride_count,
-                MAX(observed_at) AS latest_observation
-         FROM ride_history
-         WHERE observed_at >= ?`
-      ).bind(now - HISTORY_HEALTH_WINDOW_MS).first()
-    ]);
+    const metaResult = await env.DB.prepare(
+      "SELECT ride_key,status,slot_count,refreshed_at,last_error FROM ride_baseline_meta"
+    ).all();
+
+    let historyState = null;
+    try {
+      historyState = await env.DB.prepare(
+        "SELECT updated_at,payload FROM worker_state WHERE state_key='history-sampler'"
+      ).first();
+    } catch {
+      // One-release migration fallback: at most ~47 rows instead of scanning ride_history.
+      const checkpoint = await env.DB.prepare(
+        "SELECT COUNT(*) AS ride_count, MAX(updated_at) AS latest FROM ride_state_v2"
+      ).first();
+      historyState = checkpoint?.latest
+        ? {
+            updated_at: Number(checkpoint.latest),
+            payload: JSON.stringify({ rides: Number(checkpoint.ride_count || 0) })
+          }
+        : null;
+    }
 
     const rows = metaResult.results || [];
     const ready = rows.filter((row) => row.status === "ok" && Number(row.slot_count) > 0);
@@ -1657,9 +1666,12 @@ async function getAnalyticsStatus(env) {
       .sort((a, b) => b.count - a.count || a.message.localeCompare(b.message))
       .slice(0, 5);
 
-    const latestHistoryMs = Number(history30d?.latest_observation || 0);
+    let historyPayload = {};
+    try { historyPayload = JSON.parse(historyState?.payload || "{}"); } catch {}
+    const latestHistoryMs = Number(historyState?.updated_at || 0);
+    const latestRideCount = Number(historyPayload?.rides || 0);
     const historyCollecting =
-      Number(historyRecent?.sample_count || 0) > 0 &&
+      latestRideCount > 0 &&
       latestHistoryMs > 0 &&
       now - latestHistoryMs <= HISTORY_HEALTH_WINDOW_MS;
 
@@ -1681,14 +1693,15 @@ async function getAnalyticsStatus(env) {
         : latestHistoryMs > 0
           ? "stale"
           : "waiting",
-      historySamples: Number(history30d?.sample_count || 0),
-      historyRides: Number(history30d?.ride_count || 0),
-      recentHistorySamples: Number(historyRecent?.sample_count || 0),
-      recentHistoryRides: Number(historyRecent?.ride_count || 0),
+      historySamples: null,
+      historyRides: latestRideCount,
+      recentHistorySamples: latestRideCount,
+      recentHistoryRides: latestRideCount,
       latestHistorySample: latestHistoryMs
         ? new Date(latestHistoryMs).toISOString()
         : null,
-      historyHealthWindowMinutes: HISTORY_HEALTH_WINDOW_MS / 60000
+      historyHealthWindowMinutes: HISTORY_HEALTH_WINDOW_MS / 60000,
+      diagnosticsMode: "worker-state"
     };
   } catch {
     return {
@@ -1703,13 +1716,14 @@ async function getAnalyticsStatus(env) {
       themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),
       historyCollecting: false,
       historyStatus: "unavailable",
-      historySamples: 0,
+      historySamples: null,
       historyRides: 0,
       recentHistorySamples: 0,
       recentHistoryRides: 0,
       latestHistorySample: null,
       historyHealthWindowMinutes: HISTORY_HEALTH_WINDOW_MS / 60000,
-      reason: "schema-not-ready"
+      diagnosticsMode: "unavailable",
+      reason: "analytics-unavailable"
     };
   }
 }
@@ -1744,27 +1758,40 @@ async function getRideInsights(env, rideKey) {
   let baseline = null;
 
   try {
-    todayRows = (await env.DB.prepare(
-      `SELECT wait_time,observed_at FROM ride_history
-       WHERE ride_key=? AND observed_at>=? AND is_open=1 AND wait_time IS NOT NULL
-       ORDER BY observed_at ASC`
-    ).bind(rideKey, todayStart).all()).results || [];
+    const [todayResult, baselineResult, latestResult] = await Promise.all([
+      env.DB.prepare(
+        `SELECT wait_time,observed_at FROM ride_history
+         WHERE ride_key=? AND observed_at>=? AND is_open=1 AND wait_time IS NOT NULL
+         ORDER BY observed_at ASC`
+      ).bind(rideKey, todayStart).all(),
+      env.DB.prepare(
+        `SELECT median_wait,p25_wait,p75_wait,mean_wait,sample_minutes,sample_days,refreshed_at
+         FROM ride_baseline WHERE ride_key=? AND slot_minute=?`
+      ).bind(rideKey, slotMinute).first(),
+      env.DB.prepare(
+        `SELECT wait_time,is_open,source,source_updated_at,updated_at
+         FROM ride_state_v2 WHERE ride_key=?`
+      ).bind(rideKey).first()
+    ]);
 
-    historyRows = (await env.DB.prepare(
-      `SELECT wait_time,observed_at FROM ride_history
-       WHERE ride_key=? AND observed_at>=? AND observed_at<? AND is_open=1 AND wait_time IS NOT NULL
-       ORDER BY observed_at ASC`
-    ).bind(rideKey, now - 30 * 24 * 60 * 60 * 1000, todayStart).all()).results || [];
+    todayRows = todayResult.results || [];
+    baseline = baselineResult;
+    latest = latestResult;
 
-    baseline = await env.DB.prepare(
-      `SELECT median_wait,p25_wait,p75_wait,mean_wait,sample_minutes,sample_days,refreshed_at
-       FROM ride_baseline WHERE ride_key=? AND slot_minute=?`
-    ).bind(rideKey, slotMinute).first();
+    const baselineReady =
+      baseline &&
+      Number(baseline.sample_days || 0) >= 5 &&
+      Number(baseline.sample_minutes || 0) >= 60;
 
-    latest = await env.DB.prepare(
-      `SELECT wait_time,is_open,source,source_updated_at,updated_at
-       FROM ride_state_v2 WHERE ride_key=?`
-    ).bind(rideKey).first();
+    // Baseline-ready rides already have the comparison we need. Avoid reading
+    // up to 30 days of raw samples on every ride-sheet open.
+    if (!baselineReady) {
+      historyRows = (await env.DB.prepare(
+        `SELECT wait_time,observed_at FROM ride_history
+         WHERE ride_key=? AND observed_at>=? AND observed_at<? AND is_open=1 AND wait_time IS NOT NULL
+         ORDER BY observed_at ASC`
+      ).bind(rideKey, now - 30 * 24 * 60 * 60 * 1000, todayStart).all()).results || [];
+    }
   } catch {
     return {
       rideId: rideKey,
@@ -1918,6 +1945,15 @@ async function writeCurrentRideSnapshot(env, rides, notificationCheckpoint = fal
          FROM json_each(?2)`
       ).bind(bucket, JSON.stringify(historyRows))
     );
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO worker_state(state_key,updated_at,payload)
+         VALUES('history-sampler',?,?)
+         ON CONFLICT(state_key) DO UPDATE SET
+           updated_at=excluded.updated_at,
+           payload=excluded.payload`
+      ).bind(bucket, JSON.stringify({ rides: historyRows.length }))
+    );
   }
 
   if (statements.length) await env.DB.batch(statements);
@@ -1944,17 +1980,46 @@ async function ensureNotificationSchema(env) {
       last_sent INTEGER NOT NULL,
       PRIMARY KEY (endpoint, ride_key, kind)
     )`),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_notification_log_v2_last_sent ON notification_log_v2(last_sent)")
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_notification_log_v2_last_sent ON notification_log_v2(last_sent)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS worker_state (
+      state_key TEXT PRIMARY KEY,
+      updated_at INTEGER NOT NULL,
+      payload TEXT NOT NULL DEFAULT '{}'
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ride_history_observed_at ON ride_history(observed_at)")
   ]);
+}
+
+function d1FailureReason(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return /limit|quota|rows? read|exceeded/.test(message)
+    ? "d1-read-limit"
+    : "d1-unavailable";
 }
 
 async function getNotificationHealth(env) {
   try {
-    const checkpoint = await env.DB.prepare(
-      "SELECT COUNT(*) AS rides, MAX(updated_at) AS latest FROM notification_ride_state"
-    ).first();
+    let checkpoint = null;
+    try {
+      checkpoint = await env.DB.prepare(
+        "SELECT updated_at,payload FROM worker_state WHERE state_key='alert-engine'"
+      ).first();
+    } catch {
+      // One-release migration fallback before the next scheduled run creates worker_state.
+      const legacy = await env.DB.prepare(
+        "SELECT COUNT(*) AS rides, MAX(updated_at) AS latest FROM notification_ride_state"
+      ).first();
+      if (legacy?.latest) {
+        checkpoint = {
+          updated_at: Number(legacy.latest),
+          payload: JSON.stringify({ checkpointRides: Number(legacy.rides || 0), cadenceMinutes: 5 })
+        };
+      }
+    }
 
-    const latestMs = Number(checkpoint?.latest || 0);
+    let payload = {};
+    try { payload = JSON.parse(checkpoint?.payload || "{}"); } catch {}
+    const latestMs = Number(checkpoint?.updated_at || 0);
     const ageMs = latestMs ? Date.now() - latestMs : null;
     const healthyWindowMs = 15 * 60 * 1000;
     const status = !latestMs
@@ -1967,16 +2032,18 @@ async function getNotificationHealth(env) {
       ready: status === "running",
       status,
       lastCheck: latestMs ? new Date(latestMs).toISOString() : null,
-      checkpointRides: Number(checkpoint?.rides || 0),
-      cadenceMinutes: 5
+      checkpointRides: Number(payload?.checkpointRides || 0),
+      cadenceMinutes: Number(payload?.cadenceMinutes || 5),
+      source: "worker-state"
     };
-  } catch {
+  } catch (error) {
     return {
       ready: false,
       status: "unavailable",
       lastCheck: null,
       checkpointRides: 0,
-      cadenceMinutes: 5
+      cadenceMinutes: 5,
+      reason: d1FailureReason(error)
     };
   }
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.10 — 2026-09-25
+
+- Fixed desktop wait-target controls so the − / value / unit / + group stays compact and cannot run into or clip against the ride-sheet edge.
+- Boosted desktop seasonal ambience slightly so it remains visible behind the wider desktop glass layout.
+- Added a static seasonal fallback when the OS/browser requests reduced motion, preserving seasonal color and decoration without forcing animation.
+- Kept the 1.8.8/1.8.9 ride-sheet divider and glass-shading cleanup intact.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.9 — 2026-09-25
 
 - Softened desktop ride-card glass highlights so wide light-mode cards no longer show a harsh diagonal/dark shading band.

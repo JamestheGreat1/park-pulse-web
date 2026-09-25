@@ -438,3 +438,19 @@ test('mobile Liquid Glass ride sheet removes internal overlay shading and duplic
   assert.match(mobile, /display:none!important/);
   assert.match(mobile, /\.ride-history\{[^}]*border-bottom:0!important/s);
 });
+
+
+test('desktop ride cards keep subtle glass shading', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('soften desktop ride-card glass shading');
+  assert.ok(marker >= 0);
+  const desktop = css.slice(marker);
+  assert.match(desktop, /@media \(min-width:1024px\)/);
+  assert.match(desktop, /data-preview-surface="liquid"\] \.ride-card::before/);
+  assert.match(desktop, /opacity:\.48/);
+  assert.match(desktop, /scale\(1\.02\)/);
+  assert.match(desktop, /data-preview-surface="liquid"\] \.ride-card::after/);
+  assert.match(desktop, /opacity:\.58/);
+  assert.match(desktop, /data-preview-surface="neutral"\] \.ride-card::before/);
+  assert.match(desktop, /--glass-interaction-shift:2px/);
+});

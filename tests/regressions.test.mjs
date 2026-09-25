@@ -479,3 +479,10 @@ test('desktop seasonal ambience remains visible and reduced motion gets a static
   assert.match(seasonal, /seasonal-layer > \.seasonal-particle:nth-child\(-n\+14\)/);
   assert.match(seasonal, /animation:none!important/);
 });
+
+
+test('wait graph keeps average line without duplicate average text', () => {
+  const chart = app.slice(app.indexOf('const avgY = yValue(average)'), app.indexOf('const timeFormat', app.indexOf('const avgY = yValue(average)')));
+  assert.match(chart, /history-average-line/);
+  assert.doesNotMatch(chart, /history-average-label|avg \$\{average\}m/);
+});

@@ -4662,26 +4662,26 @@ body{
 /* v1.8.10 — desktop ride-sheet controls + seasonal parity */
 @media (min-width:1024px){
   .threshold-controls{
-    display:flex!important;
-    width:max-content;
-    max-width:100%;
-    margin:8px 0 0 auto!important;
+    display:grid!important;
+    grid-template-columns:44px auto auto 44px!important;
+    width:max-content!important;
+    max-width:calc(100% - 32px)!important;
+    margin:10px auto 0!important;
     align-items:center;
-    justify-content:flex-end!important;
+    justify-content:center!important;
     gap:8px;
   }
   .threshold-controls button{
-    flex:0 0 44px;
-    width:44px;
+    width:44px!important;
+    min-width:44px!important;
   }
   .threshold-controls output{
-    flex:0 0 auto;
     min-width:58px!important;
     text-align:right;
   }
   .threshold-controls>span{
-    flex:0 0 auto;
     margin-left:-3px;
+    white-space:nowrap;
   }
 
   /* Desktop has more glass/card coverage, so keep the ambience equally legible. */

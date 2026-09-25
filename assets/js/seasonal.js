@@ -23,6 +23,7 @@ export const INTENSITIES = [
 
 export const SURFACES = [
   { id: "neutral", label: "Neutral frosted glass" },
+  { id: "liquid", label: "Full Liquid Glass" },
   { id: "navy", label: "Current navy glass" }
 ];
 

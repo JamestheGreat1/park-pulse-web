@@ -3520,3 +3520,192 @@ body{
   opacity:.72;
 }
 
+
+/* v1.8.0-preview.29 — Full Liquid Glass A/B/C study.
+   Lower-opacity lenses, stronger refraction, brighter optical edges. */
+:root[data-preview-surface="liquid"]{
+  --glass:rgba(126,136,153,.055);
+  --glass-strong:rgba(118,128,147,.105);
+  --glass-thin:rgba(136,146,163,.045);
+  --glass-mid:rgba(130,140,158,.070);
+  --glass-thick:rgba(120,131,151,.110);
+  --glass-edge:rgba(255,255,255,.285);
+  --glass-edge-soft:rgba(255,255,255,.145);
+  --glass-shadow:rgba(0,0,0,.13);
+  --border:rgba(255,255,255,.19);
+  --hair:rgba(255,255,255,.090);
+  --shadow:0 24px 76px rgba(0,0,0,.16);
+}
+:root[data-theme="light"][data-preview-surface="liquid"]{
+  --glass:rgba(255,255,255,.135);
+  --glass-strong:rgba(255,255,255,.225);
+  --glass-thin:rgba(255,255,255,.105);
+  --glass-mid:rgba(255,255,255,.155);
+  --glass-thick:rgba(255,255,255,.235);
+  --glass-edge:rgba(255,255,255,.88);
+  --glass-edge-soft:rgba(255,255,255,.58);
+  --glass-shadow:rgba(65,74,90,.09);
+  --border:rgba(255,255,255,.72);
+  --hair:rgba(50,60,75,.075);
+  --shadow:0 22px 62px rgba(70,82,100,.10);
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"]{
+    --glass:rgba(255,255,255,.135);
+    --glass-strong:rgba(255,255,255,.225);
+    --glass-thin:rgba(255,255,255,.105);
+    --glass-mid:rgba(255,255,255,.155);
+    --glass-thick:rgba(255,255,255,.235);
+    --glass-edge:rgba(255,255,255,.88);
+    --glass-edge-soft:rgba(255,255,255,.58);
+    --glass-shadow:rgba(65,74,90,.09);
+    --border:rgba(255,255,255,.72);
+    --hair:rgba(50,60,75,.075);
+    --shadow:0 22px 62px rgba(70,82,100,.10);
+  }
+}
+
+/* Generic glass gets almost-clear fill; the background does the coloring. */
+:root[data-preview-surface="liquid"] .liquid-glass,
+:root[data-preview-surface="liquid"] .glass-control{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.090),rgba(255,255,255,.010) 38%,rgba(var(--blue-rgb),.018) 100%),
+    var(--glass)!important;
+  border-color:var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.24),
+    inset 1px 0 0 rgba(255,255,255,.075),
+    inset 0 -1px 0 rgba(0,0,0,.055),
+    0 18px 46px var(--glass-shadow)!important;
+  backdrop-filter:blur(38px) saturate(185%) contrast(105%) brightness(1.025)!important;
+  -webkit-backdrop-filter:blur(38px) saturate(185%) contrast(105%) brightness(1.025)!important;
+}
+
+/* Thin lenses: ride/watch cards should visibly transmit the ambient color behind them. */
+:root[data-preview-surface="liquid"] .ride-card,
+:root[data-preview-surface="liquid"] .watch-card{
+  position:relative;
+  background:
+    linear-gradient(150deg,rgba(255,255,255,.085) 0%,rgba(255,255,255,.012) 34%,transparent 62%,rgba(var(--blue-rgb),.022) 100%),
+    var(--glass-thin)!important;
+  border:1px solid var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.28),
+    inset 1px 0 0 rgba(255,255,255,.075),
+    inset 0 -1px 0 rgba(0,0,0,.055),
+    0 15px 42px var(--glass-shadow)!important;
+  backdrop-filter:blur(34px) saturate(195%) contrast(105%) brightness(1.025)!important;
+  -webkit-backdrop-filter:blur(34px) saturate(195%) contrast(105%) brightness(1.025)!important;
+}
+
+/* Medium lenses keep enough optical mass for text-heavy surfaces. */
+:root[data-preview-surface="liquid"] .hero-card,
+:root[data-preview-surface="liquid"] .settings-group,
+:root[data-preview-surface="liquid"] .toolbar{
+  position:relative;
+  background:
+    linear-gradient(148deg,rgba(255,255,255,.105) 0%,rgba(255,255,255,.015) 36%,transparent 65%,rgba(var(--blue-rgb),.026) 100%),
+    var(--glass-mid)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.32),
+    inset 1px 0 0 rgba(255,255,255,.09),
+    inset 0 -1px 0 rgba(0,0,0,.060),
+    0 20px 54px var(--glass-shadow)!important;
+  backdrop-filter:blur(44px) saturate(205%) contrast(106%) brightness(1.03)!important;
+  -webkit-backdrop-filter:blur(44px) saturate(205%) contrast(106%) brightness(1.03)!important;
+}
+
+/* Thick lenses: navigation and sheets get the strongest "optical glass" treatment. */
+:root[data-preview-surface="liquid"] .bottom-nav,
+:root[data-preview-surface="liquid"] .ride-sheet,
+:root[data-preview-surface="liquid"] .install-help-sheet{
+  position:relative;
+  background:
+    linear-gradient(150deg,rgba(255,255,255,.135) 0%,rgba(255,255,255,.022) 36%,transparent 64%,rgba(var(--blue-rgb),.032) 100%),
+    var(--glass-thick)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.36),
+    inset 1px 0 0 rgba(255,255,255,.105),
+    inset 0 -1px 0 rgba(0,0,0,.075),
+    0 24px 72px rgba(0,0,0,.17)!important;
+  backdrop-filter:blur(54px) saturate(215%) contrast(107%) brightness(1.035)!important;
+  -webkit-backdrop-filter:blur(54px) saturate(215%) contrast(107%) brightness(1.035)!important;
+}
+
+/* Specular highlight/refraction layer: brighter, thinner and more lens-like. */
+:root[data-preview-surface="liquid"] .ride-card::before,
+:root[data-preview-surface="liquid"] .watch-card::before,
+:root[data-preview-surface="liquid"] .hero-card::before,
+:root[data-preview-surface="liquid"] .settings-group::before,
+:root[data-preview-surface="liquid"] .toolbar::before,
+:root[data-preview-surface="liquid"] .bottom-nav::before,
+:root[data-preview-surface="liquid"] .ride-sheet::before,
+:root[data-preview-surface="liquid"] .install-help-sheet::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  z-index:0;
+  background:
+    radial-gradient(120% 76% at 18% -8%,rgba(255,255,255,.22),transparent 42%),
+    linear-gradient(118deg,
+      rgba(255,255,255,.245) 0%,
+      rgba(255,255,255,.075) 12%,
+      transparent 29%,
+      transparent 73%,
+      rgba(var(--blue-rgb),.055) 100%)!important;
+  opacity:.92;
+}
+:root[data-preview-surface="liquid"] .ride-card>*,
+:root[data-preview-surface="liquid"] .watch-card>*,
+:root[data-preview-surface="liquid"] .hero-card>*,
+:root[data-preview-surface="liquid"] .settings-group>*,
+:root[data-preview-surface="liquid"] .toolbar>*,
+:root[data-preview-surface="liquid"] .bottom-nav>*,
+:root[data-preview-surface="liquid"] .ride-sheet>*,
+:root[data-preview-surface="liquid"] .install-help-sheet>*{
+  position:relative;
+  z-index:1;
+}
+
+/* Keep selected/watching states glassy: accent belongs on edges and icons, not opaque fills. */
+:root[data-preview-surface="liquid"] .ride-card.watching{
+  background:
+    linear-gradient(150deg,rgba(255,255,255,.095),rgba(255,255,255,.014) 44%,rgba(var(--blue-rgb),.030)),
+    var(--glass-thin)!important;
+  border-color:rgba(var(--blue-rgb),.34)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.30),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.055),
+    0 16px 44px var(--glass-shadow)!important;
+}
+:root[data-preview-surface="liquid"] .park-chip.active,
+:root[data-preview-surface="liquid"] .filter-button.active,
+:root[data-preview-surface="liquid"] .nav-item.active,
+:root[data-preview-surface="liquid"] .mini-toggle.active{
+  background:rgba(255,255,255,.040)!important;
+  border-color:rgba(var(--blue-rgb),.32)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.16),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.07)!important;
+  color:var(--blue);
+}
+
+:root[data-preview-surface="liquid"] .search{
+  background:rgba(20,24,31,.085)!important;
+  border-color:var(--glass-edge-soft)!important;
+  backdrop-filter:blur(34px) saturate(185%)!important;
+  -webkit-backdrop-filter:blur(34px) saturate(185%)!important;
+}
+:root[data-theme="light"][data-preview-surface="liquid"] .search{
+  background:rgba(255,255,255,.16)!important;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"] .search{
+    background:rgba(255,255,255,.16)!important;
+  }
+}
+

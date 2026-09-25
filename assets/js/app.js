@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.28";
-import { store } from "./store.js?v=1.8.0-preview.28";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.28";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.28";
-import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.28";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.29";
+import { store } from "./store.js?v=1.8.0-preview.29";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.29";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.29";
+import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.29";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.8.0-preview.28";
+const APP_VERSION = "1.8.0-preview.29";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;

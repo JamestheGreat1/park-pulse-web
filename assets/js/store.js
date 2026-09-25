@@ -11,6 +11,14 @@ const defaults = {
   favorites: [],
   mustDo: [],
   favoritesOnly: false,
+  parkDay: {
+    active: false,
+    parkId: null,
+    startedAt: null,
+    expiresAt: null,
+    currentRideId: null,
+    completedRideIds: []
+  },
   rules: []
 };
 
@@ -39,6 +47,17 @@ export class Store extends EventTarget {
     this.state = { ...defaults, ...saved };
     this.state.favorites = [...new Set((Array.isArray(saved.favorites) ? saved.favorites : []).filter(id => typeof id === "string" && id.length < 120))];
     this.state.mustDo = [...new Set((Array.isArray(saved.mustDo) ? saved.mustDo : []).filter(id => typeof id === "string" && id.length < 120))];
+    const savedParkDay = saved.parkDay && typeof saved.parkDay === "object" ? saved.parkDay : {};
+    const parkDayExpired = Number(savedParkDay.expiresAt || 0) > 0 && Number(savedParkDay.expiresAt) <= Date.now();
+    this.state.parkDay = {
+      active: Boolean(savedParkDay.active) && !parkDayExpired,
+      parkId: Number.isFinite(Number(savedParkDay.parkId)) ? Number(savedParkDay.parkId) : null,
+      startedAt: Number.isFinite(Number(savedParkDay.startedAt)) ? Number(savedParkDay.startedAt) : null,
+      expiresAt: Number.isFinite(Number(savedParkDay.expiresAt)) ? Number(savedParkDay.expiresAt) : null,
+      currentRideId: typeof savedParkDay.currentRideId === "string" ? savedParkDay.currentRideId : null,
+      completedRideIds: [...new Set((Array.isArray(savedParkDay.completedRideIds) ? savedParkDay.completedRideIds : []).filter(id => typeof id === "string" && id.length < 120))]
+    };
+    if (!this.state.parkDay.active) this.state.parkDay.currentRideId = null;
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
     if (!["blue","cyan","violet","pink","orange","green","red","gold"].includes(this.state.accent)) this.state.accent = "blue";
     this.pruneExpired(false);
@@ -70,6 +89,52 @@ export class Store extends EventTarget {
       state.mustDo = state.mustDo.filter(id => id !== String(rideId));
       if (enabled) state.mustDo.push(String(rideId));
     }, "preferences");
+  }
+  startParkDay(parkId, expiresAt) {
+    this.update(state => {
+      state.parkDay = {
+        active: true,
+        parkId: Number(parkId),
+        startedAt: Date.now(),
+        expiresAt: Number(expiresAt) || null,
+        currentRideId: null,
+        completedRideIds: []
+      };
+    }, "park-day");
+  }
+  endParkDay() {
+    this.update(state => {
+      state.parkDay = {
+        active: false,
+        parkId: null,
+        startedAt: null,
+        expiresAt: null,
+        currentRideId: null,
+        completedRideIds: []
+      };
+    }, "park-day");
+  }
+  setParkDayCurrent(rideId, parkId = null) {
+    this.update(state => {
+      if (!state.parkDay?.active) return;
+      state.parkDay.currentRideId = rideId == null ? null : String(rideId);
+      if (parkId != null && Number.isFinite(Number(parkId))) state.parkDay.parkId = Number(parkId);
+    }, "park-day");
+  }
+  completeParkDayRide(rideId) {
+    this.update(state => {
+      if (!state.parkDay?.active) return;
+      const id = String(rideId);
+      state.parkDay.completedRideIds = [...new Set([...(state.parkDay.completedRideIds || []), id])];
+      if (String(state.parkDay.currentRideId || "") === id) state.parkDay.currentRideId = null;
+    }, "park-day");
+  }
+  uncompleteParkDayRide(rideId) {
+    this.update(state => {
+      if (!state.parkDay?.active) return;
+      const id = String(rideId);
+      state.parkDay.completedRideIds = (state.parkDay.completedRideIds || []).filter(item => String(item) !== id);
+    }, "park-day");
   }
   ruleForRide(rideId) {
     this.pruneExpired(false);

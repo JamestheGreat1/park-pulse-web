@@ -2604,3 +2604,88 @@ body{
   }
 }
 
+
+/* v1.8.0-preview.19 — sparkling ascent + smooth Minecraft burst. */
+
+/* Sparkle the square rocket particles while preserving the smooth climb. */
+:root[data-season="july4"] .seasonal-particle::before{
+  animation:
+    mc-rocket-rise var(--mc-cycle) linear infinite,
+    mc-rocket-sparkle .34s ease-in-out infinite!important;
+  animation-delay:
+    var(--particle-delay),
+    var(--particle-delay)!important;
+  will-change:transform,opacity,filter;
+}
+
+/* Smooth burst expansion instead of step-snapping between keyframes. */
+:root[data-season="july4"] .seasonal-particle::after{
+  animation:mc-firework-pop var(--mc-cycle) cubic-bezier(.14,.72,.24,1) infinite!important;
+  animation-delay:var(--particle-delay)!important;
+  will-change:transform,opacity,filter;
+}
+
+@keyframes mc-rocket-sparkle{
+  0%,100%{
+    filter:drop-shadow(0 0 2px currentColor) brightness(.92);
+  }
+  22%{
+    filter:drop-shadow(0 0 3px currentColor) brightness(1.45);
+  }
+  48%{
+    filter:drop-shadow(0 0 2px currentColor) brightness(1.02);
+  }
+  72%{
+    filter:drop-shadow(0 0 4px currentColor) brightness(1.72);
+  }
+}
+
+/* The pop grows continuously, then gets one soft Minecraft-like twinkle before fading. */
+@keyframes mc-firework-pop{
+  0%,61%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(.08);
+    filter:drop-shadow(0 0 2px currentColor) brightness(1);
+  }
+  63%{
+    opacity:.72;
+    transform:rotate(var(--mc-rotate)) scale(.28);
+    filter:drop-shadow(0 0 3px currentColor) brightness(1.18);
+  }
+  67%{
+    opacity:1;
+    transform:rotate(var(--mc-rotate)) scale(.58);
+    filter:drop-shadow(0 0 4px currentColor) brightness(1.35);
+  }
+  72%{
+    opacity:.94;
+    transform:rotate(var(--mc-rotate)) scale(.88);
+    filter:drop-shadow(0 0 4px currentColor) brightness(1.15);
+  }
+  77%{
+    opacity:.82;
+    transform:rotate(var(--mc-rotate)) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 5px currentColor) brightness(1.08);
+  }
+  81%{
+    opacity:.38;
+    transform:rotate(var(--mc-rotate)) scale(1.07) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 3px currentColor) brightness(.92);
+  }
+  84%{
+    opacity:.68;
+    transform:rotate(var(--mc-rotate)) scale(1.10) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 5px currentColor) brightness(1.45);
+  }
+  89%{
+    opacity:.24;
+    transform:rotate(var(--mc-rotate)) scale(1.13) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 2px currentColor) brightness(.88);
+  }
+  100%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(1.16) scale(var(--mc-burst-scale));
+    filter:drop-shadow(0 0 1px currentColor) brightness(.82);
+  }
+}
+

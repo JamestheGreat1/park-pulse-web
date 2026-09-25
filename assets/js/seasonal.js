@@ -349,12 +349,23 @@ export function applySeasonalTheme() {
   const surface = isSeasonPreviewEnabled() ? previewSurfaceSetting() : "navy";
   const root = document.documentElement;
   const effectsEnabled = seasonalEffectsEnabled();
+  const visualLayerChanged =
+    root.dataset.season !== season ||
+    root.dataset.seasonIntensity !== intensity ||
+    root.dataset.previewSurface !== surface ||
+    root.dataset.seasonalEffects !== (effectsEnabled ? "on" : "off");
 
   root.dataset.seasonalEffects = effectsEnabled ? "on" : "off";
   root.dataset.season = season;
   root.dataset.seasonIntensity = intensity;
   root.dataset.previewSurface = surface;
   root.classList.toggle("season-active", season !== "none");
+
+  if (visualLayerChanged) {
+    root.classList.add("glass-color-snap");
+    void root.offsetWidth;
+    requestAnimationFrame(() => root.classList.remove("glass-color-snap"));
+  }
 
   const seasonalLayer = ensureSeasonalLayer();
   ensureFireworksField(seasonalLayer);
@@ -390,7 +401,7 @@ export function seasonalPreviewControlsMarkup() {
       <label class="setting-row"><div><strong>Intensity</strong><small>Testing-only control. Public seasonal effects will use the approved default.</small></div>
         <select id="seasonIntensitySelect">${INTENSITIES.map((item) => `<option value="${item.id}" ${intensity === item.id ? "selected" : ""}>${item.label}</option>`).join("")}</select>
       </label>
-      <label class="setting-row"><div><strong>Glass style</strong><small>Compare neutral frosted surfaces against the current navy treatment.</small></div>
+      <label class="setting-row"><div><strong>Glass style</strong><small>Compare frosted, full Liquid Glass, and the original navy treatment.</small></div>
         <select id="previewSurfaceSelect">${SURFACES.map((item) => `<option value="${item.id}" ${surface === item.id ? "selected" : ""}>${item.label}</option>`).join("")}</select>
       </label>
     </section>

@@ -4070,3 +4070,103 @@ body{
   }
 }
 
+
+/* v1.8.0-preview.32 — black canvas + colorless Liquid Glass + instant color response. */
+
+/* Full Liquid Glass gets a true-black dark canvas. Accent/season layers provide the color. */
+:root[data-preview-surface="liquid"][data-theme="dark"]{
+  --bg:#000;
+  --bg2:#000;
+  --glass:rgba(255,255,255,.040);
+  --glass-strong:rgba(255,255,255,.080);
+  --glass-thin:rgba(255,255,255,.030);
+  --glass-mid:rgba(255,255,255,.050);
+  --glass-thick:rgba(255,255,255,.085);
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="liquid"][data-theme="system"]{
+    --bg:#000;
+    --bg2:#000;
+    --glass:rgba(255,255,255,.040);
+    --glass-strong:rgba(255,255,255,.080);
+    --glass-thin:rgba(255,255,255,.030);
+    --glass-mid:rgba(255,255,255,.050);
+    --glass-thick:rgba(255,255,255,.085);
+  }
+}
+
+:root[data-preview-surface="liquid"][data-theme="dark"] html,
+:root[data-preview-surface="liquid"][data-theme="dark"] body{
+  background-color:#000!important;
+}
+:root[data-preview-surface="liquid"][data-theme="dark"] body{
+  background:
+    radial-gradient(circle at 84% 4%,rgba(var(--blue2-rgb),.145),transparent 34rem),
+    radial-gradient(circle at 8% 54%,rgba(var(--blue-rgb),.075),transparent 30rem),
+    #000!important;
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="liquid"][data-theme="system"] html,
+  :root[data-preview-surface="liquid"][data-theme="system"] body{
+    background-color:#000!important;
+  }
+  :root[data-preview-surface="liquid"][data-theme="system"] body{
+    background:
+      radial-gradient(circle at 84% 4%,rgba(var(--blue2-rgb),.145),transparent 34rem),
+      radial-gradient(circle at 8% 54%,rgba(var(--blue-rgb),.075),transparent 30rem),
+      #000!important;
+  }
+}
+
+/* Neutral lenses: no built-in blue/gray tint. Accent color is opt-in at the refractive edges. */
+:root[data-preview-surface="liquid"] .search{
+  background:rgba(0,0,0,.055)!important;
+}
+
+/* Color changes must snap. Only transforms/opacity keep motion easing. */
+:root[data-preview-surface="liquid"] .ride-card,
+:root[data-preview-surface="liquid"] .watch-card,
+:root[data-preview-surface="liquid"] .park-chip,
+:root[data-preview-surface="liquid"] .nav-item,
+:root[data-preview-surface="liquid"] .filter-button,
+:root[data-preview-surface="liquid"] .setting-action,
+:root[data-preview-surface="liquid"] .mini-toggle,
+:root[data-preview-surface="liquid"] .icon-button,
+:root[data-preview-surface="liquid"] .watch-button,
+:root[data-preview-surface="liquid"] .liquid-glass,
+:root[data-preview-surface="liquid"] .glass-control{
+  transition-property:transform,opacity!important;
+}
+
+/* One-frame repaint state used when accent/theme/season/surface changes. */
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-card,
+:root.glass-color-snap[data-preview-surface="liquid"] .watch-card,
+:root.glass-color-snap[data-preview-surface="liquid"] .hero-card,
+:root.glass-color-snap[data-preview-surface="liquid"] .settings-group,
+:root.glass-color-snap[data-preview-surface="liquid"] .toolbar,
+:root.glass-color-snap[data-preview-surface="liquid"] .bottom-nav,
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-sheet,
+:root.glass-color-snap[data-preview-surface="liquid"] .install-help-sheet,
+:root.glass-color-snap[data-preview-surface="liquid"] .seasonal-layer,
+:root.glass-color-snap[data-preview-surface="liquid"] .ambient{
+  transition:none!important;
+}
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-card::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .watch-card::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .hero-card::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .settings-group::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .toolbar::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .bottom-nav::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-sheet::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .install-help-sheet::before,
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-card::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .watch-card::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .hero-card::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .settings-group::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .toolbar::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .bottom-nav::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .ride-sheet::after,
+:root.glass-color-snap[data-preview-surface="liquid"] .install-help-sheet::after{
+  transition:none!important;
+}
+

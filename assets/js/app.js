@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.31";
-import { store } from "./store.js?v=1.8.0-preview.31";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.31";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.31";
-import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.31";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.32";
+import { store } from "./store.js?v=1.8.0-preview.32";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.32";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.32";
+import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.32";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.8.0-preview.31";
+const APP_VERSION = "1.8.0-preview.32";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -514,8 +514,22 @@ function watchForServiceWorkerUpdate(registration) {
 }
 function setTheme() {
   const state = store.snapshot;
-  document.documentElement.dataset.theme = state.theme;
-  document.documentElement.dataset.accent = state.accent || "blue";
+  const root = document.documentElement;
+  const nextTheme = state.theme;
+  const nextAccent = state.accent || "blue";
+  const visualColorChanged =
+    root.dataset.theme !== nextTheme ||
+    root.dataset.accent !== nextAccent;
+
+  root.dataset.theme = nextTheme;
+  root.dataset.accent = nextAccent;
+
+  if (visualColorChanged) {
+    root.classList.add("glass-color-snap");
+    void root.offsetWidth;
+    requestAnimationFrame(() => root.classList.remove("glass-color-snap"));
+  }
+
   applySeasonalTheme();
 }
 function selectView(name) {

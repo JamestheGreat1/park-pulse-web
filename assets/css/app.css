@@ -1915,3 +1915,226 @@ body{
   }
 }
 
+
+/* v1.8.0-preview.14 — bottom-launch fireworks + heavier Christmas snow. */
+
+/* Christmas: noticeably fuller snowfall at each preview intensity. */
+:root[data-season="christmas"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+25){display:none!important}
+:root[data-season="christmas"][data-season-intensity="normal"] .seasonal-particle:nth-child(n+44){display:none!important}
+:root[data-season="christmas"] .seasonal-particle:nth-child(9n){
+  width:11px;
+  height:11px;
+  opacity:.64;
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(11n){
+  width:3px;
+  height:3px;
+  opacity:.44;
+  box-shadow:0 0 7px rgba(255,255,255,.28);
+}
+
+/* Keep the larger particle pool from making the other seasons unintentionally denser. */
+:root[data-season="halloween"][data-season-intensity="extra"] .seasonal-particle:nth-child(n+41){display:none!important}
+:root[data-season="easter"][data-season-intensity="extra"] .seasonal-particle:nth-child(n+41){display:none!important}
+:root[data-season="july4"] .seasonal-particle:nth-child(n+41){display:none}
+
+/* Firework variants: each rocket has its own launch lean, speed and burst proportions. */
+:root[data-season="july4"] .seasonal-particle{
+  --firework-cycle:7.2s;
+  --trail-lean:-2deg;
+  --trail-start-x:0px;
+  --trail-end-x:0px;
+  --trail-length:82px;
+  --trail-width:2px;
+  --burst-rotate:0deg;
+  --burst-x:1;
+  --burst-y:1;
+  --burst-shadow:
+     1px -38px 0 -1px currentColor,
+    17px -29px 0 -1px currentColor,
+    37px -11px 0 -1px currentColor,
+    30px  16px 0 -1px currentColor,
+    12px  36px 0 -1px currentColor,
+   -12px  31px 0 -1px currentColor,
+   -35px  12px 0 -1px currentColor,
+   -28px -19px 0 -1px currentColor,
+    -9px -31px 0 -1px currentColor,
+    44px   7px 0 -2px rgba(255,255,255,.88),
+   -40px  -4px 0 -2px rgba(255,255,255,.76),
+     5px  46px 0 -2px currentColor;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){
+  --firework-cycle:6.5s;
+  --trail-lean:-5deg;
+  --trail-start-x:22px;
+  --trail-end-x:-3px;
+  --trail-length:96px;
+  --burst-rotate:8deg;
+  --burst-x:1.18;
+  --burst-y:.88;
+  --burst-shadow:
+     0px -44px 0 -1px currentColor,
+    13px -31px 0 -1px currentColor,
+    35px -18px 0 -1px currentColor,
+    42px   9px 0 -2px currentColor,
+    22px  28px 0 -1px currentColor,
+     5px  43px 0 -2px currentColor,
+   -18px  33px 0 -1px currentColor,
+   -39px  11px 0 -2px currentColor,
+   -31px -15px 0 -1px currentColor,
+   -12px -35px 0 -1px rgba(255,255,255,.84);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){
+  --firework-cycle:7.8s;
+  --trail-lean:4deg;
+  --trail-start-x:-28px;
+  --trail-end-x:5px;
+  --trail-length:72px;
+  --trail-width:3px;
+  --burst-rotate:-11deg;
+  --burst-x:.88;
+  --burst-y:1.20;
+  --burst-shadow:
+     2px -34px 0 -1px currentColor,
+    24px -37px 0 -2px currentColor,
+    31px -12px 0 -1px currentColor,
+    24px  20px 0 -1px currentColor,
+     7px  41px 0 -2px currentColor,
+   -17px  37px 0 -1px currentColor,
+   -31px  17px 0 -1px currentColor,
+   -36px  -9px 0 -2px currentColor,
+   -15px -26px 0 -1px currentColor,
+    41px   5px 0 -2px rgba(255,255,255,.90);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){
+  --firework-cycle:6.9s;
+  --trail-lean:-1deg;
+  --trail-start-x:10px;
+  --trail-end-x:-1px;
+  --trail-length:106px;
+  --burst-rotate:17deg;
+  --burst-x:1.06;
+  --burst-y:1.08;
+}
+
+/* Trail begins below the viewport, races up, and is gone before the explosion. */
+:root[data-season="july4"] .seasonal-particle::before{
+  content:"";
+  position:absolute;
+  left:1px;
+  top:1px;
+  width:var(--trail-width);
+  height:var(--trail-length);
+  border-radius:999px;
+  transform-origin:50% 0;
+  background:linear-gradient(
+    180deg,
+    rgba(255,255,255,.98) 0%,
+    currentColor 16%,
+    color-mix(in srgb,currentColor 78%,transparent) 52%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 7px currentColor,
+    0 18px 10px -4px color-mix(in srgb,currentColor 55%,transparent);
+  opacity:0;
+  animation:firework-bottom-launch var(--firework-cycle) cubic-bezier(.18,.76,.20,1) infinite;
+  animation-delay:var(--particle-delay);
+}
+
+/* The explosion uses several deliberately uneven spark maps. */
+:root[data-season="july4"] .seasonal-particle::after{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:var(--burst-shadow);
+  filter:drop-shadow(0 0 4px currentColor);
+  opacity:0;
+  animation:firework-shaped-burst var(--firework-cycle) ease-out infinite;
+  animation-delay:var(--particle-delay);
+  transform-origin:center;
+}
+
+@keyframes firework-bottom-launch{
+  0%,42%{
+    opacity:0;
+    transform:
+      translate3d(var(--trail-start-x),100vh,0)
+      rotate(var(--trail-lean))
+      scaleY(.22);
+  }
+  45%{
+    opacity:.34;
+  }
+  53%{
+    opacity:.92;
+    transform:
+      translate3d(calc((var(--trail-start-x) + var(--trail-end-x)) / 2),48vh,0)
+      rotate(var(--trail-lean))
+      scaleY(.72);
+  }
+  60%{
+    opacity:1;
+    transform:
+      translate3d(var(--trail-end-x),6vh,0)
+      rotate(var(--trail-lean))
+      scaleY(1);
+  }
+  62.5%{
+    opacity:.15;
+    transform:
+      translate3d(var(--trail-end-x),0,0)
+      rotate(var(--trail-lean))
+      scaleY(.38);
+  }
+  63%,100%{
+    opacity:0;
+    transform:
+      translate3d(var(--trail-end-x),-2vh,0)
+      rotate(var(--trail-lean))
+      scaleY(.08);
+  }
+}
+
+@keyframes firework-shaped-burst{
+  0%,62.5%{
+    opacity:0;
+    transform:
+      rotate(var(--burst-rotate))
+      scale(.04);
+  }
+  64%{
+    opacity:.96;
+    transform:
+      rotate(var(--burst-rotate))
+      scaleX(calc(var(--burst-x) * .25))
+      scaleY(calc(var(--burst-y) * .25));
+  }
+  73%{
+    opacity:.94;
+    transform:
+      rotate(calc(var(--burst-rotate) + 4deg))
+      scaleX(calc(var(--burst-x) * .94))
+      scaleY(calc(var(--burst-y) * .94));
+  }
+  84%{
+    opacity:.44;
+    transform:
+      rotate(calc(var(--burst-rotate) + 8deg))
+      scaleX(calc(var(--burst-x) * 1.14))
+      scaleY(calc(var(--burst-y) * 1.14));
+  }
+  100%{
+    opacity:0;
+    transform:
+      rotate(calc(var(--burst-rotate) + 12deg))
+      scaleX(calc(var(--burst-x) * 1.28))
+      scaleY(calc(var(--burst-y) * 1.28));
+  }
+}
+

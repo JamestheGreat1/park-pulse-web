@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.3 — 2026-09-25
+
+- Made the selected park much easier to identify in both Frosted and Liquid Glass while keeping the glass look intact.
+- Strengthened the selected park's accent tint, border, text weight, and subtle glow without dimming the other parks.
+- Aligned frontend module/cache version keys so installed PWAs reliably receive the update.
+- Frontend-only update; no Worker deployment required.
+
+
 ## 1.7.5 — 2026-09-24
 
 - Rebuilt PWA wait-history charts with readable axes, grid lines, average reference, and Low / Average / High summaries.

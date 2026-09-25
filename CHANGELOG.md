@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.5 — 2026-09-25
+
+- Fixed Liquid Glass ride sheets on iPhone/iPad so long ride cards scroll vertically instead of clipping the bottom controls.
+- Preserved horizontal clipping for the glass effect while restoring normal touch scrolling inside the sheet.
+- Added extra safe-area room below the final ride-watch action so controls clear the Home indicator.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.4 — 2026-09-25
 
 - Added a lightweight **Next Up** card with **View ride** and **Show another** for a quick “what should I ride?” answer without turning ParkPulse into a planner.

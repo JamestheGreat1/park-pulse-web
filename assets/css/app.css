@@ -4273,7 +4273,7 @@ body{
 }
 
 
-/* v1.9 preview — Next Up, Park Day Lite, explanations, and quick actions */
+/* v1.9 preview — lightweight Next Up + recommendation context */
 .next-up-card{
   grid-column:1/-1;
   margin:0 0 18px;
@@ -4284,24 +4284,16 @@ body{
   gap:14px;
   overflow:hidden;
 }
-.next-up-card.park-day-active{
-  border-color:rgba(var(--blue-rgb),.28);
-  box-shadow:0 16px 42px rgba(var(--blue2-rgb),.10),inset 0 1px rgba(255,255,255,.06);
+.next-up-head h3{
+  margin:4px 0 5px;
+  font-size:1.08rem;
+  letter-spacing:-.02em;
 }
-.next-up-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-.next-up-head>div{min-width:0}
-.next-up-head h3{margin:4px 0 5px;font-size:1.08rem;letter-spacing:-.02em}
-.next-up-head p{margin:0;color:var(--muted);font-size:.82rem;line-height:1.45}
-.next-up-end{
-  flex:0 0 auto;
-  min-height:38px;
-  padding:0 10px;
-  border:1px solid var(--hair);
-  border-radius:11px;
-  background:rgba(255,255,255,.045);
+.next-up-head p{
+  margin:0;
   color:var(--muted);
-  font-size:.7rem;
-  font-weight:800;
+  font-size:.82rem;
+  line-height:1.45;
 }
 .next-up-ride-row{
   display:grid;
@@ -4322,31 +4314,39 @@ body{
   text-align:left;
 }
 .next-up-ride .ride-land{display:block;margin-bottom:3px}
-.next-up-ride strong{display:block;font-size:1.03rem;line-height:1.25;overflow-wrap:anywhere}
-.next-up-wait{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:76px}
+.next-up-ride strong{
+  display:block;
+  font-size:1.03rem;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+.next-up-wait{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:2px;
+  min-width:76px;
+}
 .next-up-wait b{font-size:1.26rem;line-height:1}
 .next-up-wait b.open{color:var(--good)}
 .next-up-wait b.closed,.next-up-wait b.stale{color:var(--muted)}
-.next-up-wait span{max-width:130px;color:var(--muted);font-size:.67rem;text-align:right}
-.next-up-footnote{margin:-2px 0 0;color:var(--muted);font-size:.72rem;line-height:1.4}
-.park-day-stats{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:7px;
-}
-.park-day-stats span{
-  padding:9px 8px;
-  border-radius:13px;
-  background:rgba(255,255,255,.035);
-  border:1px solid rgba(255,255,255,.035);
+.next-up-wait span{
+  max-width:130px;
   color:var(--muted);
-  font-size:.68rem;
-  text-align:center;
-  line-height:1.3;
+  font-size:.67rem;
+  text-align:right;
 }
-.park-day-stats b{display:block;color:var(--text);font-size:.9rem;margin-bottom:1px}
-.next-up-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.next-up-actions .primary-button{width:auto;margin-top:0;min-height:44px;padding:11px 13px}
+.next-up-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.next-up-actions .primary-button{
+  width:auto;
+  margin-top:0;
+  min-height:44px;
+  padding:11px 13px;
+}
 .secondary-button{
   min-height:44px;
   border:1px solid rgba(var(--blue-rgb),.22);
@@ -4377,477 +4377,29 @@ body{
   flex-direction:column;
   gap:3px;
 }
-.sheet-recommendation span{color:var(--muted);font-size:.67rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
-.sheet-recommendation strong{font-size:.8rem;line-height:1.4}
-
-.ride-actions{grid-template-rows:repeat(3,minmax(40px,1fr))}
-.ride-actions .favorite-button,
-.ride-actions .watch-button,
-.ride-actions .quick-action-button{
-  display:grid;
-  place-items:center;
-  width:100%;
-  min-width:0;
-  min-height:40px;
-  margin:0;
-  padding:9px;
-  border:0;
-  border-radius:0;
-  background:transparent;
+.sheet-recommendation span{
   color:var(--muted);
-  box-shadow:none;
-  touch-action:manipulation;
+  font-size:.67rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-weight:800;
 }
-.ride-actions .watch-button,
-.ride-actions .quick-action-button{border-top:1px solid color-mix(in srgb,var(--muted) 38%,transparent)}
-.ride-actions .quick-action-button svg{fill:currentColor;stroke:none}
-.ride-actions .quick-action-button:hover{color:var(--text)}
-.ride-actions .quick-action-button:focus-visible{outline:2px solid var(--blue);outline-offset:-4px}
-
-.quick-action-backdrop{
-  position:fixed;
-  inset:0;
-  z-index:56;
-  background:rgba(0,0,0,.44);
-  backdrop-filter:blur(5px);
-  -webkit-backdrop-filter:blur(5px);
+.sheet-recommendation strong{
+  font-size:.8rem;
+  line-height:1.4;
 }
-.quick-action-menu{
-  position:fixed;
-  z-index:57;
-  left:50%;
-  bottom:0;
-  width:min(560px,100%);
-  max-height:88vh;
-  overflow:auto;
-  transform:translateX(-50%);
-  padding:10px 14px calc(18px + var(--safe-bottom));
-  border-radius:28px 28px 0 0;
-  background-color:var(--glass-strong);
-  box-shadow:0 -24px 70px rgba(0,0,0,.28);
-}
-.quick-action-handle{width:42px;height:5px;border-radius:999px;background:rgba(255,255,255,.24);margin:2px auto 14px}
-.quick-action-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:0 3px 12px}
-.quick-action-head>div{min-width:0}
-.quick-action-head h2{margin:3px 0 5px;font-size:1.28rem;overflow-wrap:anywhere}
-.quick-action-head p{margin:0;color:var(--muted);font-size:.76rem;line-height:1.4}
-.quick-action-close{
-  width:40px;height:40px;min-width:40px;border-radius:50%;
-  border:1px solid var(--hair);background:rgba(255,255,255,.055);
-  color:var(--text);font-size:1.35rem;
-}
-.quick-action-list{display:flex;flex-direction:column;gap:7px}
-.quick-action-list>button{
-  width:100%;
-  min-height:58px;
-  padding:10px 12px;
-  border:1px solid var(--hair);
-  border-radius:16px;
-  background:rgba(255,255,255,.04);
-  color:var(--text);
-  display:grid;
-  grid-template-columns:34px minmax(0,1fr);
-  gap:10px;
-  align-items:center;
-  text-align:left;
-}
-.quick-action-list>button>span{
-  width:34px;height:34px;border-radius:11px;display:grid;place-items:center;
-  color:var(--blue);background:rgba(var(--blue-rgb),.10);font-weight:900;font-size:1rem
-}
-.quick-action-list>button>div{display:flex;flex-direction:column;gap:2px;min-width:0}
-.quick-action-list strong{font-size:.84rem}
-.quick-action-list small{color:var(--muted);font-size:.7rem;line-height:1.35}
-.quick-action-list button:disabled{opacity:.55}
-.quick-actions-open{overflow:hidden}
-
 @media(min-width:1024px){
   .next-up-card{padding:20px 22px;margin-bottom:16px}
   .next-up-ride-row{padding:15px 16px}
-  .quick-action-menu{
-    top:50%;
-    bottom:auto;
-    width:min(520px,calc(100% - 64px));
-    max-height:min(78vh,700px);
-    transform:translate(-50%,-50%);
-    border-radius:28px;
-    padding:18px;
-  }
-  .quick-action-handle{display:none}
 }
 @media(max-width:640px){
   .next-up-card{padding:15px;margin-top:-4px;border-radius:21px}
-  .next-up-head{gap:10px}
   .next-up-head h3{font-size:1rem}
   .next-up-head p{font-size:.76rem}
-  .next-up-end{min-height:36px;font-size:.66rem}
   .next-up-ride-row{padding:12px}
   .next-up-ride strong{font-size:.94rem}
   .next-up-wait b{font-size:1.12rem}
-  .park-day-stats span{font-size:.64rem;padding:8px 5px}
   .next-up-actions{grid-template-columns:1fr}
-  .ride-card{min-height:120px}
   .recommendation-hint{font-size:.63rem}
 }
-@media(max-width:360px){
-  .park-day-stats{grid-template-columns:1fr}
-  .park-day-stats span{display:flex;align-items:baseline;justify-content:center;gap:5px}
-  .park-day-stats b{display:inline;margin:0}
-}
-@media(prefers-reduced-motion:reduce){
-  .next-up-card,.quick-action-menu,.quick-action-backdrop{transition:none!important}
-}
 
-
-/* v1.9 preview — dedicated Park Day Lite screen */
-.topbar-actions{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex:0 0 auto;
-}
-.park-day-shortcut{
-  min-height:40px;
-  padding:0 13px;
-  border-radius:999px;
-  display:flex;
-  align-items:center;
-  gap:7px;
-  color:var(--blue);
-  font-size:.75rem;
-  font-weight:850;
-  letter-spacing:.01em;
-  white-space:nowrap;
-}
-.park-day-shortcut>span:first-child{
-  font-size:.92rem;
-  line-height:1;
-}
-
-.park-day-page-head{
-  padding:8px 3px 20px;
-}
-.park-day-page-head>.eyebrow{
-  display:block;
-  margin:0 0 4px;
-}
-.park-day-page-head .park-day-back{
-  min-height:38px;
-  margin:0 0 18px;
-  padding:0 11px;
-  border:1px solid var(--hair);
-  border-radius:12px;
-  background:rgba(255,255,255,.045);
-  color:var(--muted);
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  font-weight:800;
-  font-size:.76rem;
-}
-.park-day-page-head h2{
-  margin-top:5px;
-  font-size:clamp(2rem,6vw,3.25rem);
-  letter-spacing:-.045em;
-}
-.park-day-page-head p{
-  margin-top:9px;
-  max-width:640px;
-  color:var(--muted);
-  line-height:1.5;
-}
-.park-day-hero{
-  border-radius:28px;
-  padding:20px;
-  margin-bottom:12px;
-  overflow:hidden;
-  position:relative;
-}
-.park-day-hero:after{
-  content:"";
-  position:absolute;
-  width:180px;
-  height:180px;
-  right:-65px;
-  top:-85px;
-  border-radius:50%;
-  background:radial-gradient(circle,rgba(var(--blue-rgb),.24),transparent 70%);
-  pointer-events:none;
-}
-.park-day-hero-label{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:12px;
-}
-.park-day-current{
-  font-size:.68rem;
-  font-weight:820;
-  color:var(--blue);
-  border:1px solid rgba(var(--blue-rgb),.22);
-  background:rgba(var(--blue-rgb),.08);
-  border-radius:999px;
-  padding:6px 9px;
-}
-.park-day-next-ride{
-  position:relative;
-  z-index:1;
-  width:100%;
-  padding:16px;
-  border:1px solid rgba(var(--blue-rgb),.16);
-  border-radius:20px;
-  background:rgba(var(--blue-rgb),.055);
-  color:var(--text);
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  gap:16px;
-  align-items:center;
-  text-align:left;
-}
-.park-day-next-ride h3{
-  margin:3px 0 5px;
-  font-size:clamp(1.3rem,4vw,1.8rem);
-  letter-spacing:-.03em;
-}
-.park-day-next-ride p{
-  color:var(--muted);
-  font-size:.78rem;
-  line-height:1.4;
-}
-.park-day-next-wait{
-  min-width:90px;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:3px;
-}
-.park-day-next-wait b{
-  font-size:1.55rem;
-  line-height:1;
-}
-.park-day-next-wait b.open,
-.park-day-row-status b.open{color:var(--good)}
-.park-day-next-wait b.closed,
-.park-day-next-wait b.stale,
-.park-day-row-status b.closed,
-.park-day-row-status b.stale{color:var(--muted)}
-.park-day-next-wait span,
-.park-day-row-status small{
-  color:var(--muted);
-  font-size:.67rem;
-  text-align:right;
-}
-.park-day-hero-actions{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-  margin-top:10px;
-}
-.park-day-hero-actions .primary-button{
-  margin-top:0;
-}
-.park-day-no-next{
-  position:relative;
-  z-index:1;
-  padding:20px 4px 6px;
-}
-.park-day-no-next strong{
-  display:block;
-  font-size:1.08rem;
-}
-.park-day-no-next p{
-  margin-top:5px;
-  color:var(--muted);
-  line-height:1.45;
-}
-.park-day-no-next .secondary-button{
-  margin-top:14px;
-}
-.park-day-page-stats{
-  margin:0 0 26px;
-}
-.park-day-section{
-  margin:0 0 22px;
-}
-.park-day-section-head{
-  display:flex;
-  align-items:end;
-  justify-content:space-between;
-  gap:12px;
-  margin:0 2px 10px;
-}
-.park-day-section-head h3{
-  margin-top:3px;
-  font-size:1.1rem;
-}
-.park-day-section-head>span{
-  min-width:30px;
-  height:30px;
-  padding:0 8px;
-  border-radius:999px;
-  display:grid;
-  place-items:center;
-  border:1px solid var(--hair);
-  background:rgba(255,255,255,.04);
-  color:var(--muted);
-  font-size:.72rem;
-  font-weight:850;
-}
-.park-day-list{
-  border-radius:22px;
-  overflow:hidden;
-}
-.park-day-list-row{
-  width:100%;
-  min-height:76px;
-  padding:12px 14px;
-  border:0;
-  border-bottom:1px solid var(--hair);
-  background:transparent;
-  color:var(--text);
-  display:grid;
-  grid-template-columns:32px minmax(0,1fr) auto;
-  gap:11px;
-  align-items:center;
-  text-align:left;
-}
-.park-day-list-row:last-child{
-  border-bottom:0;
-}
-.park-day-list-row.completed{
-  opacity:.78;
-}
-.park-day-row-check{
-  width:30px;
-  height:30px;
-  border-radius:50%;
-  display:grid;
-  place-items:center;
-  background:rgba(var(--blue-rgb),.09);
-  border:1px solid rgba(var(--blue-rgb),.18);
-  color:var(--blue);
-  font-size:.78rem;
-  font-weight:900;
-}
-.park-day-list-row.completed .park-day-row-check{
-  background:rgba(var(--good-rgb),.14);
-  border-color:rgba(var(--good-rgb),.26);
-  color:var(--good);
-}
-.park-day-row-copy{
-  min-width:0;
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-}
-.park-day-row-copy strong{
-  font-size:.88rem;
-  overflow-wrap:anywhere;
-}
-.park-day-row-copy small{
-  margin-top:2px;
-  color:var(--muted);
-  font-size:.69rem;
-  line-height:1.35;
-}
-.park-day-row-status{
-  min-width:84px;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:3px;
-}
-.park-day-row-status b{
-  font-size:1rem;
-}
-.park-day-list-empty{
-  padding:22px 16px;
-  color:var(--muted);
-  text-align:center;
-  font-size:.78rem;
-  line-height:1.45;
-}
-.park-day-end-button{
-  width:100%;
-  min-height:46px;
-  margin:4px 0 18px;
-  border:1px solid rgba(var(--bad-rgb),.24);
-  border-radius:15px;
-  background:rgba(var(--bad-rgb),.06);
-  color:var(--bad);
-  font-weight:850;
-}
-.park-day-empty{
-  border-radius:24px;
-  padding:28px 22px;
-  text-align:center;
-}
-.park-day-empty>span{
-  display:block;
-  margin-bottom:8px;
-  color:var(--blue);
-  font-size:1.55rem;
-}
-.park-day-empty h3{
-  margin-bottom:6px;
-}
-.park-day-empty p{
-  max-width:560px;
-  margin:0 auto;
-  color:var(--muted);
-  line-height:1.5;
-}
-.park-day-empty .primary-button{
-  max-width:260px;
-  margin:18px auto 0;
-}
-
-@media(min-width:800px){
-  #view-parkday{
-    width:min(780px,100%);
-    margin-inline:auto;
-  }
-}
-@media(max-width:640px){
-  .topbar-actions{gap:6px}
-  .park-day-shortcut{
-    min-height:38px;
-    padding:0 10px;
-    font-size:.7rem;
-  }
-  .park-day-page-head{padding-top:4px}
-  .park-day-page-head .park-day-back{margin-bottom:15px}
-  .park-day-hero{
-    padding:15px;
-    border-radius:23px;
-  }
-  .park-day-next-ride{
-    padding:13px;
-    grid-template-columns:minmax(0,1fr) 76px;
-    gap:10px;
-  }
-  .park-day-next-ride h3{font-size:1.2rem}
-  .park-day-next-wait{min-width:0}
-  .park-day-next-wait b{font-size:1.25rem}
-  .park-day-hero-actions{grid-template-columns:1fr}
-  .park-day-list-row{
-    grid-template-columns:28px minmax(0,1fr) 72px;
-    gap:9px;
-    padding:11px 12px;
-  }
-  .park-day-row-check{
-    width:28px;
-    height:28px;
-  }
-  .park-day-row-status{min-width:0}
-}
-@media(max-width:390px){
-  .park-day-shortcut>span:last-child{display:none}
-  .park-day-shortcut{
-    width:38px;
-    padding:0;
-    justify-content:center;
-    border-radius:50%;
-  }
-}

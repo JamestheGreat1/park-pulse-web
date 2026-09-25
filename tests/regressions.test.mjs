@@ -344,3 +344,17 @@ test('removed For Me sort migrates back to Best Now', () => {
   vm.runInContext(code, context);
   assert.equal(vm.runInContext('store.snapshot.sort', context), 'recommended');
 });
+
+
+test('condensed Status keeps four summary rows and expandable diagnostics', () => {
+  const settings = app.slice(app.indexOf('function renderSettings('), app.indexOf('function updateWatchBadge('));
+  assert.match(settings, /<div class="settings-section-title">Status<\/div>/);
+  assert.match(settings, /<strong>System<\/strong>/);
+  assert.match(settings, /<strong>Notifications<\/strong>/);
+  assert.match(settings, /<strong>History<\/strong>/);
+  assert.match(settings, /<strong>App version<\/strong>/);
+  assert.match(settings, /<details class="diagnostics-details"/);
+  assert.match(settings, /Show diagnostics/);
+  assert.match(settings, /Data source/);
+  assert.match(settings, /Ride alert engine/);
+});

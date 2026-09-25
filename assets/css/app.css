@@ -2138,3 +2138,58 @@ body{
   }
 }
 
+
+/* v1.8.0-preview.15 — Safari-safe firework transforms. */
+:root[data-season="july4"] .seasonal-particle{
+  --trail-mid-x:0px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){--trail-mid-x:9px}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){--trail-mid-x:-11px}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){--trail-mid-x:4px}
+
+@keyframes firework-bottom-launch{
+  0%,42%{
+    opacity:0;
+    transform:translate3d(var(--trail-start-x),100vh,0) rotate(var(--trail-lean)) scaleY(.22);
+  }
+  45%{opacity:.34}
+  53%{
+    opacity:.92;
+    transform:translate3d(var(--trail-mid-x),48vh,0) rotate(var(--trail-lean)) scaleY(.72);
+  }
+  60%{
+    opacity:1;
+    transform:translate3d(var(--trail-end-x),6vh,0) rotate(var(--trail-lean)) scaleY(1);
+  }
+  62.5%{
+    opacity:.15;
+    transform:translate3d(var(--trail-end-x),0,0) rotate(var(--trail-lean)) scaleY(.38);
+  }
+  63%,100%{
+    opacity:0;
+    transform:translate3d(var(--trail-end-x),-2vh,0) rotate(var(--trail-lean)) scaleY(.08);
+  }
+}
+
+@keyframes firework-shaped-burst{
+  0%,62.5%{
+    opacity:0;
+    transform:rotate(var(--burst-rotate)) scale(.04);
+  }
+  64%{
+    opacity:.96;
+    transform:rotate(var(--burst-rotate)) scale(.25) scaleX(var(--burst-x)) scaleY(var(--burst-y));
+  }
+  73%{
+    opacity:.94;
+    transform:rotate(var(--burst-rotate)) scale(.94) scaleX(var(--burst-x)) scaleY(var(--burst-y));
+  }
+  84%{
+    opacity:.44;
+    transform:rotate(var(--burst-rotate)) scale(1.14) scaleX(var(--burst-x)) scaleY(var(--burst-y));
+  }
+  100%{
+    opacity:0;
+    transform:rotate(var(--burst-rotate)) scale(1.28) scaleX(var(--burst-x)) scaleY(var(--burst-y));
+  }
+}

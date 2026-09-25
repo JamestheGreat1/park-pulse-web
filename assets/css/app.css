@@ -4486,3 +4486,15 @@ body{
     transform:translate(-50%,-50%)!important;
   }
 }
+
+
+/* v1.8.4 — desktop threshold controls stay grouped */
+@media (min-width:1024px){
+  .threshold-controls{
+    grid-template-columns:44px auto auto 44px;
+    justify-content:end;
+  }
+  .threshold-controls output{
+    min-width:68px;
+  }
+}

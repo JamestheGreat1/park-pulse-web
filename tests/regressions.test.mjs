@@ -143,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.0-preview.5`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.0-preview.5' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.0-preview.6`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.0-preview.6' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -229,10 +229,10 @@ test('personalized ordering never promotes a stale or closed must-do above fresh
 
 test('ride card bindings always use the multi-element selector helper', () => {
   const block = app.slice(app.indexOf('function bindRideCards('), app.indexOf('function renderRideResults('));
-  assert.match(block, /\$\$\('\[data-favorite\]'/);
-  assert.match(block, /\$\$\('\[data-open-ride\]'/);
-  assert.match(block, /\$\$\('\[data-quick-actions\]'/);
-  assert.doesNotMatch(block, /(?<!\$)\$\('\[data-(favorite|open-ride|quick-actions)\]'.*\.forEach/);
+  assert.match(block, /querySelectorAll\('\[data-favorite\]'\)/);
+  assert.match(block, /querySelectorAll\('\[data-open-ride\]'\)/);
+  assert.match(block, /querySelectorAll\('\[data-quick-actions\]'\)/);
+  assert.doesNotMatch(block, /\$\('\[data-(favorite|open-ride|quick-actions)\]'.*\.forEach/);
 });
 
 test('Park Day Lite keeps session progress separate from favorites and watches', () => {

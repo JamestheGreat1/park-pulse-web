@@ -3496,3 +3496,27 @@ body{
   outline-offset:3px;
 }
 
+
+/* v1.8.0-preview.28 — denser Fall / Thanksgiving leaves. */
+:root[data-season="fall"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+21){
+  display:none!important;
+}
+:root[data-season="fall"][data-season-intensity="normal"] .seasonal-particle:nth-child(n+39){
+  display:none!important;
+}
+:root[data-season="fall"][data-season-intensity="extra"] .seasonal-particle{
+  display:block!important;
+}
+:root[data-season="fall"] .seasonal-particle{
+  opacity:.82;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(3n){
+  opacity:.76;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(4n){
+  opacity:.78;
+}
+:root[data-season="fall"] .seasonal-particle:nth-child(5n){
+  opacity:.72;
+}
+

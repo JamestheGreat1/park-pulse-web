@@ -832,3 +832,226 @@ body{
 
 /* v1.7.14 final polish — watched rides use a solid bell, matching favorites */
 .bell-solid{fill:currentColor;stroke:none}
+
+
+/* v1.8 seasonal ambience preview
+   Seasonal decoration deliberately does not override --good/--warn/--bad or the user's accent. */
+:root{
+  --season-glow1:transparent;
+  --season-glow2:transparent;
+  --season-glow3:transparent;
+  --season-particle:#fff;
+  --season-particle-alt:#fff;
+  --season-opacity:.78;
+}
+:root[data-season-intensity="subtle"]{--season-opacity:.46}
+:root[data-season-intensity="normal"]{--season-opacity:.78}
+:root[data-season-intensity="extra"]{--season-opacity:1}
+
+.seasonal-layer{
+  position:fixed;
+  inset:0;
+  z-index:0;
+  overflow:hidden;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .45s ease;
+  background:
+    radial-gradient(circle at 9% 18%,var(--season-glow1),transparent 36%),
+    radial-gradient(circle at 92% 24%,var(--season-glow2),transparent 34%),
+    radial-gradient(circle at 58% 92%,var(--season-glow3),transparent 40%);
+}
+:root.season-active .seasonal-layer{opacity:var(--season-opacity)}
+.seasonal-layer:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  opacity:.24;
+  background-image:radial-gradient(circle at center,rgba(255,255,255,.16) 0 1px,transparent 1.6px);
+  background-size:74px 74px;
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),transparent 78%);
+}
+.seasonal-particle{
+  --particle-size:4px;
+  position:absolute;
+  left:var(--particle-left);
+  bottom:-8vh;
+  width:var(--particle-size);
+  height:var(--particle-size);
+  border-radius:50%;
+  background:var(--season-particle);
+  opacity:.38;
+  filter:blur(.2px);
+  box-shadow:0 0 10px color-mix(in srgb,var(--season-particle) 70%,transparent);
+  animation:season-rise var(--particle-duration) linear infinite;
+  animation-delay:var(--particle-delay);
+}
+.seasonal-particle:nth-child(3n){background:var(--season-particle-alt);opacity:.28}
+.seasonal-particle:nth-child(4n){--particle-size:2px}
+.seasonal-particle:nth-child(5n){--particle-size:6px;opacity:.22}
+:root[data-season-intensity="subtle"] .seasonal-particle:nth-child(n+13){display:none}
+:root[data-season-intensity="normal"] .seasonal-particle:nth-child(n+22){display:none}
+
+@keyframes season-rise{
+  0%{transform:translate3d(0,7vh,0) scale(.7);opacity:0}
+  12%{opacity:.36}
+  78%{opacity:.28}
+  100%{transform:translate3d(18px,-116vh,0) scale(1.08);opacity:0}
+}
+
+/* Halloween — midnight violet + restrained pumpkin embers. */
+:root[data-season="halloween"]{
+  --season-glow1:rgba(255,111,24,.25);
+  --season-glow2:rgba(116,54,207,.27);
+  --season-glow3:rgba(231,74,31,.14);
+  --season-particle:#ff9c43;
+  --season-particle-alt:#b77cff;
+}
+:root[data-season="halloween"] .seasonal-layer{
+  background-color:rgba(20,4,30,.10);
+}
+:root[data-season="halloween"] .seasonal-layer:before{
+  content:"";
+  position:absolute;
+  inset:-18%;
+  opacity:.16;
+  background:conic-gradient(from 215deg at 80% 20%,transparent,rgba(118,57,211,.26),transparent 22%,rgba(255,116,32,.18),transparent 46%);
+  filter:blur(50px);
+  animation:season-breathe 12s ease-in-out infinite alternate;
+}
+:root[data-season="halloween"] .seasonal-particle:nth-child(6n){
+  border-radius:1px;
+  transform:rotate(45deg);
+}
+
+/* Christmas — evergreen depth, cranberry warmth, soft snow + gold points. */
+:root[data-season="christmas"]{
+  --season-glow1:rgba(21,126,91,.24);
+  --season-glow2:rgba(184,39,60,.19);
+  --season-glow3:rgba(236,188,75,.16);
+  --season-particle:rgba(255,255,255,.95);
+  --season-particle-alt:#ffd66f;
+}
+:root[data-season="christmas"] .seasonal-layer{
+  background-color:rgba(2,29,24,.08);
+}
+:root[data-season="christmas"] .seasonal-particle{
+  animation-name:season-snow;
+  filter:none;
+  opacity:.48;
+}
+:root[data-season="christmas"] .seasonal-particle:nth-child(5n){
+  box-shadow:0 0 12px #ffd66f;
+}
+
+@keyframes season-snow{
+  0%{transform:translate3d(0,-8vh,0) rotate(0);opacity:0}
+  10%{opacity:.48}
+  100%{transform:translate3d(28px,116vh,0) rotate(160deg);opacity:.05}
+}
+
+/* Easter — pastel spring haze + tiny drifting petals. */
+:root[data-season="easter"]{
+  --season-glow1:rgba(255,155,201,.23);
+  --season-glow2:rgba(164,137,255,.22);
+  --season-glow3:rgba(119,225,183,.17);
+  --season-particle:#ffb6d9;
+  --season-particle-alt:#c8b5ff;
+}
+:root[data-season="easter"] .seasonal-layer{
+  background-color:rgba(162,197,255,.045);
+}
+:root[data-season="easter"] .seasonal-particle{
+  width:7px;
+  height:4px;
+  border-radius:70% 30% 70% 30%;
+  animation-name:season-petal;
+  filter:none;
+}
+@keyframes season-petal{
+  0%{transform:translate3d(-20px,-8vh,0) rotate(0);opacity:0}
+  10%{opacity:.35}
+  50%{transform:translate3d(24px,52vh,0) rotate(180deg)}
+  100%{transform:translate3d(-10px,112vh,0) rotate(360deg);opacity:0}
+}
+
+/* Fourth of July — navy stays dominant; red/blue sparkle lives in the far background. */
+:root[data-season="july4"]{
+  --season-glow1:rgba(42,116,255,.28);
+  --season-glow2:rgba(229,63,80,.22);
+  --season-glow3:rgba(255,255,255,.10);
+  --season-particle:#77b9ff;
+  --season-particle-alt:#ff7785;
+}
+:root[data-season="july4"] .seasonal-particle{
+  bottom:auto;
+  top:calc((var(--particle-index) * 29) % 88 * 1%);
+  border-radius:1px;
+  transform:rotate(45deg);
+  animation:season-twinkle calc(var(--particle-duration) * .45) ease-in-out infinite;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(7n){
+  box-shadow:
+    0 -8px 0 -1px var(--season-particle),
+    0 8px 0 -1px var(--season-particle),
+    8px 0 0 -1px var(--season-particle-alt),
+    -8px 0 0 -1px var(--season-particle-alt);
+}
+@keyframes season-twinkle{
+  0%,100%{opacity:.04;transform:scale(.45) rotate(45deg)}
+  45%{opacity:.48;transform:scale(1.15) rotate(45deg)}
+  60%{opacity:.2;transform:scale(.8) rotate(45deg)}
+}
+
+@keyframes season-breathe{
+  from{transform:scale(.96) translate3d(-1%,0,0)}
+  to{transform:scale(1.05) translate3d(1%,1%,0)}
+}
+
+/* Preview-only chrome. Access control belongs to Cloudflare Access; this is just a visual guardrail. */
+.season-preview-badge{
+  position:fixed;
+  z-index:95;
+  top:calc(env(safe-area-inset-top,0px) + 6px);
+  left:50%;
+  transform:translateX(-50%);
+  max-width:calc(100% - 24px);
+  padding:5px 10px;
+  border:1px solid rgba(255,213,99,.36);
+  border-radius:999px;
+  background:rgba(21,18,10,.76);
+  color:#ffe099;
+  box-shadow:0 8px 28px rgba(0,0,0,.28);
+  backdrop-filter:blur(18px) saturate(150%);
+  -webkit-backdrop-filter:blur(18px) saturate(150%);
+  font-size:.62rem;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.preview-only-title{color:#f1c56f}
+.preview-settings{border-color:rgba(241,197,111,.24)}
+.preview-warning{background:rgba(241,197,111,.055)}
+.preview-lock{
+  flex:0 0 auto;
+  color:#f1c56f;
+  border:1px solid rgba(241,197,111,.28);
+  background:rgba(241,197,111,.08);
+  border-radius:999px;
+  padding:6px 8px;
+  font-size:.62rem;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+
+@media(max-width:640px){
+  .season-preview-badge{font-size:.56rem;padding:4px 8px}
+  .preview-settings .setting-row{align-items:center}
+}
+@media(prefers-reduced-motion:reduce){
+  .seasonal-layer,.seasonal-layer:before,.seasonal-particle{animation:none!important;transition:none!important}
+  .seasonal-particle{display:none!important}
+}

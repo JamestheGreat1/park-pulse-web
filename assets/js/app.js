@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.7.2";
-import { store } from "./store.js?v=1.7.2";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.7.2";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.7.2";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.7.12";
+import { store } from "./store.js?v=1.7.12";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.7.12";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.7.12";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -12,7 +12,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.11";
+const APP_VERSION = "1.7.12";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -666,7 +666,9 @@ function renderSettings() {
           ? "Waiting for the first scheduled check"
           : notificationEngine.status === "stale"
             ? `Last checked ${relativeTime(notificationEngine.lastCheck)} · scheduler may be stuck`
-            : "Alert evaluator isn’t available";
+            : notificationEngine.reason === "d1-read-limit"
+              ? "D1 read limit reached — ride alerts are paused until Cloudflare resets usage or the plan is upgraded."
+              : "D1 is unavailable — ride alerts may be paused.";
   const alertEngineLabel = !notificationEngine
     ? "Worker update"
     : notificationEngine.status === "running"
@@ -1208,8 +1210,8 @@ async function copyDiagnostics() {
     `Ride alert engine: ${backendState?.notificationEngine?.status || "unknown"}`,
     `Ride alert last check: ${backendState?.notificationEngine?.lastCheck || "none"}`,
     `History collection: ${analyticsState?.historyCollecting ? "collecting" : analyticsState?.historyStatus || "unknown"}`,
-    `History rides (31d): ${analyticsState?.ok ? analyticsState.historyRides : "unknown"}`,
-    `Recent history samples: ${analyticsState?.ok ? analyticsState.recentHistorySamples : "unknown"}`,
+    `Latest history checkpoint rides: ${analyticsState?.ok ? analyticsState.historyRides : "unknown"}`,
+    `History diagnostics mode: ${analyticsState?.diagnosticsMode || "unknown"}`,
     `Latest history sample: ${analyticsState?.latestHistorySample || "none"}`,
     `Trend baselines: ${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides}` : "unknown"}`,
     `Accent: ${store.snapshot.accent || "blue"}`
@@ -1363,10 +1365,12 @@ setupSheetDismissGesture();
   if (deepLinkRide && rideData.rideById(deepLinkRide)) openRide(deepLinkRide);
   setInterval(async () => {
     await rideData.refresh();
-    analyticsState = await fetchAnalyticsStatus().catch(() => analyticsState);
     renderSettings();
     bindDynamic();
   }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
+  setInterval(() => {
+    if (navigator.onLine) refreshAnalyticsState();
+  }, 15 * 60 * 1000);
   setInterval(() => {
     if (navigator.onLine) {
       refreshPushState({ sync: true });

@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.0-preview.5";
-import { store } from "./store.js?v=1.9.0-preview.5";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.0-preview.5";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.0-preview.5";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.0-preview.5";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.0-preview.6";
+import { store } from "./store.js?v=1.9.0-preview.6";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.0-preview.6";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.0-preview.6";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.0-preview.6";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.0-preview.5";
+const APP_VERSION = "1.9.0-preview.6";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -767,13 +767,13 @@ function rideListMarkup(state = store.snapshot) {
     : `<div class="empty liquid-glass">${rideData.error || "No rides match that search."}</div>`;
 }
 function bindRideCards(root = views.explore) {
-  $('[data-favorite]', root).forEach(button => {
+  root.querySelectorAll('[data-favorite]').forEach(button => {
     button.onclick = () => store.toggleFavorite(button.dataset.favorite);
   });
-  $('[data-open-ride]', root).forEach((button) => {
+  root.querySelectorAll('[data-open-ride]').forEach((button) => {
     button.onclick = () => openRide(button.dataset.openRide);
   });
-  $('[data-quick-actions]', root).forEach((button) => {
+  root.querySelectorAll('[data-quick-actions]').forEach((button) => {
     button.onclick = () => openQuickActions(button.dataset.quickActions, button);
   });
 }

@@ -358,3 +358,13 @@ test('condensed Status keeps four summary rows and expandable diagnostics', () =
   assert.match(settings, /Data source/);
   assert.match(settings, /Ride alert engine/);
 });
+
+
+test('desktop ride sheet wins over swipe transform and stays centered', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('force desktop ride sheets to remain truly centered');
+  assert.ok(marker >= 0);
+  const finalDesktop = css.slice(marker);
+  assert.match(finalDesktop, /@media \(min-width:1024px\)/);
+  assert.match(finalDesktop, /\.ride-sheet\{[^}]*top:50%!important[^}]*bottom:auto!important[^}]*max-height:min\(82dvh,760px\)!important[^}]*transform:translate\(-50%,-50%\)!important/s);
+});

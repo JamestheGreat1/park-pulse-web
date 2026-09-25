@@ -4527,6 +4527,10 @@ body{
 .park-day-page-head{
   padding:8px 3px 20px;
 }
+.park-day-page-head>.eyebrow{
+  display:block;
+  margin:0 0 4px;
+}
 .park-day-page-head .park-day-back{
   min-height:38px;
   margin:0 0 18px;

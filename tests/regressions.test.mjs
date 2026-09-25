@@ -143,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.7.1`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.7.1' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.8.4`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.8.4' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -159,7 +159,7 @@ test('editing a watch keeps its exact expiration unless a new duration is select
     let saved;
     const context = vm.createContext({
       rideData: { rideById: () => ({ id: 'mk:test', parkId: 6, name: 'Test Mountain' }) },
-      store: { snapshot: { mustDo: [] }, ruleForRide: () => existing, saveRule: value => { saved = value; } },
+      store: { snapshot: {}, ruleForRide: () => existing, saveRule: value => { saved = value; } },
       document: { activeElement: null, body: element('body') }, HTMLElement: class {},
       sheet: element('sheet'), backdrop: element('backdrop'), sheetReturnFocus: null,
       $: element, $$: () => [], escapeHtml: x => x, parkName: () => 'MK', rideStatus: () => ({ wait: 30 }),
@@ -196,33 +196,63 @@ test('favorites persist independently of notification watches', () => {
     CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
     window: {}, localStorage: { getItem: k => saved.get(k), setItem: (k,v) => saved.set(k,v) } });
   const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
-  vm.runInContext(code + ';store.toggleFavorite("mk:test");store.setMustDo("mk:test",true);', context);
+  vm.runInContext(code + ';store.toggleFavorite("mk:test");', context);
   const state = JSON.parse(saved.values().next().value);
   assert.deepEqual(state.favorites, ['mk:test']);
-  assert.deepEqual(state.mustDo, ['mk:test']);
   assert.deepEqual(state.rules, []);
   vm.runInContext('store.toggleFavorite("mk:test");', context);
   assert.deepEqual(JSON.parse(saved.values().next().value).favorites, []);
-  assert.equal(vm.runInContext('new Store().snapshot.mustDo[0]', context), 'mk:test');
 });
 
-test('personalized ordering never promotes a stale or closed must-do above fresh open rides', () => {
+test('Favorites narrows Best Now without changing its ordering logic', () => {
   const code = app.slice(app.indexOf('function sortedRides('), app.indexOf('function rideCard('));
   const context = vm.createContext({ isRideStale: r => !!r.stale, rideComparison: r => ({ratio:r.ratio}) });
   vm.runInContext(code, context);
   const rides = [
-    {id:'stale',name:'Stale',isOpen:true,stale:true,ratio:0.1,waitTime:5},
-    {id:'closed',name:'Closed',isOpen:false,ratio:0.1,waitTime:0},
-    {id:'favorite',name:'Favorite',isOpen:true,ratio:0.9,waitTime:30},
-    {id:'best',name:'Best',isOpen:true,ratio:0.5,waitTime:20}
+    {id:'best',name:'Best',isOpen:true,ratio:0.5,waitTime:20},
+    {id:'favorite-good',name:'Favorite Good',isOpen:true,ratio:0.7,waitTime:25},
+    {id:'favorite-ok',name:'Favorite OK',isOpen:true,ratio:0.9,waitTime:15},
+    {id:'favorite-closed',name:'Favorite Closed',isOpen:false,ratio:0.1,waitTime:0}
   ];
   context.rides = rides;
-  context.state = {query:'',openOnly:false,favoritesOnly:false,sort:'personal',favorites:['favorite'],mustDo:['closed','stale']};
-  assert.equal(vm.runInContext('sortedRides(rides,state).map(r=>r.id).join(",")',context),'favorite,best,closed,stale');
-  context.state.sort='recommended';
-  assert.equal(vm.runInContext('sortedRides(rides,state)[0].id',context),'best');
-  context.state.favoritesOnly=true;
-  assert.equal(vm.runInContext('sortedRides(rides,state).length',context),1);
+  context.state = {query:'',openOnly:false,favoritesOnly:true,sort:'recommended',favorites:['favorite-good','favorite-ok','favorite-closed']};
+  assert.equal(
+    vm.runInContext('sortedRides(rides,state).map(r=>r.id).join(",")',context),
+    'favorite-good,favorite-ok,favorite-closed'
+  );
+});
+
+test('ride cards bind Favorite and Alert without quick actions', () => {
+  const block = app.slice(app.indexOf('function bindRideCards('), app.indexOf('function renderRideResults('));
+  assert.match(block, /querySelectorAll\('\[data-favorite\]'\)/);
+  assert.match(block, /querySelectorAll\('\[data-open-ride\]'\)/);
+  assert.doesNotMatch(block, /data-quick-actions|quick-action/);
+  assert.doesNotMatch(block, /\$\('\[data-(favorite|open-ride)\]'.*\.forEach/);
+});
+
+test('Next Up skips stale, closed, and source-missing rides', () => {
+  const code = app.slice(app.indexOf('function recommendationScore('), app.indexOf('function rideStatus('));
+  const rides = [
+    {id:'other',name:'Other Ride',parkId:6,isOpen:true,waitTime:45},
+    {id:'best',name:'Best Value',parkId:6,isOpen:true,waitTime:15},
+    {id:'open',name:'Open Ride',parkId:6,isOpen:true,waitTime:5},
+    {id:'closed',name:'Closed',parkId:6,isOpen:false,waitTime:0},
+    {id:'stale',name:'Stale',parkId:6,isOpen:true,waitTime:5,stale:true},
+    {id:'missing',name:'Missing',parkId:6,isOpen:true,waitTime:5,sourceMissing:true}
+  ];
+  const context = vm.createContext({
+    Date, Number, String, Set, Math,
+    store:{snapshot:{}},
+    rideData:{ridesForPark:()=>rides,rideById:id=>rides.find(r=>r.id===id)},
+    isRideStale:r=>Boolean(r.stale),
+    rideComparison:r=>r.id==='best'?{ratio:.5,percentDelta:-50}:r.id==='other'?{ratio:1,percentDelta:0}:null,
+    rideStatus:r=>({stale:false,wait:String(r.waitTime),label:'Operating'}),
+    escapeHtml:value=>String(value),
+    nextUpOffset:0
+  });
+  vm.runInContext(code, context);
+  context.state = {selectedParkId:6,favorites:[],rules:[]};
+  assert.deepEqual(vm.runInContext('recommendationCandidates(state).map(r=>r.id)', context), ['best','open','other']);
 });
 
 test('history keeps zero waits, null waits, and closures distinct and bounds queries', async () => {
@@ -281,4 +311,105 @@ test('timezone formatters are reused without changing Eastern date parts', () =>
   assert.equal(fn(new Date('2026-09-24T12:00:00Z')).hour,8);
   assert.equal(fn(new Date('2026-01-24T12:00:00Z')).hour,7);
   assert.equal(constructions,1);
+});
+
+
+test('no single-selector helper is used with forEach anywhere in the app', () => {
+  assert.doesNotMatch(app, /(?<!\$)\$\([^;\n]*\)\.forEach/g);
+});
+
+
+
+
+test('PWA keeps Park Day and quick actions native-only', () => {
+  const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(index, /view-parkday|parkDayShortcut/);
+  assert.doesNotMatch(app, /Park Day Lite|data-quick-actions|openQuickActions|quickAction/);
+  assert.match(app, /What should I ride next\?/);
+  assert.match(app, /recommendationReason/);
+});
+
+
+test('removed For Me sort migrates back to Best Now', () => {
+  const saved = new Map([['parkpulse.rideWatcher.v1', JSON.stringify({sort:'personal'})]]);
+  const context = vm.createContext({
+    EventTarget, Event, structuredClone, Date, Number, JSON,
+    CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
+    window: { PARKPULSE_CONFIG: {} },
+    localStorage: { getItem: k => saved.get(k) || null, setItem: (k,v) => saved.set(k,v) }
+  });
+  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  vm.runInContext(code, context);
+  assert.equal(vm.runInContext('store.snapshot.sort', context), 'recommended');
+});
+
+
+test('condensed Status keeps four summary rows and expandable diagnostics', () => {
+  const settings = app.slice(app.indexOf('function renderSettings('), app.indexOf('function updateWatchBadge('));
+  assert.match(settings, /<div class="settings-section-title">Status<\/div>/);
+  assert.match(settings, /<strong>System<\/strong>/);
+  assert.match(settings, /<strong>Notifications<\/strong>/);
+  assert.match(settings, /<strong>History<\/strong>/);
+  assert.match(settings, /<strong>App version<\/strong>/);
+  assert.match(settings, /<details class="diagnostics-details"/);
+  assert.match(settings, /Show diagnostics/);
+  assert.match(settings, /Data source/);
+  assert.match(settings, /Ride alert engine/);
+});
+
+
+test('Settings customization bindings survive diagnostics wiring', () => {
+  const block = app.slice(app.indexOf('function bindDynamic('), app.indexOf('async function copyText('));
+  assert.match(block, /querySelectorAll\('\[data-copy-diagnostics\]'\)/);
+  assert.match(block, /const theme = \$\("#themeSelect"\)/);
+  assert.match(block, /button\[data-accent-choice\]/);
+  assert.match(block, /\[data-glass-style\]/);
+  assert.match(block, /seasonalEffectsToggle/);
+  assert.doesNotMatch(block, /(?<!\$)\$\([^;\n]*\)\.forEach/g);
+});
+
+
+
+test('legacy Must-do state is discarded', () => {
+  const saved = new Map([['parkpulse.rideWatcher.v1', JSON.stringify({mustDo:['mk:test'],favorites:['mk:test']})]]);
+  const context = vm.createContext({
+    EventTarget, Event, structuredClone, Date, Number, JSON,
+    CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
+    window: { PARKPULSE_CONFIG: {} },
+    localStorage: { getItem: k => saved.get(k) || null, setItem: (k,v) => saved.set(k,v) }
+  });
+  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  vm.runInContext(code, context);
+  const snapshot = vm.runInContext('store.snapshot', context);
+  assert.equal(snapshot.mustDo, undefined);
+  assert.deepEqual(snapshot.favorites, ['mk:test']);
+});
+
+
+
+
+test('desktop ride sheet expands to content with no scrolling', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('desktop ride sheets are full-content centered modals');
+  assert.ok(marker >= 0);
+  const finalDesktop = css.slice(marker);
+  assert.match(finalDesktop, /@media \(min-width:1024px\)/);
+  assert.match(finalDesktop, /top:50%!important/);
+  assert.match(finalDesktop, /bottom:auto!important/);
+  assert.match(finalDesktop, /width:min\(760px,calc\(100vw - 64px\)\)!important/);
+  assert.match(finalDesktop, /max-height:none!important/);
+  assert.match(finalDesktop, /height:auto!important/);
+  assert.match(finalDesktop, /overflow:visible!important/);
+  assert.match(finalDesktop, /transform:translate\(-50%,-50%\)!important/);
+});
+
+
+test('desktop wait-target controls stay grouped', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('desktop threshold controls stay grouped');
+  assert.ok(marker >= 0);
+  const finalDesktop = css.slice(marker);
+  assert.match(finalDesktop, /grid-template-columns:44px auto auto 44px/);
+  assert.match(finalDesktop, /justify-content:end/);
+  assert.match(finalDesktop, /min-width:68px/);
 });

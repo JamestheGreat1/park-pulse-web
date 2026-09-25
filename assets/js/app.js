@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.3";
-import { store } from "./store.js?v=1.8.3";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.3";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.3";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.8.3";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.4";
+import { store } from "./store.js?v=1.8.4";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.4";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.4";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.8.4";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.8.3";
+const APP_VERSION = "1.8.4";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -24,6 +24,8 @@ let serviceWorkerRegistration = null;
 let pendingServiceWorker = null;
 let sheetReturnFocus = null;
 let installHelpReturnFocus = null;
+let nextUpOffset = 0;
+let diagnosticsExpanded = false;
 
 const FIRST_RUN_KEY = "parkpulse.quickStart.v1";
 
@@ -170,8 +172,7 @@ function firstRunVisible() {
 }
 function dismissFirstRun() {
   try { localStorage.setItem(FIRST_RUN_KEY, "seen"); } catch {}
-  renderExplore();
-  bindDynamic();
+  render();
 }
 
 function platformInfo() {
@@ -403,6 +404,99 @@ function typicalComparisonBadge(ride) {
 
   return null;
 }
+
+
+function recommendationScore(ride, state = store.snapshot) {
+  if (!ride || !ride.isOpen || isRideStale(ride) || ride.sourceMissing) return -Infinity;
+  const id = String(ride.id);
+  const comparison = rideComparison(ride);
+  const wait = Number(ride.waitTime);
+  let score = 0;
+
+  if (state.favorites.includes(id)) score += 220;
+  if (comparison) score += Math.max(-180, Math.min(300, (1 - comparison.ratio) * 320));
+  if (Number.isFinite(wait)) score += Math.max(-80, 120 - wait) * 1.15;
+
+  return score;
+}
+
+function recommendationReason(ride, state = store.snapshot) {
+  if (!ride) return "No live ride data yet.";
+  if (isRideStale(ride)) return "Live data is stale right now.";
+  if (!ride.isOpen) return "Currently unavailable.";
+  const id = String(ride.id);
+  const comparison = rideComparison(ride);
+  const wait = Number(ride.waitTime);
+  const priority = state.favorites.includes(id) ? "Favorite" : "";
+
+  if (comparison?.percentDelta <= -25) {
+    return `${priority ? priority + " · " : ""}${Math.abs(comparison.percentDelta)}% below typical right now`;
+  }
+  if (comparison?.percentDelta <= -10) {
+    return `${priority ? priority + " · " : ""}${Math.abs(comparison.percentDelta)}% better than typical right now`;
+  }
+  if (Number.isFinite(wait) && wait <= 20) {
+    return `${priority ? priority + " · " : ""}${wait} min right now`;
+  }
+  if (priority && Number.isFinite(wait)) return `${priority} · open at ${wait} min`;
+  if (Number.isFinite(wait)) return `Open at ${wait} min right now`;
+  return "Open right now.";
+}
+
+function recommendationCandidates(state = store.snapshot) {
+  return rideData.ridesForPark(state.selectedParkId)
+    .filter(ride => ride.isOpen && !isRideStale(ride) && !ride.sourceMissing && Number.isFinite(Number(ride.waitTime)))
+    .sort((a, b) =>
+      recommendationScore(b, state) - recommendationScore(a, state) ||
+      Number(a.waitTime ?? Infinity) - Number(b.waitTime ?? Infinity) ||
+      a.name.localeCompare(b.name)
+    );
+}
+
+function nextUpRide(state = store.snapshot) {
+  const candidates = recommendationCandidates(state);
+  if (!candidates.length) return null;
+  const index = ((nextUpOffset % candidates.length) + candidates.length) % candidates.length;
+  return candidates[index];
+}
+
+function nextUpMarkup(state = store.snapshot) {
+  const ride = nextUpRide(state);
+  if (!ride) return "";
+
+  const status = rideStatus(ride);
+  const reason = recommendationReason(ride, state);
+  const comparison = rideComparison(ride);
+  const label = comparison?.percentDelta <= -25
+    ? "Great right now"
+    : state.favorites.includes(String(ride.id))
+      ? "Favorite pick"
+      : "ParkPulse pick";
+
+  return `<section class="next-up-card liquid-glass">
+    <div class="next-up-head">
+      <div><span class="eyebrow">${escapeHtml(label)}</span><h3>What should I ride next?</h3><p>${escapeHtml(reason)}</p></div>
+    </div>
+    <div class="next-up-ride-row">
+      <button class="next-up-ride" type="button" data-open-ride="${ride.id}">
+        <span class="ride-land">${escapeHtml(ride.land)}</span>
+        <strong>${escapeHtml(ride.name)}</strong>
+      </button>
+      <div class="next-up-wait"><b class="${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</b><span>${escapeHtml(status.label)}</span></div>
+    </div>
+    <div class="next-up-actions">
+      <button class="primary-button next-up-primary" type="button" data-open-ride="${ride.id}">View ride</button>
+      <button class="secondary-button" type="button" data-next-up-another>Show another</button>
+    </div>
+  </section>`;
+}
+
+function cycleNextUp() {
+  nextUpOffset += 1;
+  renderExplore();
+  bindDynamic();
+}
+
 function rideStatus(ride) {
   if (!ride) return { stale:true, wait:"—", label:"No live data", updated:"Unavailable" };
   const stale = isRideStale(ride);
@@ -563,7 +657,11 @@ function selectView(name) {
 }
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
-  let list = rides.filter((r) => (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) && (!state.openOnly || (r.isOpen && !isRideStale(r))) && (!state.favoritesOnly || state.favorites.includes(String(r.id))));
+  let list = rides.filter((r) =>
+    (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) &&
+    (!state.openOnly || (r.isOpen && !isRideStale(r))) &&
+    (!state.favoritesOnly || state.favorites.includes(String(r.id)))
+  );
   const staleRank = (ride) => isRideStale(ride) ? 1 : 0;
   if (state.sort === "wait") list.sort((a,b) => staleRank(a) - staleRank(b) || (a.isOpen === b.isOpen ? (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) : a.isOpen ? -1 : 1));
   else if (state.sort === "name") list.sort((a,b) => staleRank(a) - staleRank(b) || a.name.localeCompare(b.name));
@@ -574,11 +672,6 @@ function sortedRides(rides, state) {
     const operating = Number(b.isOpen) - Number(a.isOpen);
     if (operating) return operating;
 
-    if (state.sort === "personal") {
-      const priority = ride => (state.mustDo.includes(String(ride.id)) ? 2 : state.favorites.includes(String(ride.id)) ? 1 : 0);
-      const preference = priority(b) - priority(a);
-      if (preference) return preference;
-    }
     const aRatio = rideComparison(a)?.ratio ?? Infinity;
     const bRatio = rideComparison(b)?.ratio ?? Infinity;
     if (aRatio !== bRatio) return aRatio - bRatio;
@@ -587,31 +680,36 @@ function sortedRides(rides, state) {
   });
   return list;
 }
-function rideCard(ride) {
-  const favorite = store.snapshot.favorites.includes(String(ride.id));
+function rideCard(ride, state = store.snapshot, index = 0) {
+  const favorite = state.favorites.includes(String(ride.id));
   const rule = store.ruleForRide(ride.id);
   const status = rideStatus(ride);
   const valueBadge = typicalComparisonBadge(ride);
+  const explanation = state.sort === "recommended" && index < 3 && ride.isOpen && !status.stale
+    ? recommendationReason(ride, state)
+    : "";
   return `<article class="ride-card liquid-glass ${rule ? "watching" : ""} ${status.stale ? "stale" : ""}" data-ride-id="${ride.id}">
     <button class="ride-main" type="button" data-open-ride="${ride.id}">
-      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${rule ? `<span class="watch-badge">Watching</span>` : ""}${valueBadge ? `<span class="value-badge ${valueBadge.tone}">${escapeHtml(valueBadge.text)}</span>` : ""}</div></div>
+      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${rule ? `<span class="watch-badge">Watching</span>` : ""}${valueBadge ? `<span class="value-badge ${valueBadge.tone}">${escapeHtml(valueBadge.text)}</span>` : ""}</div>${explanation ? `<div class="recommendation-hint"><span aria-hidden="true">✦</span>${escapeHtml(explanation)}</div>` : ""}</div>
       <div class="ride-status"><span class="wait ${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><span class="status-label">${escapeHtml(status.label)}</span></div>
     </button>
-    <div class="ride-actions"><button class="favorite-button ${favorite ? "active" : ""}" type="button" data-favorite="${ride.id}" aria-pressed="${favorite}" aria-label="${favorite ? "Unfavorite" : "Favorite"} ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
-    <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button></div>
+    <div class="ride-actions">
+      <button class="favorite-button ${favorite ? "active" : ""}" type="button" data-favorite="${ride.id}" aria-pressed="${favorite}" aria-label="${favorite ? "Unfavorite" : "Favorite"} ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
+      <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button>
+    </div>
   </article>`;
 }
 function rideListMarkup(state = store.snapshot) {
   const rides = sortedRides(rideData.ridesForPark(state.selectedParkId), state);
   return rides.length
-    ? rides.map(rideCard).join("")
-    : `<div class="empty liquid-glass">${rideData.error || "No rides match that search."}</div>`;
+    ? rides.map((ride, index) => rideCard(ride, state, index)).join("")
+    : `<div class="empty liquid-glass">${escapeHtml(rideData.error || "No rides match that search.")}</div>`;
 }
 function bindRideCards(root = views.explore) {
-  $$('[data-favorite]', root).forEach(button => {
+  root.querySelectorAll('[data-favorite]').forEach(button => {
     button.onclick = () => store.toggleFavorite(button.dataset.favorite);
   });
-  $$('[data-open-ride]', root).forEach((button) => {
+  root.querySelectorAll('[data-open-ride]').forEach((button) => {
     button.onclick = () => openRide(button.dataset.openRide);
   });
 }
@@ -641,10 +739,10 @@ function renderExplore() {
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="Search rides in ${escapeHtml(parkName(state.selectedParkId))}" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
       <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
       <button class="filter-button ${state.favoritesOnly ? "active" : ""}" type="button" data-toggle-favorites aria-pressed="${state.favoritesOnly}">Favorites</button>
-      <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="personal" ${state.sort === "personal" ? "selected" : ""}>For me</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
+      <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
+    ${nextUpMarkup(state)}
     <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
-    ${state.sort === "personal" ? '<p class="personal-copy">Open, fresh rides first. Then your must-dos, favorites, and the best waits versus normal. Set a must-do on any ride’s page.</p>' : ""}
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderWatching() {
@@ -739,6 +837,39 @@ function renderSettings() {
   const historyTone = historyDiagnosticsAvailable
     ? analyticsState.historyCollecting ? "good" : "bad"
     : backendState?.ok === false ? "bad" : "";
+
+  const systemLabel = backendState?.ok === true ? "Online" : backendState?.ok === false ? "Unavailable" : "Checking";
+  const systemTone = backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : "";
+  const systemCopy = `Ride data ${refreshCopy} · ${rideData.sourceSummary || "Waiting for source"}`;
+
+  const notificationsReady = backendState?.ok === true &&
+    backendState?.vapidConfigured === true &&
+    notificationEngine?.status === "running";
+  const notificationsLabel = backendState?.ok === false
+    ? "Unavailable"
+    : notificationsReady
+      ? "Ready"
+      : !backendState?.vapidConfigured && backendState?.ok === true
+        ? "Needs setup"
+        : notificationEngine?.status === "waiting"
+          ? "Starting"
+          : backendState?.ok === true
+            ? "Needs attention"
+            : "Checking";
+  const notificationsTone = notificationsReady ? "good" : ["Unavailable","Needs setup","Needs attention"].includes(notificationsLabel) ? "bad" : "";
+  const notificationsCopy = backendState?.ok === true
+    ? `Push ${backendState?.vapidConfigured ? "ready" : "not configured"} · Alerts ${notificationEngine?.status === "running" ? "running" : notificationEngine?.status || "checking"}`
+    : "Push + ride alert status";
+
+  const baselineCopy = analyticsState?.ok
+    ? `${analyticsState.baselineRides}/${analyticsState.totalRides} baselines`
+    : "Baselines checking";
+  const historySummaryCopy = `${historyLabel} · ${baselineCopy}`;
+  const historySummaryLabel = historyDiagnosticsAvailable
+    ? analyticsState.historyCollecting ? "Healthy" : "Needs attention"
+    : backendState?.ok === false ? "Unavailable" : "Checking";
+  const historySummaryTone = historySummaryLabel === "Healthy" ? "good" : ["Needs attention","Unavailable"].includes(historySummaryLabel) ? "bad" : "";
+
   views.settings.innerHTML = `
     <div class="page-heading"><span class="eyebrow">ParkPulse</span><h2>Settings</h2><p>The useful stuff, plus a few ways to make ParkPulse yours.</p></div>
     <section class="settings-group liquid-glass">
@@ -753,18 +884,24 @@ function renderSettings() {
       <div class="setting-row glass-style-setting"><div><strong>Glass style</strong><small>Choose a softer frosted look or the clearer refractive Liquid Glass effect.</small></div><div class="glass-style-picker" role="group" aria-label="Glass style"><button type="button" data-glass-style="frosted" aria-pressed="${glassStyleSetting() === "frosted"}" class="${glassStyleSetting() === "frosted" ? "active" : ""}">Frosted</button><button type="button" data-glass-style="liquid" aria-pressed="${glassStyleSetting() === "liquid"}" class="${glassStyleSetting() === "liquid" ? "active" : ""}">Liquid</button></div></div>
       <label class="setting-row seasonal-effects-setting"><div><strong>Seasonal effects</strong><small>Automatically adds subtle holiday ambience when the season rolls around.</small></div><span class="setting-switch"><input id="seasonalEffectsToggle" type="checkbox" ${seasonalEffectsEnabled() ? "checked" : ""} aria-label="Seasonal effects"><span class="switch"></span></span></label>
     </section>
-    <div class="settings-section-title">Status & diagnostics</div>
-    <section class="settings-group liquid-glass status-diagnostics">
-      <div class="setting-row"><div><strong>Worker</strong><small>Backend + notification status</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
-      <div class="setting-row"><div><strong>Ride data</strong><small>Last time ParkPulse got fresh ride data</small></div><span class="setting-value">${escapeHtml(refreshCopy)}</span></div>
-      <div class="setting-row"><div><strong>Data source</strong><small>Powered by <a class="data-source-link" href="https://themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki</a> and <a class="data-source-link" href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times.com</a></small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
-      <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Used by the Worker — never stored in the app.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
-      <div class="setting-row"><div><strong>Push server</strong><small>Background notification setup</small></div><span class="health-pill ${backendState?.vapidConfigured ? "good" : "bad"}">${backendState?.vapidConfigured ? "Ready" : "Needs setup"}</span></div>
-      <div class="setting-row"><div><strong>Ride alert engine</strong><small>${escapeHtml(alertEngineCopy)}</small></div><span class="health-pill ${alertEngineTone}">${escapeHtml(alertEngineLabel)}</span></div>
-      <div class="setting-row"><div><strong>History collection</strong><small>${escapeHtml(historyCopy)}</small></div><span class="health-pill ${historyTone}">${escapeHtml(historyLabel)}</span></div>
-      <div class="setting-row"><div><strong>Trend baselines</strong><small>${analyticsState?.themeParksApiKeyConfigured === false ? "Historical backfill is paused because the ThemeParks API key is missing." : "History used for Best Now + crowd estimates"}</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : backendState?.ok === true ? "Retrying…" : backendState?.ok === false ? "Unavailable" : "Checking…"}</span></div>
-      <div class="setting-row"><div><strong>App version</strong><small>What you’re currently running</small></div><span class="setting-value">v${APP_VERSION}</span></div>
-      <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status. No secrets or push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
+    <div class="settings-section-title">Status</div>
+    <section class="settings-group liquid-glass status-diagnostics status-summary">
+      <div class="setting-row"><div><strong>System</strong><small>${escapeHtml(systemCopy)}</small></div><span class="health-pill ${systemTone}">${escapeHtml(systemLabel)}</span></div>
+      <div class="setting-row"><div><strong>Notifications</strong><small>${escapeHtml(notificationsCopy)}</small></div><span class="health-pill ${notificationsTone}">${escapeHtml(notificationsLabel)}</span></div>
+      <div class="setting-row"><div><strong>History</strong><small>${escapeHtml(historySummaryCopy)}</small></div><span class="health-pill ${historySummaryTone}">${escapeHtml(historySummaryLabel)}</span></div>
+      <div class="setting-row"><div><strong>App version</strong><small>Current ParkPulse build</small></div><span class="setting-value">v${APP_VERSION}</span></div>
+      <details class="diagnostics-details" ${diagnosticsExpanded ? "open" : ""}>
+        <summary><span><strong>Show diagnostics</strong><small>Data source, API, alert engine, and history details</small></span><span class="diagnostics-chevron" aria-hidden="true">›</span></summary>
+        <div class="diagnostics-expanded">
+          <div class="setting-row"><div><strong>Worker</strong><small>Backend + notification status</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
+          <div class="setting-row"><div><strong>Data source</strong><small>Powered by <a class="data-source-link" href="https://themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki</a> and <a class="data-source-link" href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times.com</a></small></div><span class="setting-value">${escapeHtml(rideData.sourceSummary || "Waiting…")}</span></div>
+          <div class="setting-row"><div><strong>ThemeParks API key</strong><small>Used by the Worker — never stored in the app.</small></div><span class="health-pill ${backendState?.themeParksApiKeyConfigured ? "good" : ""}">${backendState?.themeParksApiKeyConfigured ? "Connected" : "Anonymous"}</span></div>
+          <div class="setting-row"><div><strong>Ride alert engine</strong><small>${escapeHtml(alertEngineCopy)}</small></div><span class="health-pill ${alertEngineTone}">${escapeHtml(alertEngineLabel)}</span></div>
+          <div class="setting-row"><div><strong>History collection</strong><small>${escapeHtml(historyCopy)}</small></div><span class="health-pill ${historyTone}">${escapeHtml(historyLabel)}</span></div>
+          <div class="setting-row"><div><strong>Trend baselines</strong><small>${analyticsState?.themeParksApiKeyConfigured === false ? "Historical backfill is paused because the ThemeParks API key is missing." : "History used for Best Now + crowd estimates"}</small></div><span class="setting-value">${analyticsState?.ok ? `${analyticsState.baselineRides}/${analyticsState.totalRides} rides` : backendState?.ok === true ? "Retrying…" : backendState?.ok === false ? "Unavailable" : "Checking…"}</span></div>
+          <div class="setting-row"><div><strong>Diagnostics</strong><small>Copies basic status. No secrets or push keys.</small></div><button type="button" data-copy-diagnostics class="setting-action">Copy</button></div>
+        </div>
+      </details>
     </section>
     <section class="settings-group liquid-glass"><div class="about-row"><strong>Data</strong><p>ThemeParks.wiki is the main live feed. Queue-Times only steps in when a ride is missing. If the data is stale, ParkPulse says so instead of pretending it’s live.</p><a href="https://www.themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki ↗</a> · <a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times ↗</a></div></section>
     <p class="fine-print">ParkPulse is an independent project and is not affiliated with or endorsed by Disney.</p>`;
@@ -817,9 +954,10 @@ function render() {
   setTheme(); bindDynamic();
 }
 function bindDynamic() {
-  $$('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
-  bindRideCards();
-  $$('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
+  document.querySelectorAll('[data-park]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
+  document.querySelectorAll('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
+  bindRideCards(views.explore);
+  document.querySelectorAll('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-favorites]').forEach(b => b.onclick = () => store.update(s => { s.favoritesOnly = !s.favoritesOnly; }, 'filter'));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));
@@ -830,7 +968,9 @@ function bindDynamic() {
   $$('[data-toggle-push]').forEach((b) => b.onclick = pushOn ? deactivatePush : activatePush);
   $$('[data-install]').forEach((b) => b.onclick = installApp);
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
-  $$('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
+  document.querySelectorAll('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
+  const diagnosticsDetails = $(".diagnostics-details");
+  if (diagnosticsDetails) diagnosticsDetails.ontoggle = () => { diagnosticsExpanded = diagnosticsDetails.open; };
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
   document.querySelectorAll("button[data-accent-choice]").forEach((button) => {
     button.onclick = () => store.update((s) => { s.accent = button.dataset.accentChoice; }, "accent");
@@ -938,9 +1078,9 @@ function openRide(id) {
   sheetReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(model.name || model.rideName)}</h2></div><div class="sheet-actions"><button class="sheet-action" type="button" data-share-ride="${id}" aria-label="Share ${escapeHtml(model.name || model.rideName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div></div>
     <div class="sheet-status"><span class="wait ${rideStatus(ride).stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(rideStatus(ride).wait)}</span><small>${escapeHtml(rideStatus(ride).label)}</small></div>
+    ${ride ? `<div class="sheet-recommendation"><span>ParkPulse context</span><strong>${escapeHtml(recommendationReason(ride, store.snapshot))}</strong></div>` : ""}
     <div id="rideInsights" class="ride-insights"><span class="insight-loading">Checking the trend data…</span></div>
     <section class="ride-history"><div class="history-heading"><h3>Wait history</h3><select id="historyRange" aria-label="History range"><option value="today">Today</option><option value="7d">7 days</option><option value="30d">30 days</option></select></div><div id="rideHistory" aria-live="polite"></div></section>
-    <label class="toggle-row"><div><strong>Must-do ride</strong><small>Put it first in “For me.” This doesn’t create an alert.</small></div><input id="mustDoToggle" type="checkbox" ${store.snapshot.mustDo.includes(String(id)) ? "checked" : ""}><span class="switch"></span></label>
     <form id="watchForm">
       <label class="toggle-row"><div><strong>Notify when it reopens</strong><small>Useful when a ride goes down.</small></div><input id="reopenToggle" type="checkbox" ${existing?.reopen !== false ? "checked" : ""}><span class="switch"></span></label>
       <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when the wait drops to this or better:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>
@@ -958,7 +1098,6 @@ function openRide(id) {
   loadRideInsights(id);
   loadRideHistory(id);
   $('#historyRange', sheet).onchange = event => loadRideHistory(id, event.target.value);
-  $('#mustDoToggle', sheet).onchange = event => store.setMustDo(id, event.target.checked);
   let thresholdEnabled = Boolean(existing?.threshold), threshold = Number(existing?.threshold || 30);
   const refreshThreshold = () => { $("#thresholdValue").textContent = threshold; $("#thresholdControls").classList.toggle("disabled", !thresholdEnabled); $("#thresholdToggle").classList.toggle("active", thresholdEnabled); $("#thresholdToggle").textContent = thresholdEnabled ? "On" : "Off"; };
   $("#thresholdToggle").onclick = () => { thresholdEnabled = !thresholdEnabled; refreshThreshold(); };
@@ -1446,6 +1585,7 @@ setupSheetDismissGesture();
   });
   store.addEventListener("change", (e) => {
     if (["rules", "expired", "rule-migration"].includes(e.detail.reason)) rulesSynced = false;
+    if (e.detail.reason === "park") nextUpOffset = 0;
     if (e.detail.reason === "search") renderRideResults();
     else if (e.detail.reason !== "view") render();
   });

@@ -456,18 +456,18 @@ test('desktop ride cards keep subtle glass shading', () => {
 });
 
 
-test('desktop wait-target controls cannot stretch into the sheet edge', () => {
+test('desktop wait-target controls stay centered away from sheet edges', () => {
   const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
   const marker = css.lastIndexOf('desktop ride-sheet controls + seasonal parity');
   assert.ok(marker >= 0);
   const desktop = css.slice(marker);
-  assert.match(desktop, /\.threshold-controls\{[^}]*display:flex!important/s);
-  assert.match(desktop, /width:max-content/);
-  assert.match(desktop, /margin:8px 0 0 auto!important/);
-  assert.match(desktop, /\.threshold-controls button\{[^}]*flex:0 0 44px[^}]*width:44px/s);
-  assert.match(desktop, /\.threshold-controls output\{[^}]*min-width:58px!important/s);
+  assert.match(desktop, /\.threshold-controls\{[^}]*display:grid!important/s);
+  assert.match(desktop, /grid-template-columns:44px auto auto 44px!important/);
+  assert.match(desktop, /max-width:calc\(100% - 32px\)!important/);
+  assert.match(desktop, /margin:10px auto 0!important/);
+  assert.match(desktop, /justify-content:center!important/);
+  assert.match(desktop, /\.threshold-controls button\{[^}]*width:44px!important[^}]*min-width:44px!important/s);
 });
-
 test('desktop seasonal ambience remains visible and reduced motion gets a static fallback', () => {
   const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
   const marker = css.lastIndexOf('desktop ride-sheet controls + seasonal parity');

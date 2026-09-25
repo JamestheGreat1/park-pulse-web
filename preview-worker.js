@@ -1,5 +1,3 @@
-const API_ORIGIN = "https://parkpulse-api.jamesp5297.workers.dev";
-
 function shouldUseApi(pathname) {
   return pathname === "/health" ||
     pathname === "/vapid-key" ||
@@ -11,38 +9,23 @@ function shouldUseApi(pathname) {
     pathname.startsWith("/auth/");
 }
 
-async function proxyApi(request) {
-  const incoming = new URL(request.url);
-  const upstream = new URL(incoming.pathname + incoming.search, API_ORIGIN);
-  const headers = new Headers(request.headers);
-  headers.set("X-ParkPulse-Preview-Proxy", "1");
-
-  const init = {
-    method: request.method,
-    headers,
-    redirect: "follow"
-  };
-
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    init.body = await request.arrayBuffer();
-  }
-
-  const response = await fetch(upstream, init);
-  const responseHeaders = new Headers(response.headers);
-  responseHeaders.set("X-ParkPulse-Preview-API", "direct-proxy");
-  responseHeaders.set("Cache-Control", "no-store");
+async function proxyApi(request, env) {
+  const response = await env.PARKPULSE_API.fetch(request);
+  const headers = new Headers(response.headers);
+  headers.set("X-ParkPulse-Preview-API", "service-binding");
+  headers.set("Cache-Control", "no-store");
 
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers: responseHeaders
+    headers
   });
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (shouldUseApi(url.pathname)) return proxyApi(request);
+    if (shouldUseApi(url.pathname)) return proxyApi(request, env);
     return env.ASSETS.fetch(request);
   }
 };

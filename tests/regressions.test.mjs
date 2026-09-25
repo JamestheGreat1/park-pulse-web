@@ -454,3 +454,28 @@ test('desktop ride cards keep subtle glass shading', () => {
   assert.match(desktop, /data-preview-surface="neutral"\] \.ride-card::before/);
   assert.match(desktop, /--glass-interaction-shift:2px/);
 });
+
+
+test('desktop wait-target controls cannot stretch into the sheet edge', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('desktop ride-sheet controls + seasonal parity');
+  assert.ok(marker >= 0);
+  const desktop = css.slice(marker);
+  assert.match(desktop, /\.threshold-controls\{[^}]*display:flex!important/s);
+  assert.match(desktop, /width:max-content/);
+  assert.match(desktop, /margin:8px 0 0 auto!important/);
+  assert.match(desktop, /\.threshold-controls button\{[^}]*flex:0 0 44px[^}]*width:44px/s);
+  assert.match(desktop, /\.threshold-controls output\{[^}]*min-width:58px!important/s);
+});
+
+test('desktop seasonal ambience remains visible and reduced motion gets a static fallback', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('desktop ride-sheet controls + seasonal parity');
+  assert.ok(marker >= 0);
+  const seasonal = css.slice(marker);
+  assert.match(seasonal, /@media \(min-width:1024px\)/);
+  assert.match(seasonal, /:root\.season-active \.seasonal-layer\{[^}]*opacity:\.88/s);
+  assert.match(seasonal, /@media \(prefers-reduced-motion:reduce\)/);
+  assert.match(seasonal, /seasonal-layer > \.seasonal-particle:nth-child\(-n\+14\)/);
+  assert.match(seasonal, /animation:none!important/);
+});

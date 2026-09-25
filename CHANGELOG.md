@@ -10,6 +10,7 @@
 - Condensed Settings health information into four status rows with deeper technical details under **Show diagnostics**.
 - Hardened dynamic button binding so Settings customization controls cannot be disabled by a diagnostics wiring error.
 - Fixed desktop ride sheets so they stay vertically centered, expand to fit their full content, and never use the mobile scroll/swipe behavior.
+- Grouped desktop wait-target − / value / + controls so adjustments no longer require moving across the whole sheet.
 - Added regression coverage for the simplified UI and both release-blocker fixes.
 - Frontend-only update; no Worker deployment required.
 

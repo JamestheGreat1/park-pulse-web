@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.12 — 2026-09-25
+
+- Fixed the desktop wait-time target controls so the − / value / unit / + cluster is centered beneath the setting instead of being anchored against the right edge.
+- Added guaranteed side breathing room so the + button cannot be clipped by the ride-sheet boundary on narrower desktop windows.
+- Keeps the 1.8.11 chart cleanup and seasonal desktop parity fixes intact.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.11 — 2026-09-25
 
 - Removed the redundant “avg Xm” label from inside wait-history charts while keeping the dashed average reference line.

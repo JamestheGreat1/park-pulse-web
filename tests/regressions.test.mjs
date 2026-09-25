@@ -143,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.8.9`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.8.9' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.8.10`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.8.10' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -414,7 +414,7 @@ test('mobile ride sheets override glass overflow and remain scrollable', () => {
 
 
 
-test('desktop ride sheet uses the denser 1.8.9 layout', () => {
+test('desktop ride sheet uses the denser 1.8.10 layout', () => {
   const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
   const marker = css.lastIndexOf('denser desktop ride-sheet layout');
   assert.ok(marker >= 0);

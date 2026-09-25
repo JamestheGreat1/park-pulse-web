@@ -3709,3 +3709,320 @@ body{
   }
 }
 
+
+/* v1.8.0-preview.30 — Apple-style refractive Liquid Glass.
+   Clearer centers, stronger lens rims, brighter speculars, subtle motion. */
+:root[data-preview-surface="liquid"]{
+  --glass:rgba(142,151,168,.070);
+  --glass-strong:rgba(132,142,160,.120);
+  --glass-thin:rgba(148,158,176,.060);
+  --glass-mid:rgba(140,151,170,.090);
+  --glass-thick:rgba(130,141,162,.145);
+  --glass-edge:rgba(255,255,255,.38);
+  --glass-edge-soft:rgba(255,255,255,.18);
+  --glass-shadow:rgba(0,0,0,.14);
+  --border:rgba(255,255,255,.23);
+  --hair:rgba(255,255,255,.105);
+  --shadow:0 25px 78px rgba(0,0,0,.17);
+}
+:root[data-theme="light"][data-preview-surface="liquid"]{
+  --glass:rgba(255,255,255,.16);
+  --glass-strong:rgba(255,255,255,.25);
+  --glass-thin:rgba(255,255,255,.13);
+  --glass-mid:rgba(255,255,255,.19);
+  --glass-thick:rgba(255,255,255,.29);
+  --glass-edge:rgba(255,255,255,.94);
+  --glass-edge-soft:rgba(255,255,255,.66);
+  --glass-shadow:rgba(62,72,88,.10);
+  --border:rgba(255,255,255,.78);
+  --hair:rgba(50,60,75,.08);
+  --shadow:0 23px 64px rgba(70,82,100,.11);
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"]{
+    --glass:rgba(255,255,255,.16);
+    --glass-strong:rgba(255,255,255,.25);
+    --glass-thin:rgba(255,255,255,.13);
+    --glass-mid:rgba(255,255,255,.19);
+    --glass-thick:rgba(255,255,255,.29);
+    --glass-edge:rgba(255,255,255,.94);
+    --glass-edge-soft:rgba(255,255,255,.66);
+    --glass-shadow:rgba(62,72,88,.10);
+    --border:rgba(255,255,255,.78);
+    --hair:rgba(50,60,75,.08);
+    --shadow:0 23px 64px rgba(70,82,100,.11);
+  }
+}
+
+:root[data-preview-surface="liquid"] .liquid-glass,
+:root[data-preview-surface="liquid"] .glass-control,
+:root[data-preview-surface="liquid"] .ride-card,
+:root[data-preview-surface="liquid"] .watch-card,
+:root[data-preview-surface="liquid"] .hero-card,
+:root[data-preview-surface="liquid"] .settings-group,
+:root[data-preview-surface="liquid"] .toolbar,
+:root[data-preview-surface="liquid"] .bottom-nav,
+:root[data-preview-surface="liquid"] .ride-sheet,
+:root[data-preview-surface="liquid"] .install-help-sheet{
+  --glass-interaction-shift:0px;
+  isolation:isolate;
+}
+
+/* Less blur is deliberate: this should look clear/wet, not frosted. */
+:root[data-preview-surface="liquid"] .liquid-glass,
+:root[data-preview-surface="liquid"] .glass-control{
+  background:
+    radial-gradient(110% 72% at 12% -12%,rgba(255,255,255,.11),transparent 48%),
+    linear-gradient(145deg,rgba(255,255,255,.068),rgba(255,255,255,.008) 42%,rgba(var(--blue-rgb),.020) 100%),
+    var(--glass)!important;
+  border-color:var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.34),
+    inset 1px 0 0 rgba(255,255,255,.10),
+    inset 0 -1px 0 rgba(0,0,0,.06),
+    inset 0 0 0 1px rgba(255,255,255,.035),
+    0 18px 48px var(--glass-shadow)!important;
+  backdrop-filter:blur(20px) saturate(195%) contrast(107%) brightness(1.035)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(195%) contrast(107%) brightness(1.035)!important;
+}
+
+/* Thin card lenses: clear center, crisp rim, background color stays readable through them. */
+:root[data-preview-surface="liquid"] .ride-card,
+:root[data-preview-surface="liquid"] .watch-card{
+  overflow:hidden;
+  background:
+    radial-gradient(110% 75% at 12% -10%,rgba(255,255,255,.105),transparent 48%),
+    linear-gradient(150deg,rgba(255,255,255,.060) 0%,rgba(255,255,255,.008) 36%,transparent 65%,rgba(var(--blue-rgb),.026) 100%),
+    var(--glass-thin)!important;
+  border:1px solid var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.42),
+    inset 1px 0 0 rgba(255,255,255,.12),
+    inset -1px 0 0 rgba(var(--blue-rgb),.035),
+    inset 0 -1px 0 rgba(0,0,0,.065),
+    inset 0 0 18px rgba(var(--blue-rgb),.012),
+    0 15px 42px var(--glass-shadow)!important;
+  backdrop-filter:blur(14px) saturate(205%) contrast(108%) brightness(1.04)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(205%) contrast(108%) brightness(1.04)!important;
+}
+
+/* Medium lenses: more optical depth without turning opaque. */
+:root[data-preview-surface="liquid"] .hero-card,
+:root[data-preview-surface="liquid"] .settings-group,
+:root[data-preview-surface="liquid"] .toolbar{
+  overflow:hidden;
+  background:
+    radial-gradient(115% 80% at 14% -12%,rgba(255,255,255,.13),transparent 50%),
+    linear-gradient(148deg,rgba(255,255,255,.080) 0%,rgba(255,255,255,.010) 39%,transparent 67%,rgba(var(--blue-rgb),.030) 100%),
+    var(--glass-mid)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.46),
+    inset 1px 0 0 rgba(255,255,255,.13),
+    inset -1px 0 0 rgba(var(--blue-rgb),.040),
+    inset 0 -1px 0 rgba(0,0,0,.07),
+    inset 0 0 24px rgba(var(--blue-rgb),.015),
+    0 20px 56px var(--glass-shadow)!important;
+  backdrop-filter:blur(18px) saturate(210%) contrast(109%) brightness(1.045)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(210%) contrast(109%) brightness(1.045)!important;
+}
+
+/* Thick lenses stay readable but still clearly transparent. */
+:root[data-preview-surface="liquid"] .bottom-nav,
+:root[data-preview-surface="liquid"] .ride-sheet,
+:root[data-preview-surface="liquid"] .install-help-sheet{
+  overflow:hidden;
+  background:
+    radial-gradient(120% 84% at 15% -14%,rgba(255,255,255,.16),transparent 51%),
+    linear-gradient(150deg,rgba(255,255,255,.100) 0%,rgba(255,255,255,.014) 39%,transparent 68%,rgba(var(--blue-rgb),.036) 100%),
+    var(--glass-thick)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.50),
+    inset 1px 0 0 rgba(255,255,255,.15),
+    inset -1px 0 0 rgba(var(--blue-rgb),.05),
+    inset 0 -1px 0 rgba(0,0,0,.085),
+    inset 0 0 30px rgba(var(--blue-rgb),.018),
+    0 24px 74px rgba(0,0,0,.18)!important;
+  backdrop-filter:blur(25px) saturate(220%) contrast(110%) brightness(1.05)!important;
+  -webkit-backdrop-filter:blur(25px) saturate(220%) contrast(110%) brightness(1.05)!important;
+}
+
+/* Moving caustic/specular sheet. Scroll only shifts this compositor layer. */
+:root[data-preview-surface="liquid"] .ride-card::before,
+:root[data-preview-surface="liquid"] .watch-card::before,
+:root[data-preview-surface="liquid"] .hero-card::before,
+:root[data-preview-surface="liquid"] .settings-group::before,
+:root[data-preview-surface="liquid"] .toolbar::before,
+:root[data-preview-surface="liquid"] .bottom-nav::before,
+:root[data-preview-surface="liquid"] .ride-sheet::before,
+:root[data-preview-surface="liquid"] .install-help-sheet::before{
+  content:"";
+  position:absolute;
+  inset:-7%;
+  border-radius:inherit;
+  pointer-events:none;
+  z-index:0;
+  background:
+    radial-gradient(52% 28% at 18% 4%,rgba(255,255,255,.40),rgba(255,255,255,.10) 32%,transparent 72%),
+    radial-gradient(46% 30% at 88% 96%,rgba(var(--blue-rgb),.125),transparent 72%),
+    linear-gradient(118deg,
+      rgba(255,255,255,.16) 0%,
+      rgba(255,255,255,.055) 12%,
+      transparent 28%,
+      transparent 72%,
+      rgba(var(--blue-rgb),.065) 100%)!important;
+  opacity:.84;
+  transform:translate3d(calc(var(--glass-scroll-x,0px) + var(--glass-interaction-shift)),var(--glass-scroll-y,0px),0) scale(1.06);
+  transform-origin:center;
+  transition:transform .32s cubic-bezier(.2,.7,.2,1),opacity .28s ease;
+  will-change:transform,opacity;
+}
+
+/* Refractive inner rim. Supported browsers intensify only the edge, not the center. */
+:root[data-preview-surface="liquid"] .ride-card::after,
+:root[data-preview-surface="liquid"] .watch-card::after,
+:root[data-preview-surface="liquid"] .hero-card::after,
+:root[data-preview-surface="liquid"] .settings-group::after,
+:root[data-preview-surface="liquid"] .toolbar::after,
+:root[data-preview-surface="liquid"] .bottom-nav::after,
+:root[data-preview-surface="liquid"] .ride-sheet::after,
+:root[data-preview-surface="liquid"] .install-help-sheet::after{
+  content:"";
+  position:absolute;
+  inset:1px;
+  width:auto;
+  height:auto;
+  left:1px;
+  right:1px;
+  top:1px;
+  bottom:1px;
+  border-radius:inherit;
+  padding:1px;
+  pointer-events:none;
+  z-index:0;
+  box-sizing:border-box;
+  background:
+    linear-gradient(135deg,
+      rgba(255,255,255,.62) 0%,
+      rgba(255,255,255,.16) 18%,
+      rgba(255,255,255,.025) 38%,
+      rgba(var(--blue-rgb),.060) 68%,
+      rgba(255,255,255,.22) 100%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  opacity:.92;
+  backdrop-filter:saturate(245%) contrast(112%) brightness(1.08) blur(1.2px);
+  -webkit-backdrop-filter:saturate(245%) contrast(112%) brightness(1.08) blur(1.2px);
+}
+
+:root[data-preview-surface="liquid"] .ride-card>*,
+:root[data-preview-surface="liquid"] .watch-card>*,
+:root[data-preview-surface="liquid"] .hero-card>*,
+:root[data-preview-surface="liquid"] .settings-group>*,
+:root[data-preview-surface="liquid"] .toolbar>*,
+:root[data-preview-surface="liquid"] .bottom-nav>*,
+:root[data-preview-surface="liquid"] .ride-sheet>*,
+:root[data-preview-surface="liquid"] .install-help-sheet>*{
+  position:relative;
+  z-index:1;
+}
+
+/* Wet-glass interaction: move the highlight, not the entire component. */
+@media(hover:hover){
+  :root[data-preview-surface="liquid"] .ride-card:hover,
+  :root[data-preview-surface="liquid"] .watch-card:hover,
+  :root[data-preview-surface="liquid"] .hero-card:hover,
+  :root[data-preview-surface="liquid"] .toolbar:hover,
+  :root[data-preview-surface="liquid"] .settings-group:hover{
+    --glass-interaction-shift:6px;
+  }
+  :root[data-preview-surface="liquid"] .ride-card:hover::before,
+  :root[data-preview-surface="liquid"] .watch-card:hover::before,
+  :root[data-preview-surface="liquid"] .hero-card:hover::before,
+  :root[data-preview-surface="liquid"] .toolbar:hover::before,
+  :root[data-preview-surface="liquid"] .settings-group:hover::before{
+    opacity:.98;
+  }
+}
+:root[data-preview-surface="liquid"] .ride-card:active,
+:root[data-preview-surface="liquid"] .watch-card:active,
+:root[data-preview-surface="liquid"] .hero-card:active,
+:root[data-preview-surface="liquid"] .bottom-nav:active{
+  --glass-interaction-shift:-3px;
+}
+:root[data-preview-surface="liquid"] .toolbar:focus-within,
+:root[data-preview-surface="liquid"] .settings-group:focus-within,
+:root[data-preview-surface="liquid"] .ride-sheet:focus-within{
+  --glass-interaction-shift:4px;
+}
+
+/* Watching stays transparent; selection is communicated by a brighter refractive edge. */
+:root[data-preview-surface="liquid"] .ride-card.watching{
+  background:
+    radial-gradient(110% 75% at 12% -10%,rgba(255,255,255,.11),transparent 48%),
+    linear-gradient(150deg,rgba(255,255,255,.066),rgba(255,255,255,.008) 44%,rgba(var(--blue-rgb),.038)),
+    var(--glass-thin)!important;
+  border-color:rgba(var(--blue-rgb),.40)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.45),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.07),
+    inset 0 0 18px rgba(var(--blue-rgb),.016),
+    0 16px 44px var(--glass-shadow)!important;
+}
+
+:root[data-preview-surface="liquid"] .search{
+  background:rgba(18,23,31,.065)!important;
+  border-color:var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.13),
+    inset 0 0 0 1px rgba(255,255,255,.025)!important;
+  backdrop-filter:blur(12px) saturate(195%) contrast(106%)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(195%) contrast(106%)!important;
+}
+:root[data-theme="light"][data-preview-surface="liquid"] .search{
+  background:rgba(255,255,255,.13)!important;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"] .search{
+    background:rgba(255,255,255,.13)!important;
+  }
+}
+
+/* Light mode needs less highlight intensity because the environment is already bright. */
+:root[data-theme="light"][data-preview-surface="liquid"] .ride-card::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .watch-card::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .hero-card::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .settings-group::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .toolbar::before,
+:root[data-theme="light"][data-preview-surface="liquid"] .bottom-nav::before{
+  opacity:.58;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"] .ride-card::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .watch-card::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .hero-card::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .settings-group::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .toolbar::before,
+  :root[data-theme="system"][data-preview-surface="liquid"] .bottom-nav::before{
+    opacity:.58;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  :root[data-preview-surface="liquid"] .ride-card::before,
+  :root[data-preview-surface="liquid"] .watch-card::before,
+  :root[data-preview-surface="liquid"] .hero-card::before,
+  :root[data-preview-surface="liquid"] .settings-group::before,
+  :root[data-preview-surface="liquid"] .toolbar::before,
+  :root[data-preview-surface="liquid"] .bottom-nav::before,
+  :root[data-preview-surface="liquid"] .ride-sheet::before,
+  :root[data-preview-surface="liquid"] .install-help-sheet::before{
+    transform:scale(1.06)!important;
+    transition:none!important;
+  }
+}
+

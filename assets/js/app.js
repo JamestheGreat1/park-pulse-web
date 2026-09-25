@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.29";
-import { store } from "./store.js?v=1.8.0-preview.29";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.29";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.29";
-import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.29";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.30";
+import { store } from "./store.js?v=1.8.0-preview.30";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.30";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.30";
+import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.30";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.8.0-preview.29";
+const APP_VERSION = "1.8.0-preview.30";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -1315,8 +1315,38 @@ async function installApp() {
   if (platform.android) return toast("On Android: browser menu → Install app / Add to Home screen.");
   toast("Use your browser menu → Install ParkPulse.");
 }
+
+let liquidGlassMotionFrame = 0;
+const liquidGlassMotionMedia = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+
+function updateLiquidGlassMotion() {
+  liquidGlassMotionFrame = 0;
+  const root = document.documentElement;
+  if (liquidGlassMotionMedia?.matches) {
+    root.style.setProperty("--glass-scroll-x", "0px");
+    root.style.setProperty("--glass-scroll-y", "0px");
+    return;
+  }
+
+  const scrollY = window.scrollY || 0;
+  root.style.setProperty("--glass-scroll-x", `${(Math.sin(scrollY / 260) * 7).toFixed(2)}px`);
+  root.style.setProperty("--glass-scroll-y", `${(Math.cos(scrollY / 340) * 2.5).toFixed(2)}px`);
+}
+
+function queueLiquidGlassMotion() {
+  if (liquidGlassMotionFrame) return;
+  liquidGlassMotionFrame = requestAnimationFrame(updateLiquidGlassMotion);
+}
+
+function setupLiquidGlassMotion() {
+  updateLiquidGlassMotion();
+  window.addEventListener("scroll", queueLiquidGlassMotion, { passive: true });
+  liquidGlassMotionMedia?.addEventListener?.("change", queueLiquidGlassMotion);
+}
+
 async function init() {
   setTheme();
+  setupLiquidGlassMotion();
   setupPullToRefresh();
 setupSheetDismissGesture();
   if ("serviceWorker" in navigator) {

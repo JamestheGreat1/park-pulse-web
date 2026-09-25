@@ -1,5 +1,6 @@
 {
   "version": "1.7.16",
   "released": "2026-09-24",
-  "channel": "accent-grid-polish"
+  "channel": "accent-grid-polish",
+  "build_note": "accent-grid-redeploy"
 }

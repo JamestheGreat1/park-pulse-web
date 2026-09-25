@@ -1496,3 +1496,187 @@ body{
   color:var(--blue);
 }
 
+
+/* v1.8.0-preview.9 — deeper Liquid Glass study. */
+:root[data-preview-surface="neutral"]{
+  --glass-thin:rgba(132,138,150,.095);
+  --glass-mid:rgba(126,132,145,.135);
+  --glass-thick:rgba(116,122,136,.205);
+  --glass-edge:rgba(255,255,255,.18);
+  --glass-edge-soft:rgba(255,255,255,.085);
+  --glass-shadow:rgba(0,0,0,.18);
+}
+:root[data-theme="light"][data-preview-surface="neutral"]{
+  --glass-thin:rgba(255,255,255,.30);
+  --glass-mid:rgba(252,253,255,.42);
+  --glass-thick:rgba(249,250,253,.58);
+  --glass-edge:rgba(255,255,255,.84);
+  --glass-edge-soft:rgba(255,255,255,.48);
+  --glass-shadow:rgba(70,78,92,.12);
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="neutral"]{
+    --glass-thin:rgba(255,255,255,.30);
+    --glass-mid:rgba(252,253,255,.42);
+    --glass-thick:rgba(249,250,253,.58);
+    --glass-edge:rgba(255,255,255,.84);
+    --glass-edge-soft:rgba(255,255,255,.48);
+    --glass-shadow:rgba(70,78,92,.12);
+  }
+}
+
+/* Thin optical glass: lists/cards let the colorful background breathe through. */
+:root[data-preview-surface="neutral"] .ride-card,
+:root[data-preview-surface="neutral"] .watch-card{
+  position:relative;
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.105),rgba(255,255,255,.018) 42%,rgba(255,255,255,.035)),
+    var(--glass-thin)!important;
+  border:1px solid var(--glass-edge-soft)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.17),
+    inset 1px 0 0 rgba(255,255,255,.055),
+    inset 0 -1px 0 rgba(0,0,0,.075),
+    0 16px 42px var(--glass-shadow)!important;
+  backdrop-filter:blur(22px) saturate(145%) contrast(102%)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(145%) contrast(102%)!important;
+}
+
+/* Medium glass: hero/settings/toolbars have a little more optical mass. */
+:root[data-preview-surface="neutral"] .hero-card,
+:root[data-preview-surface="neutral"] .settings-group,
+:root[data-preview-surface="neutral"] .toolbar{
+  position:relative;
+  background:
+    linear-gradient(148deg,rgba(255,255,255,.13),rgba(255,255,255,.022) 38%,rgba(255,255,255,.045)),
+    var(--glass-mid)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.20),
+    inset 1px 0 0 rgba(255,255,255,.065),
+    inset 0 -1px 0 rgba(0,0,0,.08),
+    0 20px 54px var(--glass-shadow)!important;
+  backdrop-filter:blur(30px) saturate(150%) contrast(102%)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(150%) contrast(102%)!important;
+}
+
+/* Thick glass: floating nav/sheets feel like heavier lenses. */
+:root[data-preview-surface="neutral"] .bottom-nav,
+:root[data-preview-surface="neutral"] .ride-sheet,
+:root[data-preview-surface="neutral"] .install-help-sheet{
+  background:
+    linear-gradient(150deg,rgba(255,255,255,.16),rgba(255,255,255,.028) 40%,rgba(255,255,255,.055)),
+    var(--glass-thick)!important;
+  border:1px solid var(--glass-edge)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.24),
+    inset 1px 0 0 rgba(255,255,255,.075),
+    inset 0 -1px 0 rgba(0,0,0,.10),
+    0 24px 72px rgba(0,0,0,.22)!important;
+  backdrop-filter:blur(38px) saturate(155%) contrast(103%)!important;
+  -webkit-backdrop-filter:blur(38px) saturate(155%) contrast(103%)!important;
+}
+
+/* Specular reflection: light across the top-left edge instead of a flat tint. */
+:root[data-preview-surface="neutral"] .ride-card::before,
+:root[data-preview-surface="neutral"] .watch-card::before,
+:root[data-preview-surface="neutral"] .hero-card::before,
+:root[data-preview-surface="neutral"] .settings-group::before,
+:root[data-preview-surface="neutral"] .toolbar::before,
+:root[data-preview-surface="neutral"] .bottom-nav::before,
+:root[data-preview-surface="neutral"] .ride-sheet::before,
+:root[data-preview-surface="neutral"] .install-help-sheet::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  z-index:0;
+  background:
+    linear-gradient(118deg,
+      rgba(255,255,255,.16) 0%,
+      rgba(255,255,255,.055) 18%,
+      transparent 39%,
+      transparent 72%,
+      rgba(var(--blue-rgb),.035) 100%);
+  opacity:.72;
+}
+:root[data-preview-surface="neutral"] .ride-card>*,
+:root[data-preview-surface="neutral"] .watch-card>*,
+:root[data-preview-surface="neutral"] .hero-card>*,
+:root[data-preview-surface="neutral"] .settings-group>*,
+:root[data-preview-surface="neutral"] .toolbar>*,
+:root[data-preview-surface="neutral"] .bottom-nav>*,
+:root[data-preview-surface="neutral"] .ride-sheet>*,
+:root[data-preview-surface="neutral"] .install-help-sheet>*{
+  position:relative;
+  z-index:1;
+}
+
+/* Watching/selected state stays neutral; color moves to edges, icons and copy. */
+:root[data-preview-surface="neutral"] .ride-card.watching{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.11),rgba(255,255,255,.02)),
+    var(--glass-thin)!important;
+  border-color:rgba(var(--blue-rgb),.28)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.18),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.045),
+    0 16px 42px var(--glass-shadow)!important;
+}
+:root[data-preview-surface="neutral"] .park-chip.active,
+:root[data-preview-surface="neutral"] .filter-button.active,
+:root[data-preview-surface="neutral"] .nav-item.active,
+:root[data-preview-surface="neutral"] .mini-toggle.active{
+  background:rgba(255,255,255,.055)!important;
+  border-color:rgba(var(--blue-rgb),.30)!important;
+  color:var(--blue)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.11),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.055)!important;
+}
+
+/* Controls feel like smaller pieces of glass rather than colored pills. */
+:root[data-preview-surface="neutral"] .filter-button,
+:root[data-preview-surface="neutral"] .toolbar select,
+:root[data-preview-surface="neutral"] .settings-group select,
+:root[data-preview-surface="neutral"] .setting-action,
+:root[data-preview-surface="neutral"] .hero-watch,
+:root[data-preview-surface="neutral"] .sheet-close,
+:root[data-preview-surface="neutral"] .install-help-close{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.095),rgba(255,255,255,.025)),
+    rgba(120,126,138,.10)!important;
+  border-color:rgba(255,255,255,.12)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.13),
+    0 7px 20px rgba(0,0,0,.08)!important;
+  backdrop-filter:blur(18px) saturate(140%)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(140%)!important;
+}
+:root[data-preview-surface="neutral"] .glass-control:active,
+:root[data-preview-surface="neutral"] .filter-button:active,
+:root[data-preview-surface="neutral"] .park-chip:active,
+:root[data-preview-surface="neutral"] .setting-action:active,
+:root[data-preview-surface="neutral"] .hero-watch:active{
+  transform:scale(.975);
+}
+
+/* Background carries more of the color, with restrained spill onto glass edges. */
+:root[data-preview-surface="neutral"] body{
+  background:
+    radial-gradient(circle at 82% 4%,rgba(var(--blue2-rgb),.16),transparent 32rem),
+    radial-gradient(circle at 5% 48%,rgba(var(--blue-rgb),.085),transparent 30rem),
+    linear-gradient(160deg,var(--bg),var(--bg2))!important;
+}
+:root[data-preview-surface="neutral"] .ambient{opacity:.58}
+:root[data-preview-surface="neutral"] .ambient-two{opacity:.31}
+:root[data-preview-surface="neutral"] .ambient-three{opacity:.25}
+
+/* Halloween rain follows its visual slant: right to left. */
+@keyframes halloween-rain{
+  0%{transform:translate3d(46px,-18vh,0) rotate(-13deg);opacity:0}
+  10%{opacity:.58}
+  100%{transform:translate3d(-64px,122vh,0) rotate(-13deg);opacity:.16}
+}
+

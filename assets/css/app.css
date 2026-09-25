@@ -4026,3 +4026,47 @@ body{
   }
 }
 
+
+/* v1.8.0-preview.31 — Liquid Glass is material-only.
+   Restore layout-sensitive positioning inherited from the base UI. */
+:root[data-preview-surface="liquid"] .bottom-nav{
+  position:fixed!important;
+  left:50%!important;
+  transform:translateX(-50%)!important;
+}
+:root[data-preview-surface="liquid"] .ride-sheet{
+  position:fixed!important;
+  left:50%!important;
+}
+:root[data-preview-surface="liquid"] .install-help-sheet{
+  position:fixed!important;
+}
+
+/* Desktop geometry must remain identical to Original/Frosted. */
+@media(min-width:1024px){
+  :root[data-preview-surface="liquid"] .bottom-nav{
+    top:16px!important;
+    bottom:auto!important;
+    width:auto!important;
+    height:52px!important;
+    min-height:52px!important;
+    grid-template-columns:repeat(3,auto)!important;
+    padding:5px!important;
+    border-radius:19px!important;
+  }
+}
+
+/* Phone geometry must remain identical to the base mobile dock. */
+@media(max-width:640px){
+  :root[data-preview-surface="liquid"] .bottom-nav{
+    top:auto!important;
+    bottom:calc(8px + var(--safe-bottom))!important;
+    width:min(460px,calc(100% - 20px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)))!important;
+    height:var(--nav-h)!important;
+    min-height:var(--nav-h)!important;
+    grid-template-columns:repeat(3,1fr)!important;
+    padding:7px!important;
+    border-radius:25px!important;
+  }
+}
+

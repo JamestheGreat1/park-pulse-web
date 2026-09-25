@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.11 — 2026-09-25
+
+- Removed the redundant “avg Xm” label from inside wait-history charts while keeping the dashed average reference line.
+- The Average summary card below the chart remains the single place that displays the numeric average.
+- Includes the desktop wait-target clipping and seasonal-parity fixes from 1.8.10.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.10 — 2026-09-25
 
 - Fixed desktop wait-target controls so the − / value / unit / + group stays compact and cannot run into or clip against the ride-sheet edge.

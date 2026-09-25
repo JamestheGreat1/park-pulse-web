@@ -18,7 +18,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Favorites** let you save rides without turning on notifications.
 - **For me** puts your must-dos and favorites first while still paying attention to the current wait.
 - **Wait history** shows how a ride has moved today, over the past 7 days, or over the past 30 days.
-- **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both.
+- **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both. Watched rides use a solid bell so they’re easy to spot at a glance.
 - **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
 - **Park context** includes today's hours, closing information, ticketed events, and observed ride downtime.
 - **Customization** includes light, dark, and system themes plus eight accent colors that subtly carry through the glass, glow, and selected controls.

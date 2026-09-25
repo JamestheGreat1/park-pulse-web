@@ -25,6 +25,7 @@ let pendingServiceWorker = null;
 let sheetReturnFocus = null;
 let installHelpReturnFocus = null;
 let nextUpOffset = 0;
+let diagnosticsExpanded = false;
 
 const FIRST_RUN_KEY = "parkpulse.quickStart.v1";
 
@@ -892,7 +893,7 @@ function renderSettings() {
       <div class="setting-row"><div><strong>Notifications</strong><small>${escapeHtml(notificationsCopy)}</small></div><span class="health-pill ${notificationsTone}">${escapeHtml(notificationsLabel)}</span></div>
       <div class="setting-row"><div><strong>History</strong><small>${escapeHtml(historySummaryCopy)}</small></div><span class="health-pill ${historySummaryTone}">${escapeHtml(historySummaryLabel)}</span></div>
       <div class="setting-row"><div><strong>App version</strong><small>Current ParkPulse build</small></div><span class="setting-value">v${APP_VERSION}</span></div>
-      <details class="diagnostics-details">
+      <details class="diagnostics-details" ${diagnosticsExpanded ? "open" : ""}>
         <summary><span><strong>Show diagnostics</strong><small>Data source, API, alert engine, and history details</small></span><span class="diagnostics-chevron" aria-hidden="true">›</span></summary>
         <div class="diagnostics-expanded">
           <div class="setting-row"><div><strong>Worker</strong><small>Backend + notification status</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
@@ -970,7 +971,9 @@ function bindDynamic() {
   $$('[data-toggle-push]').forEach((b) => b.onclick = pushOn ? deactivatePush : activatePush);
   $$('[data-install]').forEach((b) => b.onclick = installApp);
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
-  $$('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
+  $('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
+  const diagnosticsDetails = $(".diagnostics-details");
+  if (diagnosticsDetails) diagnosticsDetails.ontoggle = () => { diagnosticsExpanded = diagnosticsDetails.open; };
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
   document.querySelectorAll("button[data-accent-choice]").forEach((button) => {
     button.onclick = () => store.update((s) => { s.accent = button.dataset.accentChoice; }, "accent");

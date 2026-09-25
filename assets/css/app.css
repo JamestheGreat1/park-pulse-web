@@ -4246,3 +4246,28 @@ body{
   text-decoration:none;
 }
 .data-source-link:hover{text-decoration:underline}
+
+/* v1.8.3 — clearer selected park state without turning the picker into solid buttons. */
+:root[data-preview-surface="neutral"] .park-chip.active{
+  background:
+    linear-gradient(145deg,rgba(var(--blue-rgb),.18),rgba(var(--blue2-rgb),.10))!important;
+  border-color:rgba(var(--blue-rgb),.58)!important;
+  color:var(--blue)!important;
+  font-weight:850;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.16),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.12),
+    0 6px 18px rgba(var(--blue2-rgb),.10)!important;
+}
+:root[data-preview-surface="liquid"] .park-chip.active{
+  background:
+    linear-gradient(145deg,rgba(var(--blue-rgb),.14),rgba(var(--blue2-rgb),.055)),
+    rgba(255,255,255,.055)!important;
+  border-color:rgba(var(--blue-rgb),.62)!important;
+  color:var(--blue)!important;
+  font-weight:850;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.28),
+    inset 0 0 0 1px rgba(var(--blue-rgb),.14),
+    0 7px 22px rgba(var(--blue2-rgb),.10)!important;
+}

@@ -1034,24 +1034,8 @@ body{
   overflow:hidden;
   text-overflow:ellipsis;
 }
-.preview-only-title{color:#f1c56f}
-.preview-settings{border-color:rgba(241,197,111,.24)}
-.preview-warning{background:rgba(241,197,111,.055)}
-.preview-lock{
-  flex:0 0 auto;
-  color:#f1c56f;
-  border:1px solid rgba(241,197,111,.28);
-  background:rgba(241,197,111,.08);
-  border-radius:999px;
-  padding:6px 8px;
-  font-size:.62rem;
-  font-weight:900;
-  letter-spacing:.08em;
-}
-
 @media(max-width:640px){
   .season-preview-badge{font-size:.56rem;padding:4px 8px}
-  .preview-settings .setting-row{align-items:center}
 }
 @media(prefers-reduced-motion:reduce){
   .seasonal-layer,.seasonal-layer:before,.seasonal-particle{animation:none!important;transition:none!important}

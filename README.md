@@ -8,7 +8,7 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.13**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.14**
 
 ## What ParkPulse does
 
@@ -21,7 +21,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both.
 - **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
 - **Park context** includes today's hours, closing information, ticketed events, and observed ride downtime.
-- **Customization** includes light, dark, and system themes plus eight accent colors.
+- **Customization** includes light, dark, and system themes plus eight accent colors that subtly carry through the glass, glow, and selected controls.
 - **Mobile-friendly controls** include pull-to-refresh and pull-down-to-close ride sheets.
 - **D1-efficient diagnostics** keep backend health checks lightweight instead of repeatedly scanning the full wait-history table.
 

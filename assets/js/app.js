@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.7.15";
-import { store } from "./store.js?v=1.7.15";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.7.15";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.7.15";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.1";
+import { store } from "./store.js?v=1.8.0-preview.1";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.1";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.1";\nimport { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls } from "./seasonal.js?v=1.8.0-preview.1";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -12,7 +12,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.15";
+const APP_VERSION = "1.8.0-preview.1";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -515,6 +515,7 @@ function setTheme() {
   const state = store.snapshot;
   document.documentElement.dataset.theme = state.theme;
   document.documentElement.dataset.accent = state.accent || "blue";
+  applySeasonalTheme();
 }
 function selectView(name) {
   store.update((s) => { s.activeView = name; }, "view");
@@ -717,6 +718,7 @@ function renderSettings() {
       <label class="setting-row"><div><strong>Appearance</strong><small>Follow your system, or pick light or dark yourself.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
       <div class="setting-row accent-setting"><div><strong>Accent color</strong><small>Changes the highlights and glow. Purely vibes.</small></div><div class="accent-picker" role="group" aria-label="Accent color">${ACCENTS.map((accent) => `<button type="button" class="accent-swatch accent-${accent.id} ${state.accent === accent.id ? "active" : ""}" data-accent-choice="${accent.id}" aria-label="${accent.label}" aria-pressed="${state.accent === accent.id}"><span></span></button>`).join("")}</div></div>
     </section>
+    ${seasonalPreviewControlsMarkup()}
     <div class="settings-section-title">Status & diagnostics</div>
     <section class="settings-group liquid-glass status-diagnostics">
       <div class="setting-row"><div><strong>Worker</strong><small>Backend + notification status</small></div><span class="health-pill ${backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : ""}">${escapeHtml(backendCopy)}</span></div>
@@ -796,8 +798,12 @@ function bindDynamic() {
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
   $$('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
-  $$("button[data-accent-choice]").forEach((button) => {
+  $("button[data-accent-choice]").forEach((button) => {
     button.onclick = () => store.update((s) => { s.accent = button.dataset.accentChoice; }, "accent");
+  });
+  bindSeasonalPreviewControls(() => {
+    renderSettings();
+    bindDynamic();
   });
 }
 async function copyText(value) {

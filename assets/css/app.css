@@ -4468,34 +4468,21 @@ body{
 }
 
 
-/* v1.8.4 — force desktop ride sheets to remain truly centered */
+/* v1.8.4 — desktop ride sheets are full-content centered modals */
 @media (min-width:1024px){
   .ride-sheet{
     top:50%!important;
     bottom:auto!important;
     width:min(760px,calc(100vw - 64px))!important;
-    max-height:calc(100dvh - 32px)!important;
+    max-height:none!important;
+    height:auto!important;
     transform:translate(-50%,-50%)!important;
     border-radius:30px;
-    overflow:auto!important;
+    overflow:visible!important;
+    overscroll-behavior:auto!important;
   }
   .ride-sheet.sheet-dragging,
   .ride-sheet.sheet-dismissing{
     transform:translate(-50%,-50%)!important;
-  }
-}
-
-
-/* v1.8.4 — hide desktop ride-sheet scrollbars without disabling scroll */
-@media (min-width:1024px){
-  .ride-sheet{
-    scrollbar-width:none;
-    -ms-overflow-style:none;
-    overflow-x:hidden!important;
-  }
-  .ride-sheet::-webkit-scrollbar{
-    width:0;
-    height:0;
-    display:none;
   }
 }

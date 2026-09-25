@@ -3246,8 +3246,8 @@ body{
   position:absolute;
   width:var(--spark-size);
   height:var(--spark-size);
-  margin-left:calc(var(--spark-size) / -2);
-  margin-top:calc(var(--spark-size) / -2);
+  margin-left:0;
+  margin-top:0;
   border-radius:50%;
   color:inherit;
   pointer-events:none;

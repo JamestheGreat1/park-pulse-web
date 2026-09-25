@@ -504,7 +504,6 @@ select option:disabled{color:var(--muted)}
 .ride-actions button:focus-visible{outline:2px solid var(--blue);outline-offset:-4px}
 @media(hover:hover) and (pointer:fine){.ride-actions button:hover{background:rgba(var(--blue-rgb),.20);color:var(--text)}}
 @media(forced-colors:active){.ride-actions{border-color:ButtonText}.ride-actions .watch-button{border-color:ButtonText}.ride-actions button[aria-pressed="true"],.ride-actions .watch-button.active{outline:2px solid Highlight;outline-offset:-4px}}
-.personal-copy{color:var(--muted);font-size:.85rem;line-height:1.5;margin:0 0 14px}
 #view-explore .toolbar{grid-template-columns:minmax(140px,1fr) auto auto auto}
 .ride-history{padding:16px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);margin:16px 0;color:var(--muted);font-size:.85rem}
 .history-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.history-heading h3{color:var(--text);font-size:1rem}

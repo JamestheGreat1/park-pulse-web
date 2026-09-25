@@ -271,11 +271,15 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
   }
   #view-explore .section-heading{
     grid-column:1/-1;
+    width:min(100%,1040px);
+    justify-self:center;
     margin-top:8px;
     margin-bottom:14px;
   }
   #view-explore .ride-list{
     grid-column:1/-1;
+    width:min(100%,1040px);
+    justify-self:center;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:12px;
   }

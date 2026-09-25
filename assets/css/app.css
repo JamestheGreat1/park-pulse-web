@@ -2509,3 +2509,98 @@ body{
     transform:rotate(var(--mc-rotate)) scale(1.15) scale(var(--mc-burst-scale));
   }
 }
+
+
+/* v1.8.0-preview.18 — smoother Minecraft-style rocket trails. */
+:root[data-season="july4"] .seasonal-particle{
+  --mc-x1:0px;
+  --mc-x2:0px;
+  --mc-x3:0px;
+  --mc-x4:0px;
+  --mc-rocket-sparks:
+      0px   8px 0 -1px rgba(255,255,255,.96),
+      1px  16px 0 -1px currentColor,
+     -1px  24px 0 -1px currentColor,
+      2px  33px 0 -1px rgba(255,255,255,.82),
+     -2px  42px 0 -1px currentColor,
+      1px  52px 0 -1px currentColor,
+     -1px  63px 0 -1px rgba(255,255,255,.68),
+      2px  74px 0 -1px currentColor,
+     -2px  86px 0 -1px currentColor,
+      1px  99px 0 -1px rgba(255,255,255,.48);
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){
+  --mc-x1:7px;
+  --mc-x2:5px;
+  --mc-x3:3px;
+  --mc-x4:1px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){
+  --mc-x1:-9px;
+  --mc-x2:-7px;
+  --mc-x3:-4px;
+  --mc-x4:-2px;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){
+  --mc-x1:4px;
+  --mc-x2:3px;
+  --mc-x3:2px;
+  --mc-x4:1px;
+}
+
+:root[data-season="july4"] .seasonal-particle::before{
+  width:3px;
+  height:3px;
+  border-radius:1px;
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  animation:mc-rocket-rise var(--mc-cycle) linear infinite!important;
+  animation-delay:var(--particle-delay)!important;
+  filter:drop-shadow(0 0 2px currentColor);
+}
+
+/* More animation samples + tighter sparks = continuous motion without losing the pixel look. */
+@keyframes mc-rocket-rise{
+  0%,39%{
+    opacity:0;
+    transform:translate3d(var(--mc-lean),100vh,0) scale(.76);
+  }
+  41%{
+    opacity:.20;
+    transform:translate3d(var(--mc-lean),94vh,0) scale(.80);
+  }
+  44%{
+    opacity:.52;
+    transform:translate3d(var(--mc-x1),82vh,0) scale(.84);
+  }
+  48%{
+    opacity:.82;
+    transform:translate3d(var(--mc-x1),66vh,0) scale(.88);
+  }
+  52%{
+    opacity:.96;
+    transform:translate3d(var(--mc-x2),49vh,0) scale(.92);
+  }
+  56%{
+    opacity:1;
+    transform:translate3d(var(--mc-x3),32vh,0) scale(.96);
+  }
+  59%{
+    opacity:1;
+    transform:translate3d(var(--mc-x4),18vh,0) scale(1);
+  }
+  61.5%{
+    opacity:.94;
+    transform:translate3d(0,6vh,0) scale(1);
+  }
+  62.5%{
+    opacity:.42;
+    transform:translate3d(0,1.5vh,0) scale(.92);
+  }
+  63%,100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.78);
+  }
+}
+

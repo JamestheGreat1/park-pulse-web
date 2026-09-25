@@ -6,35 +6,38 @@ This branch is the protected test bed for ParkPulse features before they move to
 
 `preview/seasonal-overlays`
 
-Preview version: `1.9.0-preview.9`
+Preview version: `1.9.0-preview.10`
 
 Production `main` remains unchanged until the preview work is explicitly approved.
 
 ## Current preview experiment
 
-This build ports four native-app ideas into the PWA without bringing back the old full planner:
+This build intentionally keeps the PWA small. After testing a broader native-app port, Park Day Lite and Quick Actions were removed from the PWA preview and remain native-app ideas.
 
-- **Next Up** — one recommended ride at a time, with “I’m heading there” and “Show another.”
-- **Recommendation explanations** — concise, factual reasons based on must-dos, favorites, live waits, and the existing historical comparison.
-- **Park Day Lite** — a lightweight session that tracks the current Next Up ride, rides marked ridden, remaining must-dos, and watched rides. **Dedicated Park Day screen** opens from Explore while the normal three-tab bottom navigation stays unchanged.
-- **Quick Actions** — Favorite, Must-do, Watch/Edit Watch, Set as Next Up, mark a completed ride back as not ridden, and Share.
+The preview now tests only:
 
-No new backend schema or Worker logic is required for these features. Park Day Lite is intentionally device-local.
+- **Next Up** — one useful ride recommendation at a time, with **View ride** and **Show another**.
+- **Recommendation explanations** — short, factual context based on must-dos, favorites, live waits, and the existing historical comparison.
 
-## Intended preview hostname
+Ride cards stay simple: **Favorite + Alert** only.
 
-`preview.useparkpulse.com`
+No new backend schema or Worker logic is required for these features.
 
-The preview build routes API and push requests through the preview Worker, which service-binds to the production ParkPulse API. This keeps the preview origin working without putting API secrets in the client.
+## Preview URL
+
+`https://preview-seasonal-overlays-park-pulse-web.jamesp5297.workers.dev/`
+
+The preview Worker routes API, health, and push requests through the `PARKPULSE_API` Cloudflare Service Binding. API routes are network-only in the preview service worker so live wait responses are not served from the static shell cache.
 
 ## Test checklist
 
 ### Next Up
-- Confirm a fresh, open ride is selected.
-- Confirm **Show another** cycles without starting Park Day.
-- Confirm **I’m heading there** starts Park Day Lite and locks that ride as Next Up.
-- Confirm switching parks gives a recommendation for the selected park.
-- Confirm stale, closed, source-missing, and already-ridden rides are not chosen as new recommendations.
+- Confirm an open, fresh ride is recommended when one is available.
+- Confirm **View ride** opens the normal ride sheet.
+- Confirm **Show another** cycles through eligible recommendations.
+- Confirm switching parks recalculates the recommendation.
+- Confirm stale, closed, and source-missing rides are not recommended.
+- Confirm the card stays out of the way when there is no eligible recommendation.
 
 ### Recommendation explanations
 - Confirm must-dos and favorites are called out correctly.
@@ -42,21 +45,10 @@ The preview build routes API and push requests through the preview Worker, which
 - Confirm the top Best Now / For me cards get compact explanation copy.
 - Confirm ride sheets show the same factual ParkPulse context.
 
-### Park Day Lite
-- Confirm **Mark ridden** adds to the session count and advances Next Up.
-- Confirm remaining must-dos update.
-- Confirm watched count reflects watches in the selected park.
-- Confirm **End Park Day** clears session-only progress without deleting favorites, must-dos, or watches.
-- Confirm the session expires at ParkPulse’s 3 a.m. Eastern park-day boundary.
-
-### Quick Actions
-- Test Favorite / Remove favorite.
-- Test Must-do / Remove must-do.
-- Test Watch / Edit watch.
-- Test Set as Next Up both before and during Park Day.
-- Test Mark not ridden on a completed ride.
-- Test Share.
-- Test Escape/backdrop close and focus return on desktop.
+### Ride-card simplicity
+- Confirm each ride card has only **Favorite** and **Alert** controls.
+- Confirm there is no Quick Actions menu.
+- Confirm there is no Park Day screen, Park Day state, or Park Day shortcut.
 
 ### General regression
 - iPhone installed PWA and Safari.
@@ -75,8 +67,7 @@ The preview build routes API and push requests through the preview Worker, which
 - `preview-worker.js` — proxies API paths through the `PARKPULSE_API` Cloudflare Service Binding
 - `assets/js/config.js` — uses the preview origin as `WORKER_BASE`
 
-The production branch does not need these preview-only routing files. The preview badge intentionally says **Feature Preview** rather than naming a seasonal test.
-
+The production branch does not need these preview-only routing files. The preview badge intentionally says **Feature Preview**.
 
 ## Cloudflare Preview binding note
 

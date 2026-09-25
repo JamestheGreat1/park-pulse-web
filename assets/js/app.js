@@ -6,7 +6,7 @@ import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, 
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-const views = { explore: $("#view-explore"), parkday: $("#view-parkday"), watching: $("#view-watching"), settings: $("#view-settings") };
+const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const installHelpSheet = $("#installHelpSheet");
@@ -24,7 +24,6 @@ let serviceWorkerRegistration = null;
 let pendingServiceWorker = null;
 let sheetReturnFocus = null;
 let installHelpReturnFocus = null;
-let quickActionReturnFocus = null;
 let nextUpOffset = 0;
 
 const FIRST_RUN_KEY = "parkpulse.quickStart.v1";
@@ -405,12 +404,6 @@ function typicalComparisonBadge(ride) {
   return null;
 }
 
-function activeParkDay(state = store.snapshot) {
-  const parkDay = state.parkDay;
-  if (!parkDay?.active) return null;
-  if (parkDay.expiresAt && Number(parkDay.expiresAt) <= Date.now()) return null;
-  return parkDay;
-}
 
 function recommendationScore(ride, state = store.snapshot) {
   if (!ride || !ride.isOpen || isRideStale(ride) || ride.sourceMissing) return -Infinity;
@@ -451,10 +444,8 @@ function recommendationReason(ride, state = store.snapshot) {
 }
 
 function recommendationCandidates(state = store.snapshot) {
-  const parkDay = activeParkDay(state);
-  const completed = new Set((parkDay?.completedRideIds || []).map(String));
   return rideData.ridesForPark(state.selectedParkId)
-    .filter(ride => ride.isOpen && !isRideStale(ride) && !ride.sourceMissing && Number.isFinite(Number(ride.waitTime)) && !completed.has(String(ride.id)))
+    .filter(ride => ride.isOpen && !isRideStale(ride) && !ride.sourceMissing && Number.isFinite(Number(ride.waitTime)))
     .sort((a, b) =>
       recommendationScore(b, state) - recommendationScore(a, state) ||
       Number(a.waitTime ?? Infinity) - Number(b.waitTime ?? Infinity) ||
@@ -463,53 +454,30 @@ function recommendationCandidates(state = store.snapshot) {
 }
 
 function nextUpRide(state = store.snapshot) {
-  const parkDay = activeParkDay(state);
-  if (parkDay?.currentRideId) {
-    const current = rideData.rideById(parkDay.currentRideId);
-    if (current && Number(current.parkId) === Number(state.selectedParkId) && !(parkDay.completedRideIds || []).includes(String(current.id))) {
-      return { ride: current, current: true };
-    }
-  }
   const candidates = recommendationCandidates(state);
-  if (!candidates.length) return { ride: null, current: false };
+  if (!candidates.length) return null;
   const index = ((nextUpOffset % candidates.length) + candidates.length) % candidates.length;
-  return { ride: candidates[index], current: false };
-}
-
-function parkDayStats(state = store.snapshot) {
-  const parkDay = activeParkDay(state);
-  if (!parkDay) return null;
-  const parkRideIds = new Set(rideData.ridesForPark(state.selectedParkId).map(ride => String(ride.id)));
-  const completed = new Set((parkDay.completedRideIds || []).map(String));
-  return {
-    ridden: [...completed].filter(id => parkRideIds.has(id)).length,
-    mustDoLeft: state.mustDo.filter(id => parkRideIds.has(String(id)) && !completed.has(String(id))).length,
-    watching: state.rules.filter(rule => Number(rule.parkId) === Number(state.selectedParkId)).length
-  };
+  return candidates[index];
 }
 
 function nextUpMarkup(state = store.snapshot) {
-  const parkDay = activeParkDay(state);
-  const { ride, current } = nextUpRide(state);
-  if (!ride && !parkDay) return "";
-
-  const stats = parkDayStats(state);
-  if (!ride) {
-    return `<section class="next-up-card liquid-glass park-day-active">
-      <div class="next-up-head"><div><span class="eyebrow">Park Day</span><h3>No strong Next Up pick right now</h3><p>ParkPulse will keep looking as waits and ride status change.</p></div><button class="next-up-end" type="button" data-view-jump="parkday">Open Park Day →</button></div>
-      <div class="park-day-stats"><span><b>${stats?.mustDoLeft || 0}</b> must-dos left</span><span><b>${stats?.watching || 0}</b> watched</span><span><b>${stats?.ridden || 0}</b> ridden</span></div>
-    </section>`;
-  }
+  const ride = nextUpRide(state);
+  if (!ride) return "";
 
   const status = rideStatus(ride);
   const reason = recommendationReason(ride, state);
   const comparison = rideComparison(ride);
-  const label = current ? "Next Up" : comparison?.percentDelta <= -25 ? "Great right now" : state.mustDo.includes(String(ride.id)) ? "Must-do pick" : state.favorites.includes(String(ride.id)) ? "Favorite pick" : "ParkPulse pick";
+  const label = comparison?.percentDelta <= -25
+    ? "Great right now"
+    : state.mustDo.includes(String(ride.id))
+      ? "Must-do pick"
+      : state.favorites.includes(String(ride.id))
+        ? "Favorite pick"
+        : "ParkPulse pick";
 
-  return `<section class="next-up-card liquid-glass ${parkDay ? "park-day-active" : ""}">
+  return `<section class="next-up-card liquid-glass">
     <div class="next-up-head">
-      <div><span class="eyebrow">${parkDay ? "Park Day · " : ""}${escapeHtml(label)}</span><h3>${parkDay && current ? "You’re heading to" : "What should I ride next?"}</h3><p>${escapeHtml(reason)}</p></div>
-      ${parkDay ? '<button class="next-up-end" type="button" data-view-jump="parkday">Open Park Day →</button>' : ""}
+      <div><span class="eyebrow">${escapeHtml(label)}</span><h3>What should I ride next?</h3><p>${escapeHtml(reason)}</p></div>
     </div>
     <div class="next-up-ride-row">
       <button class="next-up-ride" type="button" data-open-ride="${ride.id}">
@@ -518,159 +486,17 @@ function nextUpMarkup(state = store.snapshot) {
       </button>
       <div class="next-up-wait"><b class="${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</b><span>${escapeHtml(status.label)}</span></div>
     </div>
-    ${parkDay ? `<div class="park-day-stats"><span><b>${stats.mustDoLeft}</b> must-dos left</span><span><b>${stats.watching}</b> watched</span><span><b>${stats.ridden}</b> ridden</span></div>` : '<p class="next-up-footnote">Pick it and Park Day Lite starts automatically — no itinerary required.</p>'}
     <div class="next-up-actions">
-      ${current
-        ? `<button class="primary-button next-up-primary" type="button" data-mark-ridden="${ride.id}">Mark ridden</button><button class="secondary-button" type="button" data-next-up-another>Pick another</button>`
-        : `<button class="primary-button next-up-primary" type="button" data-next-up-go="${ride.id}">I’m heading there</button><button class="secondary-button" type="button" data-next-up-another>Show another</button>`}
+      <button class="primary-button next-up-primary" type="button" data-open-ride="${ride.id}">View ride</button>
+      <button class="secondary-button" type="button" data-next-up-another>Show another</button>
     </div>
   </section>`;
 }
 
-function setRideAsNextUp(id) {
-  const ride = rideData.rideById(id);
-  if (!ride) return;
-  const parkDay = activeParkDay();
-  if (!parkDay) store.startParkDay(ride.parkId, easternParkDayEnd());
-  nextUpOffset = 0;
-  store.setParkDayCurrent(String(id), ride.parkId);
-  toast(`${ride.name} is Next Up`);
-}
-
 function cycleNextUp() {
   nextUpOffset += 1;
-  const parkDay = activeParkDay();
-  if (parkDay?.currentRideId) {
-    store.setParkDayCurrent(null);
-    return;
-  }
   renderExplore();
   bindDynamic();
-}
-
-function markRideRidden(id) {
-  const ride = rideData.rideById(id);
-  nextUpOffset = 0;
-  store.completeParkDayRide(id);
-  toast(ride ? `${ride.name} marked ridden` : "Ride marked ridden");
-}
-
-
-function parkDayListRow(ride, { note = "", completed = false } = {}) {
-  if (!ride) return "";
-  const status = rideStatus(ride);
-  return `<button class="park-day-list-row ${completed ? "completed" : ""}" type="button" data-open-ride="${ride.id}">
-    <span class="park-day-row-check" aria-hidden="true">${completed ? "✓" : "→"}</span>
-    <span class="park-day-row-copy">
-      <span class="ride-land">${escapeHtml(ride.land)}</span>
-      <strong>${escapeHtml(ride.name)}</strong>
-      ${note ? `<small>${escapeHtml(note)}</small>` : ""}
-    </span>
-    <span class="park-day-row-status"><b class="${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</b><small>${escapeHtml(status.label)}</small></span>
-  </button>`;
-}
-
-function renderParkDay() {
-  const state = store.snapshot;
-  const parkDay = activeParkDay(state);
-  if (!views.parkday) return;
-
-  if (!parkDay) {
-    views.parkday.innerHTML = `
-      <div class="park-day-page-head">
-        <button class="park-day-back" type="button" data-view-jump="explore" aria-label="Back to Explore">← <span>Explore</span></button>
-        <span class="eyebrow">Park Day Lite</span>
-        <h2>No Park Day running</h2>
-        <p>Pick a Next Up ride from Explore and ParkPulse will start a lightweight day session automatically.</p>
-      </div>
-      <section class="park-day-empty liquid-glass">
-        <span aria-hidden="true">✦</span>
-        <h3>Nothing to manage yet</h3>
-        <p>No itinerary, no schedule. Park Day only keeps track of what you’re doing next, what you still want to ride, and what you’ve already done.</p>
-        <button class="primary-button" type="button" data-view-jump="explore">Find a ride</button>
-      </section>`;
-    return;
-  }
-
-  const stats = parkDayStats(state);
-  const { ride: nextRide, current } = nextUpRide(state);
-  const completed = new Set((parkDay.completedRideIds || []).map(String));
-  const parkRideIds = new Set(rideData.ridesForPark(state.selectedParkId).map(ride => String(ride.id)));
-  const mustDoRides = state.mustDo
-    .filter(id => parkRideIds.has(String(id)) && !completed.has(String(id)))
-    .map(id => rideData.rideById(id))
-    .filter(Boolean);
-  const riddenRides = [...completed]
-    .filter(id => parkRideIds.has(String(id)))
-    .map(id => rideData.rideById(id))
-    .filter(Boolean);
-  const watchedRules = state.rules.filter(rule => Number(rule.parkId) === Number(state.selectedParkId));
-  const watchedRides = watchedRules
-    .map(rule => ({ rule, ride: rideData.rideById(rule.rideId) }))
-    .filter(item => item.ride);
-  const nextStatus = nextRide ? rideStatus(nextRide) : null;
-
-  views.parkday.innerHTML = `
-    <div class="park-day-page-head">
-      <button class="park-day-back" type="button" data-view-jump="explore" aria-label="Back to Explore">← <span>Explore</span></button>
-      <span class="eyebrow">Park Day Lite</span>
-      <h2>${escapeHtml(parkName(state.selectedParkId))}</h2>
-      <p>Your day at a glance. Just the useful stuff — no itinerary required.</p>
-    </div>
-
-    <section class="park-day-hero liquid-glass">
-      <div class="park-day-hero-label"><span class="eyebrow">Next Up</span>${nextRide ? (current ? '<span class="park-day-current">Locked in</span>' : '<span class="park-day-current">Suggested</span>') : '<span class="park-day-current">Waiting</span>'}</div>
-      ${nextRide ? `
-        <button class="park-day-next-ride" type="button" data-open-ride="${nextRide.id}">
-          <div><span class="ride-land">${escapeHtml(nextRide.land)}</span><h3>${escapeHtml(nextRide.name)}</h3><p>${escapeHtml(recommendationReason(nextRide, state))}</p></div>
-          <div class="park-day-next-wait"><b class="${nextStatus.stale ? "stale" : nextRide.isOpen ? "open" : "closed"}">${escapeHtml(nextStatus.wait)}</b><span>${escapeHtml(nextStatus.label)}</span></div>
-        </button>
-        <div class="park-day-hero-actions">
-          ${current
-            ? `<button class="primary-button" type="button" data-mark-ridden="${nextRide.id}">Mark ridden</button><button class="secondary-button" type="button" data-next-up-another>Pick another</button>`
-            : `<button class="primary-button" type="button" data-next-up-go="${nextRide.id}">Make this Next Up</button><button class="secondary-button" type="button" data-next-up-another>Show another</button>`}
-        </div>`
-        : `<div class="park-day-no-next"><strong>No strong pick right now</strong><p>ParkPulse will keep looking as ride status and waits change.</p><button class="secondary-button" type="button" data-view-jump="explore">Browse rides</button></div>`}
-    </section>
-
-    <div class="park-day-stats park-day-page-stats">
-      <span><b>${stats?.mustDoLeft || 0}</b> must-dos left</span>
-      <span><b>${stats?.watching || 0}</b> watched</span>
-      <span><b>${stats?.ridden || 0}</b> ridden</span>
-    </div>
-
-    <section class="park-day-section">
-      <div class="park-day-section-head"><div><span class="eyebrow">Still on the list</span><h3>Must-dos left</h3></div><span>${mustDoRides.length}</span></div>
-      <div class="park-day-list liquid-glass">
-        ${mustDoRides.length ? mustDoRides.map(ride => parkDayListRow(ride, { note: recommendationReason(ride, state) })).join("") : '<div class="park-day-list-empty">You’re caught up on must-dos for this park.</div>'}
-      </div>
-    </section>
-
-    <section class="park-day-section">
-      <div class="park-day-section-head"><div><span class="eyebrow">Today</span><h3>Ridden</h3></div><span>${riddenRides.length}</span></div>
-      <div class="park-day-list liquid-glass">
-        ${riddenRides.length ? riddenRides.map(ride => parkDayListRow(ride, { note: "Marked ridden today", completed: true })).join("") : '<div class="park-day-list-empty">Nothing marked ridden yet.</div>'}
-      </div>
-    </section>
-
-    <section class="park-day-section">
-      <div class="park-day-section-head"><div><span class="eyebrow">ParkPulse is watching</span><h3>Active watches</h3></div><span>${watchedRides.length}</span></div>
-      <div class="park-day-list liquid-glass">
-        ${watchedRides.length ? watchedRides.map(({ rule, ride }) => parkDayListRow(ride, {
-          note: [rule.reopen ? "Reopening" : null, rule.threshold ? `≤ ${rule.threshold} min` : null].filter(Boolean).join(" · ") || "Status watch"
-        })).join("") : '<div class="park-day-list-empty">No ride watches in this park right now.</div>'}
-      </div>
-    </section>
-
-    <button class="park-day-end-button" type="button" data-end-park-day>End Park Day</button>`;
-}
-
-function updateParkDayShortcut() {
-  const shortcut = $("#parkDayShortcut");
-  if (!shortcut) return;
-  const parkDay = activeParkDay();
-  shortcut.classList.toggle("hidden", !parkDay);
-  shortcut.setAttribute("aria-hidden", String(!parkDay));
 }
 
 function rideStatus(ride) {
@@ -817,9 +643,8 @@ function selectView(name) {
   if (liquid) root.classList.add("glass-color-snap");
 
   for (const [key, el] of Object.entries(views)) el.classList.toggle("active", key === name);
-  const navName = name === "parkday" ? "explore" : name;
   document.querySelectorAll(".nav-item").forEach((button) => {
-    const active = button.dataset.viewTarget === navName;
+    const active = button.dataset.viewTarget === name;
     button.classList.toggle("active", active);
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
@@ -874,7 +699,6 @@ function rideCard(ride, state = store.snapshot, index = 0) {
     <div class="ride-actions">
       <button class="favorite-button ${favorite ? "active" : ""}" type="button" data-favorite="${ride.id}" aria-pressed="${favorite}" aria-label="${favorite ? "Unfavorite" : "Favorite"} ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
       <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button>
-      <button class="quick-action-button" type="button" data-quick-actions="${ride.id}" aria-label="Quick actions for ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
     </div>
   </article>`;
 }
@@ -890,9 +714,6 @@ function bindRideCards(root = views.explore) {
   });
   root.querySelectorAll('[data-open-ride]').forEach((button) => {
     button.onclick = () => openRide(button.dataset.openRide);
-  });
-  root.querySelectorAll('[data-quick-actions]').forEach((button) => {
-    button.onclick = () => openQuickActions(button.dataset.quickActions, button);
   });
 }
 function renderRideResults() {
@@ -1085,35 +906,22 @@ function renderRideDataUpdate() {
   renderRideResults();
   renderRefreshCopy();
   renderParkHours();
-  renderParkDay();
   renderWatching();
   renderSettings();
   updateWatchBadge();
-  updateParkDayShortcut();
   setTheme();
   bindDynamic();
 }
 function render() {
   store.pruneExpired(false);
-  renderExplore(); renderParkDay(); renderWatching(); renderSettings();
+  renderExplore(); renderWatching(); renderSettings();
   updateWatchBadge();
-  updateParkDayShortcut();
   setTheme(); bindDynamic();
 }
 function bindDynamic() {
   document.querySelectorAll('[data-park]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
-  document.querySelectorAll('[data-next-up-go]').forEach((b) => b.onclick = () => setRideAsNextUp(b.dataset.nextUpGo));
   document.querySelectorAll('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
-  document.querySelectorAll('[data-mark-ridden]').forEach((b) => b.onclick = () => markRideRidden(b.dataset.markRidden));
-  document.querySelectorAll('[data-end-park-day]').forEach((b) => b.onclick = () => {
-    nextUpOffset = 0;
-    const wasParkDayView = store.snapshot.activeView === "parkday";
-    store.endParkDay();
-    if (wasParkDayView) selectView("explore");
-    toast("Park Day ended");
-  });
   bindRideCards(views.explore);
-  if (views.parkday) bindRideCards(views.parkday);
   $('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-favorites]').forEach(b => b.onclick = () => store.update(s => { s.favoritesOnly = !s.favoritesOnly; }, 'filter'));
@@ -1163,91 +971,6 @@ async function copyText(value) {
   document.execCommand("copy");
   area.remove();
 }
-function closeQuickActions() {
-  const menu = $("#quickActionMenu");
-  const menuBackdrop = $("#quickActionBackdrop");
-  if (!menu || menu.classList.contains("hidden")) return;
-  menu.classList.add("hidden");
-  menu.setAttribute("aria-hidden", "true");
-  menuBackdrop?.classList.add("hidden");
-  menuBackdrop?.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("quick-actions-open");
-  const returnTo = quickActionReturnFocus;
-  quickActionReturnFocus = null;
-  if (returnTo?.isConnected) requestAnimationFrame(() => returnTo.focus({ preventScroll: true }));
-}
-
-function ensureQuickActionMenu() {
-  let menuBackdrop = $("#quickActionBackdrop");
-  let menu = $("#quickActionMenu");
-  if (!menuBackdrop) {
-    menuBackdrop = document.createElement("div");
-    menuBackdrop.id = "quickActionBackdrop";
-    menuBackdrop.className = "quick-action-backdrop hidden";
-    menuBackdrop.setAttribute("aria-hidden", "true");
-    document.body.append(menuBackdrop);
-  }
-  if (!menu) {
-    menu = document.createElement("section");
-    menu.id = "quickActionMenu";
-    menu.className = "quick-action-menu liquid-glass hidden";
-    menu.setAttribute("role", "dialog");
-    menu.setAttribute("aria-modal", "true");
-    menu.setAttribute("aria-hidden", "true");
-    document.body.append(menu);
-  }
-  menuBackdrop.onclick = closeQuickActions;
-  return { menu, menuBackdrop };
-}
-
-function openQuickActions(id, trigger = null) {
-  const ride = rideData.rideById(id);
-  if (!ride) return;
-  const state = store.snapshot;
-  const favorite = state.favorites.includes(String(id));
-  const mustDo = state.mustDo.includes(String(id));
-  const rule = store.ruleForRide(id);
-  const parkDay = activeParkDay(state);
-  const completed = Boolean(parkDay?.completedRideIds?.includes(String(id)));
-  const current = String(parkDay?.currentRideId || "") === String(id);
-  const { menu, menuBackdrop } = ensureQuickActionMenu();
-  quickActionReturnFocus = trigger || (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-
-  menu.innerHTML = `
-    <div class="quick-action-handle" aria-hidden="true"></div>
-    <div class="quick-action-head"><div><span class="ride-land">${escapeHtml(ride.land)}</span><h2>${escapeHtml(ride.name)}</h2><p>${escapeHtml(recommendationReason(ride, state))}</p></div><button type="button" class="quick-action-close" data-close-quick-actions aria-label="Close">×</button></div>
-    <div class="quick-action-list">
-      <button type="button" data-quick-action="favorite"><span>★</span><div><strong>${favorite ? "Remove favorite" : "Favorite"}</strong><small>Save it without creating an alert.</small></div></button>
-      <button type="button" data-quick-action="must-do"><span>✓</span><div><strong>${mustDo ? "Remove must-do" : "Must-do ride"}</strong><small>Prioritize it in For me and Next Up.</small></div></button>
-      <button type="button" data-quick-action="watch"><span>🔔</span><div><strong>${rule ? "Edit watch" : "Watch ride"}</strong><small>Reopening and wait-target alerts.</small></div></button>
-      ${completed
-        ? '<button type="button" data-quick-action="unride"><span>↺</span><div><strong>Mark not ridden</strong><small>Put it back into Park Day recommendations.</small></div></button>'
-        : `<button type="button" data-quick-action="next" ${current ? "disabled" : ""}><span>→</span><div><strong>${current ? "Already Next Up" : "Set as Next Up"}</strong><small>${parkDay ? "Make this your current Park Day pick." : "Starts Park Day Lite with this ride."}</small></div></button>`}
-      <button type="button" data-quick-action="share"><span>↗</span><div><strong>Share</strong><small>Send a ParkPulse link to this ride.</small></div></button>
-    </div>`;
-
-  menu.classList.remove("hidden");
-  menu.setAttribute("aria-hidden", "false");
-  menuBackdrop.classList.remove("hidden");
-  menuBackdrop.setAttribute("aria-hidden", "false");
-  document.body.classList.add("quick-actions-open");
-
-  $('[data-close-quick-actions]', menu).onclick = closeQuickActions;
-  menu.querySelectorAll('[data-quick-action]').forEach(button => {
-    button.onclick = async () => {
-      const action = button.dataset.quickAction;
-      if (action === "favorite") store.toggleFavorite(id);
-      if (action === "must-do") store.setMustDo(id, !mustDo);
-      if (action === "watch") { closeQuickActions(); openRide(id); return; }
-      if (action === "next") { closeQuickActions(); setRideAsNextUp(id); return; }
-      if (action === "unride") { store.uncompleteParkDayRide(id); toast(`${ride.name} is back in Park Day`); }
-      if (action === "share") { closeQuickActions(); await shareRide(id); return; }
-      closeQuickActions();
-    };
-  });
-  requestAnimationFrame(() => $('[data-close-quick-actions]', menu)?.focus({ preventScroll: true }));
-}
-
 async function shareRide(id) {
   const ride = rideData.rideById(id) || store.ruleForRide(id);
   if (!ride) return;
@@ -1282,11 +1005,6 @@ function focusableInSheet() {
     .filter((el) => !el.classList.contains("hidden") && el.offsetParent !== null);
 }
 function handleDialogKeydown(event) {
-  if (event.key === "Escape" && $("#quickActionMenu") && !$("#quickActionMenu").classList.contains("hidden")) {
-    event.preventDefault();
-    closeQuickActions();
-    return;
-  }
   if (event.key === "Escape" && installHelpSheet && !installHelpSheet.classList.contains("hidden")) {
     event.preventDefault();
     closeInstallHelp();
@@ -1860,8 +1578,6 @@ setupSheetDismissGesture();
       refreshPushState({ sync: true });
       if (!analyticsState?.ok) refreshAnalyticsState();
     }
-    const parkDay = store.snapshot.parkDay;
-    if (parkDay?.active && parkDay.expiresAt && Number(parkDay.expiresAt) <= Date.now()) store.endParkDay();
     renderParkHours();
     renderRideResults();
   }, 60 * 1000);

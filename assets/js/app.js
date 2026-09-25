@@ -1,7 +1,7 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.7.12";
-import { store } from "./store.js?v=1.7.12";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.7.12";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.7.12";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.7.13";
+import { store } from "./store.js?v=1.7.13";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.7.13";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.7.13";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -12,7 +12,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.7.12";
+const APP_VERSION = "1.7.13";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -622,6 +622,13 @@ function renderWatching() {
       return `<article class="watch-card liquid-glass ${status.stale ? "stale" : ""}"><button class="watch-card-main" type="button" data-open-ride="${rule.rideId}"><span class="ride-land">${escapeHtml(parkName(rule.parkId))}</span><h3>${escapeHtml(rule.rideName)}</h3><p>${escapeHtml(detail || "Status watch")} · ${remaining(rule)}</p></button><div class="watch-live"><span class="wait ${status.stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><button class="delete-watch" type="button" data-delete-watch="${rule.rideId}" aria-label="Stop watching ${escapeHtml(rule.rideName)}">×</button></div></article>`;
     }).join("") : `<div class="empty liquid-glass"><span class="empty-icon">🔔</span><h3>Nothing here yet</h3><p>Pick a ride, set a target, and ParkPulse will keep an eye on it.</p><button type="button" data-view-jump="explore">Find a ride</button></div>`}</div>`;
 }
+async function refreshBackendState() {
+  const next = await backendHealth().catch(() => null);
+  backendState = next || { ok: false };
+  renderSettings();
+  bindDynamic();
+}
+
 async function refreshAnalyticsState() {
   const next = await fetchAnalyticsStatus().catch(() => null);
   if (next) analyticsState = next;
@@ -1329,13 +1336,14 @@ setupSheetDismissGesture();
     renderStatusBanner();
     await rideData.refresh({ parkId: store.snapshot.selectedParkId });
     await refreshPushState({ sync: true });
-    await refreshAnalyticsState();
+    await Promise.all([refreshBackendState(), refreshAnalyticsState()]);
     renderStatusBanner();
   });
   window.addEventListener("offline", renderStatusBanner);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       refreshPushState({ sync: true });
+      refreshBackendState();
       refreshAnalyticsState();
       checkForAppUpdate();
     }
@@ -1368,6 +1376,9 @@ setupSheetDismissGesture();
     renderSettings();
     bindDynamic();
   }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));
+  setInterval(() => {
+    if (navigator.onLine) refreshBackendState();
+  }, 5 * 60 * 1000);
   setInterval(() => {
     if (navigator.onLine) refreshAnalyticsState();
   }, 15 * 60 * 1000);

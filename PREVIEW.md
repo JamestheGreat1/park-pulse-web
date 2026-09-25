@@ -82,3 +82,9 @@ Worker Previews do not inherit top-level bindings. Preview-specific service bind
 ## Condensed Status
 
 Settings now keeps only four always-visible status rows: **System**, **Notifications**, **History**, and **App version**. Detailed Worker, source, API-key, alert-engine, history, baseline, and copy-diagnostics information lives under **Show diagnostics**.
+
+
+## Final simplification
+
+- **Must-do was removed** from the PWA. Next Up now uses favorites plus live wait/value context.
+- Desktop ride sheets remain centered, use the available viewport height, and hide the visual scrollbar while preserving scroll when needed.

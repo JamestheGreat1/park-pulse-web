@@ -1043,7 +1043,7 @@ body{
 }
 
 
-/* v1.8.0-preview.6 — balanced accent grid + distinct seasonal motion. */
+/* v1.8.1-preview.6 — balanced accent grid + distinct seasonal motion. */
 .accent-picker{
   display:grid!important;
   grid-template-columns:repeat(4,38px)!important;
@@ -1225,7 +1225,7 @@ body{
 }
 
 
-/* v1.8.0-preview.7 — stronger seasonal signatures. */
+/* v1.8.1-preview.7 — stronger seasonal signatures. */
 :root[data-season-intensity="subtle"]{--season-opacity:.58}
 :root[data-season-intensity="normal"]{--season-opacity:.88}
 :root[data-season-intensity="extra"]{--season-opacity:1}
@@ -1389,7 +1389,7 @@ body{
 }
 
 
-/* v1.8.0-preview.8 — neutral frosted-glass A/B experiment. */
+/* v1.8.1-preview.8 — neutral frosted-glass A/B experiment. */
 :root[data-preview-surface="neutral"]{
   --glass:rgba(118,126,140,.16);
   --glass-strong:rgba(105,113,128,.30);
@@ -1481,7 +1481,7 @@ body{
 }
 
 
-/* v1.8.0-preview.9 — deeper Liquid Glass study. */
+/* v1.8.1-preview.9 — deeper Liquid Glass study. */
 :root[data-preview-surface="neutral"]{
   --glass-thin:rgba(132,138,150,.095);
   --glass-mid:rgba(126,132,145,.135);
@@ -1665,7 +1665,7 @@ body{
 }
 
 
-/* v1.8.0-preview.11 — subtler Halloween lightning: distant flashes only at the top. */
+/* v1.8.1-preview.11 — subtler Halloween lightning: distant flashes only at the top. */
 :root[data-season="halloween"] .seasonal-layer:before{
   content:"";
   position:absolute;
@@ -1699,7 +1699,7 @@ body{
 }
 
 
-/* v1.8.0-preview.12 — align Halloween rain streaks with right-to-left wind. */
+/* v1.8.1-preview.12 — align Halloween rain streaks with right-to-left wind. */
 @keyframes halloween-rain{
   0%{transform:translate3d(46px,-18vh,0) rotate(13deg);opacity:0}
   10%{opacity:.58}
@@ -1707,7 +1707,7 @@ body{
 }
 
 
-/* v1.8.0-preview.13 — stronger glass, windier rain, rocket-style fireworks. */
+/* v1.8.1-preview.13 — stronger glass, windier rain, rocket-style fireworks. */
 
 /* A small glass bump: clearer edges and stronger lensing without adding navy tint. */
 :root[data-preview-surface="neutral"]{
@@ -1900,7 +1900,7 @@ body{
 }
 
 
-/* v1.8.0-preview.14 — bottom-launch fireworks + heavier Christmas snow. */
+/* v1.8.1-preview.14 — bottom-launch fireworks + heavier Christmas snow. */
 
 /* Christmas: noticeably fuller snowfall at each preview intensity. */
 :root[data-season="christmas"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+25){display:none!important}
@@ -2123,7 +2123,7 @@ body{
 }
 
 
-/* v1.8.0-preview.15 — Safari-safe firework transforms. */
+/* v1.8.1-preview.15 — Safari-safe firework transforms. */
 :root[data-season="july4"] .seasonal-particle{
   --trail-mid-x:0px;
 }
@@ -2179,7 +2179,7 @@ body{
 }
 
 
-/* v1.8.0-preview.16 — Minecraft-inspired July 4 fireworks.
+/* v1.8.1-preview.16 — Minecraft-inspired July 4 fireworks.
    Pixel spark ascent, discrete blocky explosions, twinkle/fade. */
 :root[data-season="july4"] .seasonal-particle{
   --mc-cycle:6.8s;
@@ -2402,7 +2402,7 @@ body{
 }
 
 
-/* v1.8.0-preview.17 — Safari-safe Minecraft firework motion. */
+/* v1.8.1-preview.17 — Safari-safe Minecraft firework motion. */
 :root[data-season="july4"] .seasonal-particle{
   --mc-mid1:0px;
   --mc-mid2:0px;
@@ -2495,7 +2495,7 @@ body{
 }
 
 
-/* v1.8.0-preview.18 — smoother Minecraft-style rocket trails. */
+/* v1.8.1-preview.18 — smoother Minecraft-style rocket trails. */
 :root[data-season="july4"] .seasonal-particle{
   --mc-x1:0px;
   --mc-x2:0px;
@@ -2589,7 +2589,7 @@ body{
 }
 
 
-/* v1.8.0-preview.19 — sparkling ascent + smooth Minecraft burst. */
+/* v1.8.1-preview.19 — sparkling ascent + smooth Minecraft burst. */
 
 /* Sparkle the square rocket particles while preserving the smooth climb. */
 :root[data-season="july4"] .seasonal-particle::before{
@@ -2674,7 +2674,7 @@ body{
 }
 
 
-/* v1.8.0-preview.20 — slower sparkling launch + softer, less blocky bursts. */
+/* v1.8.1-preview.20 — slower sparkling launch + softer, less blocky bursts. */
 
 /* Give the rocket a little more hang time without making it sluggish. */
 :root[data-season="july4"] .seasonal-particle{--mc-cycle:7.7s}
@@ -2800,7 +2800,7 @@ body{
 }
 
 
-/* v1.8.0-preview.21 — real-particle July 4 engine.
+/* v1.8.1-preview.21 — real-particle July 4 engine.
    Individual trail twinkles + radial sparks with subtle drift and gravity. */
 
 /* Retire the legacy pseudo-element firework particles. */
@@ -3037,7 +3037,7 @@ body{
 }
 
 
-/* v1.8.0-preview.22 — continuous rocket motion, no positional waypoints. */
+/* v1.8.1-preview.22 — continuous rocket motion, no positional waypoints. */
 
 /* One uninterrupted transform from below the viewport to the burst point.
    Twinkle stays on child sparks, so it cannot interfere with rocket movement. */
@@ -3082,7 +3082,7 @@ body{
 }
 
 
-/* v1.8.0-preview.23 — independent staggered July 4 trail sparks. */
+/* v1.8.1-preview.23 — independent staggered July 4 trail sparks. */
 .firework-rocket{
   display:contents;
   animation:none!important;
@@ -3169,7 +3169,7 @@ body{
 }
 
 
-/* v1.8.0-preview.24 — true emitted firework trail.
+/* v1.8.1-preview.24 — true emitted firework trail.
    The head rises smoothly and leaves independent falling sparks behind. */
 
 /* Override the previous staggered-trail experiment: one smooth head again. */
@@ -3338,7 +3338,7 @@ body{
 }
 
 
-/* v1.8.0-preview.25 — Fall / Thanksgiving leaves + public seasonal toggle. */
+/* v1.8.1-preview.25 — Fall / Thanksgiving leaves + public seasonal toggle. */
 :root[data-season="fall"]{
   --season-glow1:rgba(210,116,42,.22);
   --season-glow2:rgba(164,72,37,.16);
@@ -3481,7 +3481,7 @@ body{
 }
 
 
-/* v1.8.0-preview.28 — denser Fall / Thanksgiving leaves. */
+/* v1.8.1-preview.28 — denser Fall / Thanksgiving leaves. */
 :root[data-season="fall"][data-season-intensity="subtle"] .seasonal-particle:nth-child(n+21){
   display:none!important;
 }
@@ -3505,7 +3505,7 @@ body{
 }
 
 
-/* v1.8.0-preview.29 — Full Liquid Glass A/B/C study.
+/* v1.8.1-preview.29 — Full Liquid Glass A/B/C study.
    Lower-opacity lenses, stronger refraction, brighter optical edges. */
 :root[data-preview-surface="liquid"]{
   --glass:rgba(126,136,153,.055);
@@ -3694,7 +3694,7 @@ body{
 }
 
 
-/* v1.8.0-preview.30 — Apple-style refractive Liquid Glass.
+/* v1.8.1-preview.30 — Apple-style refractive Liquid Glass.
    Clearer centers, stronger lens rims, brighter speculars, subtle motion. */
 :root[data-preview-surface="liquid"]{
   --glass:rgba(142,151,168,.070);
@@ -4011,7 +4011,7 @@ body{
 }
 
 
-/* v1.8.0-preview.31 — Liquid Glass is material-only.
+/* v1.8.1-preview.31 — Liquid Glass is material-only.
    Restore layout-sensitive positioning inherited from the base UI. */
 :root[data-preview-surface="liquid"] .bottom-nav{
   position:fixed!important;
@@ -4055,7 +4055,7 @@ body{
 }
 
 
-/* v1.8.0-preview.32 — black canvas + colorless Liquid Glass + instant color response. */
+/* v1.8.1-preview.32 — black canvas + colorless Liquid Glass + instant color response. */
 
 /* Full Liquid Glass gets a true-black dark canvas. Accent/season layers provide the color. */
 :root[data-preview-surface="liquid"][data-theme="dark"]{
@@ -4155,7 +4155,7 @@ body{
 }
 
 
-/* v1.8.0-preview.34 — darker Neutral Frosted Glass in dark mode. */
+/* v1.8.1-preview.34 — darker Neutral Frosted Glass in dark mode. */
 :root[data-preview-surface="neutral"][data-theme="dark"]{
   --glass:rgba(46,52,62,.23);
   --glass-strong:rgba(38,44,54,.38);
@@ -4192,7 +4192,7 @@ body{
 }
 
 
-/* v1.8.0-preview.34 — preserve Liquid Glass compositor layers across page changes. */
+/* v1.8.1-preview.34 — preserve Liquid Glass compositor layers across page changes. */
 :root[data-preview-surface="liquid"] .view-panel.active{
   animation:none!important;
 }
@@ -4238,4 +4238,11 @@ body{
 .glass-style-picker button.active{color:var(--text);background:rgba(255,255,255,.10);box-shadow:inset 0 1px rgba(255,255,255,.16),0 4px 14px rgba(0,0,0,.10)}
 :root[data-preview-surface="liquid"] .glass-style-picker button.active{background:rgba(255,255,255,.055);box-shadow:inset 0 0 0 1px rgba(var(--blue-rgb),.22)}
 @media(max-width:420px){.glass-style-setting{align-items:center}.glass-style-picker{grid-template-columns:repeat(2,minmax(66px,1fr))}.glass-style-picker button{padding-inline:9px}}
-
+  
+/* Provider attribution links. */
+.data-source-link{
+  color:var(--blue);
+  font-weight:800;
+  text-decoration:none;
+}
+.data-source-link:hover{text-decoration:underline}

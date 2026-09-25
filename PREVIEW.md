@@ -6,7 +6,7 @@ This branch is the protected test bed for ParkPulse features before they move to
 
 `preview/seasonal-overlays`
 
-Preview version: `1.9.0-preview.3`
+Preview version: `1.9.0-preview.4`
 
 Production `main` remains unchanged until the preview work is explicitly approved.
 
@@ -76,3 +76,8 @@ The preview build routes API and push requests through the preview Worker, which
 - `assets/js/config.js` — uses the preview origin as `WORKER_BASE`
 
 The production branch does not need these preview-only routing files. The preview badge intentionally says **Feature Preview** rather than naming a seasonal test.
+
+
+## Cloudflare Preview binding note
+
+Worker Previews do not inherit top-level bindings. Preview-specific service bindings must also be declared inside `previews.services`. The `PARKPULSE_API` binding is therefore listed both at the top level and under `previews`.

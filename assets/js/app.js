@@ -1091,7 +1091,7 @@ function openQuickActions(id, trigger = null) {
     <div class="quick-action-list">
       <button type="button" data-quick-action="favorite"><span>★</span><div><strong>${favorite ? "Remove favorite" : "Favorite"}</strong><small>Save it without creating an alert.</small></div></button>
       <button type="button" data-quick-action="must-do"><span>✓</span><div><strong>${mustDo ? "Remove must-do" : "Must-do ride"}</strong><small>Prioritize it in For me and Next Up.</small></div></button>
-      <button type="button" data-quick-action="watch"><span>♟</span><div><strong>${rule ? "Edit watch" : "Watch ride"}</strong><small>Reopening and wait-target alerts.</small></div></button>
+      <button type="button" data-quick-action="watch"><span>🔔</span><div><strong>${rule ? "Edit watch" : "Watch ride"}</strong><small>Reopening and wait-target alerts.</small></div></button>
       ${completed
         ? '<button type="button" data-quick-action="unride"><span>↺</span><div><strong>Mark not ridden</strong><small>Put it back into Park Day recommendations.</small></div></button>'
         : `<button type="button" data-quick-action="next" ${current ? "disabled" : ""}><span>→</span><div><strong>${current ? "Already Next Up" : "Set as Next Up"}</strong><small>${parkDay ? "Make this your current Park Day pick." : "Starts Park Day Lite with this ride."}</small></div></button>`}

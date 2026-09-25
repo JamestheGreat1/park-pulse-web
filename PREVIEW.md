@@ -6,7 +6,7 @@ This branch is the protected test bed for ParkPulse features before they move to
 
 `preview/seasonal-overlays`
 
-Preview version: `1.8.4-preview.18`
+Preview version: `1.8.4-preview.19`
 
 Production `main` remains unchanged until the preview work is explicitly approved.
 
@@ -14,7 +14,7 @@ Production `main` remains unchanged until the preview work is explicitly approve
 
 This build intentionally keeps the PWA small. After testing a broader native-app port, Park Day Lite and Quick Actions were removed from the PWA preview and remain native-app ideas.
 
-The preview now tests only:
+The preview now tests the final 1.8.4 scope:
 
 - **Next Up** — one useful ride recommendation at a time, with **View ride** and **Show another**.
 - **Recommendation explanations** — short, factual context on Best Now results and ride sheets.

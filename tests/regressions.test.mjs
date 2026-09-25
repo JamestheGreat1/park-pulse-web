@@ -412,27 +412,29 @@ test('mobile ride sheets override glass overflow and remain scrollable', () => {
 });
 
 
-test('mobile Liquid Glass ride sheet hides the inner-rim seam', () => {
-  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
-  const marker = css.lastIndexOf('remove mobile Liquid Glass ride-sheet seam');
-  assert.ok(marker >= 0);
-  const mobile = css.slice(marker);
-  assert.match(mobile, /@media \(max-width:1023px\)/);
-  assert.match(mobile, /:root\[data-preview-surface="liquid"\] \.ride-sheet::after/);
-  assert.match(mobile, /display:none!important/);
-});
 
 
-test('desktop ride sheet stays compact and scrollable', () => {
+test('desktop ride sheet uses the denser 1.8.8 layout', () => {
   const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
-  const marker = css.lastIndexOf('compact, scrollable desktop ride sheets');
+  const marker = css.lastIndexOf('denser desktop ride-sheet layout');
   assert.ok(marker >= 0);
   const desktop = css.slice(marker);
   assert.match(desktop, /@media \(min-width:1024px\)/);
-  assert.match(desktop, /width:min\(680px,calc\(100vw - 72px\)\)!important/);
-  assert.match(desktop, /max-height:calc\(100dvh - 72px\)!important/);
-  assert.match(desktop, /overflow-y:auto!important/);
-  assert.match(desktop, /overflow-x:hidden!important/);
-  assert.match(desktop, /scrollbar-width:thin/);
-  assert.match(desktop, /transform:translate\(-50%,-50%\)!important/);
+  assert.match(desktop, /width:min\(640px,calc\(100vw - 72px\)\)!important/);
+  assert.match(desktop, /max-height:calc\(100dvh - 64px\)!important/);
+  assert.match(desktop, /padding:18px 20px 20px!important/);
+  assert.match(desktop, /\.history-chart-wrap\{[^}]*height:150px/s);
+  assert.match(desktop, /#watchForm>\.toggle-row,[\s\S]*padding:12px 2px/);
+});
+
+test('mobile Liquid Glass ride sheet removes internal overlay shading and duplicate divider', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('simplify mobile Liquid Glass ride sheets');
+  assert.ok(marker >= 0);
+  const mobile = css.slice(marker);
+  assert.match(mobile, /@media \(max-width:1023px\)/);
+  assert.match(mobile, /\.ride-sheet::before,/);
+  assert.match(mobile, /\.ride-sheet::after/);
+  assert.match(mobile, /display:none!important/);
+  assert.match(mobile, /\.ride-history\{[^}]*border-bottom:0!important/s);
 });

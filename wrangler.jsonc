@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "park-pulse-web",
+  "compatibility_date": "2026-09-24",
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist"
+  },
+  "previews": {}
+}

@@ -143,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.7.1`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.7.1' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.0-preview.1`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.0-preview.1' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -223,6 +223,54 @@ test('personalized ordering never promotes a stale or closed must-do above fresh
   assert.equal(vm.runInContext('sortedRides(rides,state)[0].id',context),'best');
   context.state.favoritesOnly=true;
   assert.equal(vm.runInContext('sortedRides(rides,state).length',context),1);
+});
+
+
+test('Park Day Lite keeps session progress separate from favorites and watches', () => {
+  const saved = new Map();
+  const context = vm.createContext({ EventTarget, Event, structuredClone, Date, Number, JSON,
+    CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
+    window: {}, localStorage: { getItem: k => saved.get(k), setItem: (k,v) => saved.set(k,v) } });
+  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  vm.runInContext(code + ';store.startParkDay(6, Date.now()+3600000);store.setParkDayCurrent("mk:test",6);store.completeParkDayRide("mk:test");', context);
+  let state = JSON.parse(saved.values().next().value);
+  assert.equal(state.parkDay.active, true);
+  assert.equal(state.parkDay.currentRideId, null);
+  assert.deepEqual(state.parkDay.completedRideIds, ['mk:test']);
+  assert.deepEqual(state.favorites, []);
+  assert.deepEqual(state.rules, []);
+  vm.runInContext('store.uncompleteParkDayRide("mk:test");store.endParkDay();', context);
+  state = JSON.parse(saved.values().next().value);
+  assert.equal(state.parkDay.active, false);
+  assert.deepEqual(state.parkDay.completedRideIds, []);
+});
+
+test('Next Up skips stale, closed, source-missing, and already-ridden rides', () => {
+  const code = app.slice(app.indexOf('function activeParkDay('), app.indexOf('function rideStatus('));
+  const rides = [
+    {id:'must',name:'Must Do',parkId:6,isOpen:true,waitTime:45},
+    {id:'best',name:'Best Value',parkId:6,isOpen:true,waitTime:15},
+    {id:'done',name:'Already Rode',parkId:6,isOpen:true,waitTime:5},
+    {id:'closed',name:'Closed',parkId:6,isOpen:false,waitTime:0},
+    {id:'stale',name:'Stale',parkId:6,isOpen:true,waitTime:5,stale:true},
+    {id:'missing',name:'Missing',parkId:6,isOpen:true,waitTime:5,sourceMissing:true}
+  ];
+  const context = vm.createContext({
+    Date, Number, String, Set, Math,
+    store:{snapshot:{}},
+    rideData:{ridesForPark:()=>rides,rideById:id=>rides.find(r=>r.id===id)},
+    isRideStale:r=>Boolean(r.stale),
+    rideComparison:r=>r.id==='best'?{ratio:.5,percentDelta:-50}:r.id==='must'?{ratio:1,percentDelta:0}:null
+  });
+  vm.runInContext(code, context);
+  context.state = {
+    selectedParkId:6,
+    mustDo:['must'],
+    favorites:[],
+    rules:[],
+    parkDay:{active:true,expiresAt:Date.now()+3600000,currentRideId:null,completedRideIds:['done']}
+  };
+  assert.deepEqual(vm.runInContext('recommendationCandidates(state).map(r=>r.id)', context), ['must','best']);
 });
 
 test('history keeps zero waits, null waits, and closures distinct and bounds queries', async () => {

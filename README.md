@@ -8,7 +8,7 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.7.15**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.8.0**
 
 ## What ParkPulse does
 
@@ -21,7 +21,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both. Watched rides use a solid bell so they’re easy to spot at a glance.
 - **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
 - **Park context** includes today's hours, closing information, ticketed events, and observed ride downtime.
-- **Customization** includes light, dark, and system themes plus eight accent colors that subtly carry through the glass, glow, and selected controls.
+- **Customization** includes light, dark, and system themes, eight accent colors, Frosted or Liquid Glass, and optional seasonal effects.
 - **Mobile-friendly controls** include pull-to-refresh and pull-down-to-close ride sheets.
 - **D1-efficient diagnostics** keep backend health checks lightweight instead of repeatedly scanning the full wait-history table.
 
@@ -172,10 +172,34 @@ You can choose:
 
 - **Appearance:** System, Dark, or Light
 - **Accent color:** Blue, Cyan, Violet, Pink, Orange, Green, Red, or Gold
+- **Glass style:** Frosted or Liquid
+- **Seasonal effects:** On or Off
 
-The accent changes the highlights, buttons, and glow while status colors still keep their actual meaning.
+**Frosted** is the softer, blurrier glass style. **Liquid** is clearer and more refractive, with stronger edge highlights and more of the background showing through.
+
+In dark mode, both styles sit on a black base so the color comes from your accent instead of everything being permanently tinted blue.
+
+Your accent changes the highlights, buttons, glow, and parts of the glass treatment while ride-status colors still keep their actual meaning.
 
 Purely vibes. As it should be.
+
+## Seasonal effects
+
+ParkPulse can quietly dress itself up for a few times of year without changing how the actual ride information works.
+
+The current automatic windows are:
+
+- **Halloween:** October 1–31
+- **Fall / Thanksgiving:** November 1 through Thanksgiving Day
+- **Christmas:** the day after Thanksgiving through December 31
+- **Easter:** 10 days before Easter through Easter Monday
+- **Fourth of July:** July 1–5
+
+Depending on the season, that can mean rain and distant lightning, falling leaves, snow, spring petals, or fireworks.
+
+They are background effects only. ParkPulse does not replace meaningful open / closed / warning colors with holiday colors, and **Reduced Motion** removes the moving particle effects.
+
+If you would rather keep ParkPulse plain year-round, turn **Seasonal effects** off in Settings.
 
 ## Push notifications
 
@@ -207,9 +231,11 @@ Settings also has a small diagnostics section for checking the Worker, notificat
 
 ## Updates
 
-ParkPulse checks for frontend updates and will let you know when a new version is ready.
+ParkPulse checks for a new version when it opens, when you return to it, and periodically while it stays active.
 
-If the installed PWA ever seems stuck on an older version, fully close it and reopen it after accepting the update.
+When an update is ready, the in-app update banner appears. You normally should not need to fully quit the PWA just to make it notice a new version.
+
+If an installed copy ever does seem stuck, accept the update, fully close ParkPulse, and open it again.
 
 Release notes are kept in the **[changelog](CHANGELOG.md)**.
 
@@ -231,4 +257,3 @@ ParkPulse is a personal independent project built because I wanted something sim
 It is not affiliated with, sponsored by, or endorsed by Disney.
 
 **Less refreshing. More riding.**
-\n\nParkPulse checks for a new version when it opens, when you return to it, and about every five minutes while it stays active. When an update is ready, the in-app update banner appears — you shouldn't need to fully quit the PWA first.\n

@@ -135,17 +135,6 @@ function fireworkMarkup(index) {
   const x3 = startX * .24 + (seededUnit(seed * 15.7) - .5) * 1.5;
   const color = colors[index % colors.length];
 
-  const trail = Array.from({ length: 11 }, (_, sparkIndex) => {
-    const sparkSeed = seed * 100 + sparkIndex + 1;
-    const x = (seededUnit(sparkSeed * 1.7) - .5) * 7;
-    const y = 2 + sparkIndex * 8.2 + seededUnit(sparkSeed * 2.3) * 4;
-    const size = 2.1 + seededUnit(sparkSeed * 3.7) * 2;
-    const twinkle = .38 + seededUnit(sparkSeed * 4.1) * .34;
-    const twinkleDelay = -(seededUnit(sparkSeed * 5.3) * twinkle);
-    const star = seededUnit(sparkSeed * 6.7) > .70 ? " star" : "";
-    return `<span class="firework-trail-spark${star}" style="--trail-x:${px(x)};--trail-y:${px(y)};--spark-size:${px(size)};--twinkle-duration:${twinkle.toFixed(2)}s;--twinkle-delay:${twinkleDelay.toFixed(2)}s"></span>`;
-  }).join("");
-
   const burstCount = 17;
   const shapeX = .90 + seededUnit(seed * 17.3) * .22;
   const shapeY = .90 + seededUnit(seed * 19.1) * .22;
@@ -174,10 +163,118 @@ function fireworkMarkup(index) {
 
   return `
     <span class="firework" style="--fw-left:${left.toFixed(2)}%;--fw-top:${top.toFixed(2)}%;--fw-duration:${duration.toFixed(2)}s;--fw-delay:${delay.toFixed(2)}s;--fw-color:${color};--rocket-x0:${px(startX)};--rocket-x1:${px(x1)};--rocket-x2:${px(x2)};--rocket-x3:${px(x3)}">
-      <span class="firework-rocket">${trail}</span>
+      <span class="firework-rocket"><span class="firework-head"></span></span>
       <span class="firework-burst">${burst}</span>
     </span>
   `;
+}
+
+
+let fireworkEmitterFrame = 0;
+let fireworkEmitterLastFrame = 0;
+let fireworkEmitterCounter = 0;
+const fireworkEmitterLastByRocket = new WeakMap();
+
+function removeEmittedFireworkSparks() {
+  document.querySelectorAll(".firework-emitted-spark").forEach((spark) => spark.remove());
+}
+
+function stopFireworkEmitter() {
+  if (fireworkEmitterFrame) cancelAnimationFrame(fireworkEmitterFrame);
+  fireworkEmitterFrame = 0;
+  fireworkEmitterLastFrame = 0;
+  removeEmittedFireworkSparks();
+}
+
+function emitTrailSpark(field, head, rocketIndex) {
+  if (!field.isConnected || !head.isConnected || head.getClientRects().length === 0) return;
+
+  const rocket = head.closest(".firework-rocket");
+  const firework = head.closest(".firework");
+  if (!rocket || !firework || getComputedStyle(firework).display === "none") return;
+
+  const rocketOpacity = Number.parseFloat(getComputedStyle(rocket).opacity || "0");
+  if (rocketOpacity < .16) return;
+
+  const fieldRect = field.getBoundingClientRect();
+  const headRect = head.getBoundingClientRect();
+  const x = headRect.left - fieldRect.left + headRect.width / 2;
+  const y = headRect.top - fieldRect.top + headRect.height / 2;
+
+  if (x < -20 || x > fieldRect.width + 20 || y < -20 || y > fieldRect.height + 20) return;
+
+  const seed = ++fireworkEmitterCounter + rocketIndex * 101;
+  const jitterX = (seededUnit(seed * 1.7) - .5) * 8;
+  const jitterY = (seededUnit(seed * 2.3) - .5) * 5;
+  const driftX = (seededUnit(seed * 3.1) - .5) * 16;
+  const fallY = 8 + seededUnit(seed * 4.3) * 16;
+  const size = 2.0 + seededUnit(seed * 5.9) * 2.7;
+  const life = .62 + seededUnit(seed * 6.7) * .34;
+  const twinkle = .28 + seededUnit(seed * 7.9) * .34;
+  const star = seededUnit(seed * 8.7) > .78;
+
+  const spark = document.createElement("span");
+  spark.className = `firework-emitted-spark${star ? " star" : ""}`;
+  spark.style.left = `${(x + jitterX).toFixed(1)}px`;
+  spark.style.top = `${(y + jitterY).toFixed(1)}px`;
+  spark.style.setProperty("--spark-size", `${size.toFixed(1)}px`);
+  spark.style.setProperty("--spark-life", `${life.toFixed(2)}s`);
+  spark.style.setProperty("--spark-twinkle", `${twinkle.toFixed(2)}s`);
+  spark.style.setProperty("--spark-dx1", `${(driftX * .28).toFixed(1)}px`);
+  spark.style.setProperty("--spark-dy1", `${(fallY * .18).toFixed(1)}px`);
+  spark.style.setProperty("--spark-dx2", `${(driftX * .62).toFixed(1)}px`);
+  spark.style.setProperty("--spark-dy2", `${(fallY * .52).toFixed(1)}px`);
+  spark.style.setProperty("--spark-dx3", `${driftX.toFixed(1)}px`);
+  spark.style.setProperty("--spark-dy3", `${fallY.toFixed(1)}px`);
+  spark.style.color = getComputedStyle(firework).color;
+  spark.innerHTML = "<i></i>";
+  field.append(spark);
+
+  spark.addEventListener("animationend", (event) => {
+    if (event.animationName === "fw-emitted-spark") spark.remove();
+  }, { once: true });
+}
+
+function fireworkEmitterTick(now) {
+  fireworkEmitterFrame = 0;
+
+  if (document.documentElement.dataset.season !== "july4" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    stopFireworkEmitter();
+    return;
+  }
+
+  const field = document.querySelector(".fireworks-field");
+  if (!field) return;
+
+  if (now - fireworkEmitterLastFrame >= 36) {
+    fireworkEmitterLastFrame = now;
+    field.querySelectorAll(".firework-head").forEach((head, index) => {
+      const last = fireworkEmitterLastByRocket.get(head) || 0;
+      const interval = 48 + (index % 3) * 7;
+      if (now - last >= interval) {
+        fireworkEmitterLastByRocket.set(head, now);
+        emitTrailSpark(field, head, index);
+      }
+    });
+  }
+
+  fireworkEmitterFrame = requestAnimationFrame(fireworkEmitterTick);
+}
+
+function syncFireworkEmitter() {
+  const enabled =
+    document.documentElement.dataset.season === "july4" &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (!enabled) {
+    stopFireworkEmitter();
+    return;
+  }
+
+  if (!fireworkEmitterFrame) {
+    fireworkEmitterFrame = requestAnimationFrame(fireworkEmitterTick);
+  }
 }
 
 function ensureFireworksField(layer) {
@@ -233,6 +330,7 @@ export function applySeasonalTheme() {
 
   const seasonalLayer = ensureSeasonalLayer();
   ensureFireworksField(seasonalLayer);
+  syncFireworkEmitter();
 
   const badge = ensurePreviewBadge();
   if (badge) {

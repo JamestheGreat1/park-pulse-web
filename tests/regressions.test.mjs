@@ -370,21 +370,6 @@ test('Settings customization bindings survive diagnostics wiring', () => {
 
 
 
-test('desktop ride sheet wins over swipe transform and stays centered', () => {
-  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
-  const marker = css.lastIndexOf('force desktop ride sheets to remain truly centered');
-  assert.ok(marker >= 0);
-  const finalDesktop = css.slice(marker);
-  assert.match(finalDesktop, /@media \(min-width:1024px\)/);
-  assert.match(finalDesktop, /\.ride-sheet\{/);
-  assert.match(finalDesktop, /top:50%!important/);
-  assert.match(finalDesktop, /bottom:auto!important/);
-  assert.match(finalDesktop, /width:min\(760px,calc\(100vw - 64px\)\)!important/);
-  assert.match(finalDesktop, /max-height:calc\(100dvh - 32px\)!important/);
-  assert.match(finalDesktop, /transform:translate\(-50%,-50%\)!important/);
-});
-
-
 test('legacy Must-do state is discarded', () => {
   const saved = new Map([['parkpulse.rideWatcher.v1', JSON.stringify({mustDo:['mk:test'],favorites:['mk:test']})]]);
   const context = vm.createContext({
@@ -401,12 +386,19 @@ test('legacy Must-do state is discarded', () => {
 });
 
 
-test('desktop ride sheet hides scrollbar without disabling scroll', () => {
+
+
+test('desktop ride sheet expands to content with no scrolling', () => {
   const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
-  const marker = css.lastIndexOf('hide desktop ride-sheet scrollbars without disabling scroll');
+  const marker = css.lastIndexOf('desktop ride sheets are full-content centered modals');
   assert.ok(marker >= 0);
-  const block = css.slice(marker);
-  assert.match(block, /scrollbar-width:none/);
-  assert.match(block, /overflow-x:hidden!important/);
-  assert.match(block, /\.ride-sheet::\-webkit-scrollbar/);
+  const finalDesktop = css.slice(marker);
+  assert.match(finalDesktop, /@media \(min-width:1024px\)/);
+  assert.match(finalDesktop, /top:50%!important/);
+  assert.match(finalDesktop, /bottom:auto!important/);
+  assert.match(finalDesktop, /width:min\(760px,calc\(100vw - 64px\)\)!important/);
+  assert.match(finalDesktop, /max-height:none!important/);
+  assert.match(finalDesktop, /height:auto!important/);
+  assert.match(finalDesktop, /overflow:visible!important/);
+  assert.match(finalDesktop, /transform:translate\(-50%,-50%\)!important/);
 });

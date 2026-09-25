@@ -971,7 +971,7 @@ function bindDynamic() {
   $$('[data-toggle-push]').forEach((b) => b.onclick = pushOn ? deactivatePush : activatePush);
   $$('[data-install]').forEach((b) => b.onclick = installApp);
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
-  $('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
+  document.querySelectorAll('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const diagnosticsDetails = $(".diagnostics-details");
   if (diagnosticsDetails) diagnosticsDetails.ontoggle = () => { diagnosticsExpanded = diagnosticsDetails.open; };
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");

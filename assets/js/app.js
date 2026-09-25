@@ -1112,8 +1112,9 @@ function bindDynamic() {
     if (wasParkDayView) selectView("explore");
     toast("Park Day ended");
   });
-  bindRideCards();
-  $$('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
+  bindRideCards(views.explore);
+  if (views.parkday) bindRideCards(views.parkday);
+  $('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
   $$('[data-toggle-favorites]').forEach(b => b.onclick = () => store.update(s => { s.favoritesOnly = !s.favoritesOnly; }, 'filter'));
   $$('[data-toggle-open]').forEach((b) => b.onclick = () => store.update((s) => { s.openOnly = !s.openOnly; }, "filter"));

@@ -4171,7 +4171,7 @@ body{
 }
 
 
-/* v1.8.0-preview.33 — darker Neutral Frosted Glass in dark mode. */
+/* v1.8.0-preview.34 — darker Neutral Frosted Glass in dark mode. */
 :root[data-preview-surface="neutral"][data-theme="dark"]{
   --glass:rgba(46,52,62,.23);
   --glass-strong:rgba(38,44,54,.38);
@@ -4205,5 +4205,14 @@ body{
   :root[data-preview-surface="neutral"][data-theme="system"] .search{
     background:rgba(7,9,13,.24)!important;
   }
+}
+
+
+/* v1.8.0-preview.34 — preserve Liquid Glass compositor layers across page changes. */
+:root[data-preview-surface="liquid"] .view-panel.active{
+  animation:none!important;
+}
+:root[data-preview-surface="liquid"] .view-panel{
+  transform:none;
 }
 

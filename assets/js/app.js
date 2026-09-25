@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.33";
-import { store } from "./store.js?v=1.8.0-preview.33";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.33";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.33";
-import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.33";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.34";
+import { store } from "./store.js?v=1.8.0-preview.34";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.34";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.34";
+import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls, isSeasonPreviewEnabled, seasonalEffectsEnabled, setSeasonalEffectsEnabled } from "./seasonal.js?v=1.8.0-preview.34";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.8.0-preview.33";
+const APP_VERSION = "1.8.0-preview.34";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -533,15 +533,33 @@ function setTheme() {
   applySeasonalTheme();
 }
 function selectView(name) {
+  const target = views[name];
+  if (!target) return;
+
   store.update((s) => { s.activeView = name; }, "view");
+
+  // Only build the views once. Recreating backdrop-filter elements on every
+  // tab change makes browsers briefly composite them against a stale backdrop.
+  if (!target.childElementCount) render();
+
+  const root = document.documentElement;
+  const liquid = root.dataset.previewSurface === "liquid";
+  if (liquid) root.classList.add("glass-color-snap");
+
   for (const [key, el] of Object.entries(views)) el.classList.toggle("active", key === name);
-  $$(".nav-item").forEach((button) => {
+  $(".nav-item").forEach((button) => {
     const active = button.dataset.viewTarget === name;
     button.classList.toggle("active", active);
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   });
-  window.scrollTo({ top: 0, left: 0, behavior: "auto" }); render();
+
+  if (liquid) {
+    void target.offsetWidth;
+    requestAnimationFrame(() => root.classList.remove("glass-color-snap"));
+  }
+
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 }
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();

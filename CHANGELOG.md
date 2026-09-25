@@ -7,7 +7,9 @@
 - Removed the overlapping **For Me** sort; **Favorites + Best Now** now covers the personalized shortlist cleanly, and old saved For Me state falls back to Best Now.
 - Kept ride cards focused on just **Favorite** and **Alert** controls.
 - Condensed Settings health information into four status rows with deeper technical details under **Show diagnostics**.
-- Hardened dynamic button binding and added regression coverage for the simplified UI.
+- Hardened dynamic button binding so Settings customization controls cannot be disabled by a diagnostics wiring error.
+- Fixed desktop ride sheets so they stay vertically centered instead of inheriting the mobile swipe transform and hanging off the bottom of the viewport.
+- Added regression coverage for the simplified UI and both release-blocker fixes.
 - Frontend-only update; no Worker deployment required.
 
 ## 1.8.3 — 2026-09-25

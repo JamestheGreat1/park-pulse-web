@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.4 — 2026-09-25
+
+- Added a lightweight **Next Up** card with **View ride** and **Show another** for a quick “what should I ride?” answer without turning ParkPulse into a planner.
+- Added clearer factual recommendation context to **Best Now** results and ride sheets.
+- Removed the overlapping **For Me** sort; **Favorites + Best Now** now covers the personalized shortlist cleanly, and old saved For Me state falls back to Best Now.
+- Kept ride cards focused on just **Favorite** and **Alert** controls.
+- Condensed Settings health information into four status rows with deeper technical details under **Show diagnostics**.
+- Hardened dynamic button binding and added regression coverage for the simplified UI.
+- Frontend-only update; no Worker deployment required.
+
 ## 1.8.3 — 2026-09-25
 
 - Made the selected park much easier to identify in both Frosted and Liquid Glass while keeping the glass look intact.

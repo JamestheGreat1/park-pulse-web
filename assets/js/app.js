@@ -198,7 +198,10 @@ function installSetting() {
   return { visible: false, installed: false, copy: "", action: "" };
 }
 function iconBell(active = false) {
-  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>${active ? '<circle cx="18" cy="5" r="3" class="bell-dot"/>' : ""}</svg>`;
+  if (active) {
+    return `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="bell-solid" d="M12 2a6 6 0 0 0-6 6v3.35c0 1.92-.67 3.78-1.9 5.25l-.68.81A1 1 0 0 0 4.2 19h15.6a1 1 0 0 0 .78-1.59l-.68-.81A8.15 8.15 0 0 1 18 11.35V8a6 6 0 0 0-6-6Zm-2.75 18a3 3 0 0 0 5.5 0h-5.5Z"/></svg>`;
+  }
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>`;
 }
 function zoneParts(date, timeZone) {
   const values = {};

@@ -828,3 +828,7 @@ body{
 @media(prefers-reduced-motion:reduce){
   .liquid-glass,.glass-control{transition:none!important}
 }
+
+
+/* v1.7.14 final polish — watched rides use a solid bell, matching favorites */
+.bell-solid{fill:currentColor;stroke:none}

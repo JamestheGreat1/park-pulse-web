@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.13 — 2026-09-25
+
+- Fixed the desktop wait-time target controls for Windows scaling/browser zoom by applying the centered geometry from 700px upward instead of relying on the old 1024px desktop breakpoint.
+- Locked the − / value / unit / + cluster to a deterministic width with guaranteed side clearance.
+- Removed the Liquid Glass inner rim from ride sheets so its curved border can no longer visually cut through form controls.
+- Keeps the recent seasonal, chart, mobile-scroll, and desktop-density fixes intact.
+- Frontend-only hotfix; no Worker deployment required.
+
 ## 1.8.12 — 2026-09-25
 
 - Fixed the desktop wait-time target controls so the − / value / unit / + cluster is centered beneath the setting instead of being anchored against the right edge.

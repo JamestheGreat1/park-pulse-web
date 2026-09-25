@@ -1,7 +1,8 @@
 import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.0-preview.1";
 import { store } from "./store.js?v=1.8.0-preview.1";
 import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.0-preview.1";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.1";\nimport { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls } from "./seasonal.js?v=1.8.0-preview.1";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.0-preview.1";
+import { applySeasonalTheme, seasonalPreviewControlsMarkup, bindSeasonalPreviewControls } from "./seasonal.js?v=1.8.0-preview.1";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];

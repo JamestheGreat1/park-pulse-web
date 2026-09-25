@@ -8,7 +8,7 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.8.3**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.8.4**
 
 ## What ParkPulse does
 
@@ -16,7 +16,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Best Now** compares the current wait with what is normally expected for that ride around the same time of day.
 - **Wait comparisons** quickly show when something is running better or worse than typical.
 - **Favorites** let you save rides without turning on notifications.
-- **For me** puts your must-dos and favorites first while still paying attention to the current wait.
+- **Next Up** suggests one useful open ride at a time using current waits, normal wait context, favorites, and must-dos.
 - **Wait history** shows how a ride has moved today, over the past 7 days, or over the past 30 days.
 - **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both. Watched rides use a solid bell so they’re easy to spot at a glance.
 - **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
@@ -63,7 +63,7 @@ that means the posted wait is about 24% lower than ParkPulse's comparison for th
 
 That does **not** mean ParkPulse can predict exactly how long you will stand in line. It is just useful context for the posted wait.
 
-If you want something simpler, you can switch to **Lowest wait** or **A–Z**, search for a ride, or show only open rides.
+If you want something simpler, you can switch to **Lowest wait** or **A–Z**, search for a ride, show only open rides, or combine **Favorites + Best Now** for a personalized shortlist.
 
 ### 3. Save the stuff you care about
 
@@ -71,9 +71,9 @@ Tap the **star** on a ride to add it to Favorites.
 
 Favorites stay on that device and do not create notifications.
 
-If there is something you absolutely want to ride, open it and turn on **Must-do ride**. Then use the **For me** sort to put your must-dos and favorites toward the top.
+If there is something you absolutely want to ride, open it and turn on **Must-do ride**. Must-dos are considered by **Next Up**, while the **Favorites** filter keeps your saved rides easy to narrow down.
 
-That gives you a more personal list without turning ParkPulse into a spreadsheet wearing Mickey ears.
+That keeps the personalization useful without turning ParkPulse into a spreadsheet wearing Mickey ears.
 
 ## Watching a ride
 
@@ -227,7 +227,7 @@ ParkPulse tries pretty hard not to fake certainty.
 
 If you are offline, ParkPulse may still open using its cached app and last-known ride data, but it obviously cannot pull fresh waits from the void. Once you are back online, refresh and let any pending watch changes sync.
 
-Settings also has a small diagnostics section for checking the Worker, notification engine, ride data, and history collection if something seems off.
+Settings keeps the everyday health check compact with **System**, **Notifications**, **History**, and **App version**. If something seems off, open **Show diagnostics** for the Worker, data source, alert engine, and history details.
 
 ## Updates
 

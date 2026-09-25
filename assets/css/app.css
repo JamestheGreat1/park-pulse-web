@@ -4170,3 +4170,40 @@ body{
   transition:none!important;
 }
 
+
+/* v1.8.0-preview.33 — darker Neutral Frosted Glass in dark mode. */
+:root[data-preview-surface="neutral"][data-theme="dark"]{
+  --glass:rgba(46,52,62,.23);
+  --glass-strong:rgba(38,44,54,.38);
+  --glass-thin:rgba(56,62,72,.145);
+  --glass-mid:rgba(48,54,65,.205);
+  --glass-thick:rgba(40,46,57,.305);
+  --glass-edge:rgba(255,255,255,.20);
+  --glass-edge-soft:rgba(255,255,255,.095);
+  --glass-shadow:rgba(0,0,0,.23);
+  --border:rgba(235,240,248,.14);
+  --hair:rgba(235,240,248,.075);
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="neutral"][data-theme="system"]{
+    --glass:rgba(46,52,62,.23);
+    --glass-strong:rgba(38,44,54,.38);
+    --glass-thin:rgba(56,62,72,.145);
+    --glass-mid:rgba(48,54,65,.205);
+    --glass-thick:rgba(40,46,57,.305);
+    --glass-edge:rgba(255,255,255,.20);
+    --glass-edge-soft:rgba(255,255,255,.095);
+    --glass-shadow:rgba(0,0,0,.23);
+    --border:rgba(235,240,248,.14);
+    --hair:rgba(235,240,248,.075);
+  }
+}
+:root[data-preview-surface="neutral"][data-theme="dark"] .search{
+  background:rgba(7,9,13,.24)!important;
+}
+@media(prefers-color-scheme:dark){
+  :root[data-preview-surface="neutral"][data-theme="system"] .search{
+    background:rgba(7,9,13,.24)!important;
+  }
+}
+

@@ -64,3 +64,10 @@ The five-minute job now only fetches rides, evaluates alerts, and records live h
 Deploy using `npx wrangler deploy` from this folder; confirm both cron schedules in the deployment output. In `npx wrangler tail --format pretty`, look for `Alert job: complete` on successive five-minute runs. Stage logs identify the last completed stage if CPU exhaustion persists. They do not log subscription endpoints or credentials.
 
 A CPU-limit outcome does not identify the expensive stage by itself. Workers Free has a 10 ms CPU budget per scheduled invocation; moving maintenance reduces work but cannot guarantee free-tier capacity for alert encryption and all source processing. If the alert job still exceeds CPU, check the Workers plan and configured CPU limit. This release does not change billing or impose a paid-only CPU setting.
+
+
+## D1 read optimization
+
+Worker 1.7.3 adds a tiny `worker_state` table for alert-engine and history-sampler health. Status endpoints now read one metadata row instead of scanning the 31-day `ride_history` table. Ride insights also skip the raw 30-day history query whenever a ready baseline already exists.
+
+The Worker creates `worker_state` automatically on scheduled/manual refresh, and `schema.sql` includes it for fresh deployments. Deploy the Worker after pulling this change.

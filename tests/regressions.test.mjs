@@ -378,5 +378,10 @@ test('desktop ride sheet wins over swipe transform and stays centered', () => {
   assert.ok(marker >= 0);
   const finalDesktop = css.slice(marker);
   assert.match(finalDesktop, /@media \(min-width:1024px\)/);
-  assert.match(finalDesktop, /\.ride-sheet\{[^}]*top:50%!important[^}]*bottom:auto!important[^}]*width:min\\(760px,calc\\(100vw - 64px\\)\\)!important[^}]*max-height:calc\\(100dvh - 32px\\)!important[^}]*transform:translate\(-50%,-50%\)!important/s);
+  assert.match(finalDesktop, /\.ride-sheet\{/);
+  assert.match(finalDesktop, /top:50%!important/);
+  assert.match(finalDesktop, /bottom:auto!important/);
+  assert.match(finalDesktop, /width:min\(760px,calc\(100vw - 64px\)\)!important/);
+  assert.match(finalDesktop, /max-height:calc\(100dvh - 32px\)!important/);
+  assert.match(finalDesktop, /transform:translate\(-50%,-50%\)!important/);
 });

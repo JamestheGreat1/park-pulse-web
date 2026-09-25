@@ -4619,3 +4619,41 @@ body{
     margin-top:6px;
   }
 }
+
+
+/* v1.8.9 — soften desktop ride-card glass shading */
+@media (min-width:1024px){
+  :root[data-preview-surface="liquid"] .ride-card::before{
+    inset:-2%;
+    background:
+      radial-gradient(72% 48% at 12% -4%,rgba(255,255,255,.22),transparent 58%),
+      linear-gradient(118deg,
+        rgba(255,255,255,.075) 0%,
+        rgba(255,255,255,.025) 18%,
+        transparent 44%,
+        transparent 78%,
+        rgba(var(--blue-rgb),.025) 100%)!important;
+    opacity:.48;
+    transform:translate3d(calc(var(--glass-scroll-x,0px) + var(--glass-interaction-shift)),var(--glass-scroll-y,0px),0) scale(1.02);
+  }
+  :root[data-preview-surface="liquid"] .ride-card::after{
+    opacity:.58;
+    backdrop-filter:saturate(185%) contrast(106%) brightness(1.04) blur(.6px);
+    -webkit-backdrop-filter:saturate(185%) contrast(106%) brightness(1.04) blur(.6px);
+  }
+  :root[data-preview-surface="neutral"] .ride-card::before{
+    background:
+      radial-gradient(72% 48% at 12% -4%,rgba(255,255,255,.16),transparent 60%),
+      linear-gradient(118deg,
+        rgba(255,255,255,.065) 0%,
+        rgba(255,255,255,.022) 18%,
+        transparent 44%,
+        rgba(var(--blue-rgb),.018) 100%)!important;
+    opacity:.48;
+  }
+}
+@media (min-width:1024px) and (hover:hover){
+  :root[data-preview-surface="liquid"] .ride-card:hover{
+    --glass-interaction-shift:2px;
+  }
+}

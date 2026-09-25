@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.0-preview.13";
-import { store } from "./store.js?v=1.9.0-preview.13";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.0-preview.13";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.0-preview.13";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.0-preview.13";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.0-preview.14";
+import { store } from "./store.js?v=1.9.0-preview.14";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.0-preview.14";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.0-preview.14";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.0-preview.14";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.0-preview.13";
+const APP_VERSION = "1.9.0-preview.14";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -1042,7 +1042,7 @@ function openRide(id) {
     ${ride ? `<div class="sheet-recommendation"><span>ParkPulse context</span><strong>${escapeHtml(recommendationReason(ride, store.snapshot))}</strong></div>` : ""}
     <div id="rideInsights" class="ride-insights"><span class="insight-loading">Checking the trend data…</span></div>
     <section class="ride-history"><div class="history-heading"><h3>Wait history</h3><select id="historyRange" aria-label="History range"><option value="today">Today</option><option value="7d">7 days</option><option value="30d">30 days</option></select></div><div id="rideHistory" aria-live="polite"></div></section>
-    <label class="toggle-row"><div><strong>Must-do ride</strong><small>Put it first in “For me.” This doesn’t create an alert.</small></div><input id="mustDoToggle" type="checkbox" ${store.snapshot.mustDo.includes(String(id)) ? "checked" : ""}><span class="switch"></span></label>
+    <label class="toggle-row"><div><strong>Must-do ride</strong><small>Prioritize it in Next Up. This doesn’t create an alert.</small></div><input id="mustDoToggle" type="checkbox" ${store.snapshot.mustDo.includes(String(id)) ? "checked" : ""}><span class="switch"></span></label>
     <form id="watchForm">
       <label class="toggle-row"><div><strong>Notify when it reopens</strong><small>Useful when a ride goes down.</small></div><input id="reopenToggle" type="checkbox" ${existing?.reopen !== false ? "checked" : ""}><span class="switch"></span></label>
       <div class="threshold-block"><div class="threshold-head"><div><strong>Wait-time target</strong><small>Buzz me when the wait drops to this or better:</small></div><button id="thresholdToggle" class="mini-toggle ${existing?.threshold ? "active" : ""}" type="button">${existing?.threshold ? "On" : "Off"}</button></div><div id="thresholdControls" class="threshold-controls ${existing?.threshold ? "" : "disabled"}"><button type="button" data-step="-5">−</button><output id="thresholdValue">${existing?.threshold || 30}</output><span>min</span><button type="button" data-step="5">+</button></div></div>

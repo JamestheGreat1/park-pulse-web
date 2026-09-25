@@ -112,6 +112,85 @@ export function activeSeason(now = new Date()) {
   return selected === "auto" ? automaticSeason(now) : selected;
 }
 
+
+function seededUnit(seed) {
+  const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function px(value) {
+  return `${Math.round(value * 10) / 10}px`;
+}
+
+function fireworkMarkup(index) {
+  const colors = ["#ff6f7e", "#73b8ff", "#ffffff", "#ffd56b", "#ff7b8d", "#8fc7ff", "#ffffff"];
+  const seed = index + 1;
+  const left = 10 + seededUnit(seed * 3.1) * 80;
+  const top = 9 + seededUnit(seed * 4.7) * 43;
+  const duration = 7.0 + seededUnit(seed * 5.9) * 1.7;
+  const delay = -(seededUnit(seed * 7.3) * duration);
+  const startX = (seededUnit(seed * 9.1) - .5) * 24;
+  const x1 = startX * .76 + (seededUnit(seed * 11.7) - .5) * 3;
+  const x2 = startX * .49 + (seededUnit(seed * 13.1) - .5) * 2;
+  const x3 = startX * .24 + (seededUnit(seed * 15.7) - .5) * 1.5;
+  const color = colors[index % colors.length];
+
+  const trail = Array.from({ length: 11 }, (_, sparkIndex) => {
+    const sparkSeed = seed * 100 + sparkIndex + 1;
+    const x = (seededUnit(sparkSeed * 1.7) - .5) * 7;
+    const y = 2 + sparkIndex * 8.2 + seededUnit(sparkSeed * 2.3) * 4;
+    const size = 2.1 + seededUnit(sparkSeed * 3.7) * 2;
+    const twinkle = .38 + seededUnit(sparkSeed * 4.1) * .34;
+    const twinkleDelay = -(seededUnit(sparkSeed * 5.3) * twinkle);
+    const star = seededUnit(sparkSeed * 6.7) > .70 ? " star" : "";
+    return `<span class="firework-trail-spark${star}" style="--trail-x:${px(x)};--trail-y:${px(y)};--spark-size:${px(size)};--twinkle-duration:${twinkle.toFixed(2)}s;--twinkle-delay:${twinkleDelay.toFixed(2)}s"></span>`;
+  }).join("");
+
+  const burstCount = 17;
+  const shapeX = .90 + seededUnit(seed * 17.3) * .22;
+  const shapeY = .90 + seededUnit(seed * 19.1) * .22;
+  const rotation = (seededUnit(seed * 20.9) - .5) * .18;
+  const burst = Array.from({ length: burstCount }, (_, sparkIndex) => {
+    const sparkSeed = seed * 1000 + sparkIndex + 1;
+    const angle = ((Math.PI * 2 * sparkIndex) / burstCount) + (seededUnit(sparkSeed * 1.9) - .5) * .25 + rotation;
+    const distance = 34 + seededUnit(sparkSeed * 2.9) * 31;
+    const drift = (seededUnit(sparkSeed * 3.7) - .5) * 9;
+    const fall = 7 + seededUnit(sparkSeed * 4.7) * 12;
+    const dx = Math.cos(angle) * distance * shapeX;
+    const dy = Math.sin(angle) * distance * shapeY;
+    const dx1 = dx * .28;
+    const dy1 = dy * .28;
+    const dx2 = dx * .64;
+    const dy2 = dy * .64 + 1;
+    const dx3 = dx * .88 + drift * .35;
+    const dy3 = dy * .88 + 3;
+    const dx4 = dx + drift;
+    const dy4 = dy + fall;
+    const size = 2.4 + seededUnit(sparkSeed * 5.9) * 2.4;
+    const twinkle = .46 + seededUnit(sparkSeed * 7.1) * .42;
+    const twinkleDelay = -(seededUnit(sparkSeed * 8.3) * twinkle);
+    return `<span class="firework-burst-spark" style="--dx1:${px(dx1)};--dy1:${px(dy1)};--dx2:${px(dx2)};--dy2:${px(dy2)};--dx3:${px(dx3)};--dy3:${px(dy3)};--dx4:${px(dx4)};--dy4:${px(dy4)};--spark-size:${px(size)};--twinkle-duration:${twinkle.toFixed(2)}s;--twinkle-delay:${twinkleDelay.toFixed(2)}s"><i></i></span>`;
+  }).join("");
+
+  return `
+    <span class="firework" style="--fw-left:${left.toFixed(2)}%;--fw-top:${top.toFixed(2)}%;--fw-duration:${duration.toFixed(2)}s;--fw-delay:${delay.toFixed(2)}s;--fw-color:${color};--rocket-x0:${px(startX)};--rocket-x1:${px(x1)};--rocket-x2:${px(x2)};--rocket-x3:${px(x3)}">
+      <span class="firework-rocket">${trail}</span>
+      <span class="firework-burst">${burst}</span>
+    </span>
+  `;
+}
+
+function ensureFireworksField(layer) {
+  let field = layer.querySelector(".fireworks-field");
+  if (field) return field;
+  field = document.createElement("div");
+  field.className = "fireworks-field";
+  field.setAttribute("aria-hidden", "true");
+  field.innerHTML = Array.from({ length: 7 }, (_, index) => fireworkMarkup(index)).join("");
+  layer.append(field);
+  return field;
+}
+
 function ensureSeasonalLayer() {
   let layer = document.querySelector(".seasonal-layer");
   if (layer) return layer;
@@ -152,7 +231,8 @@ export function applySeasonalTheme() {
   root.dataset.previewSurface = surface;
   root.classList.toggle("season-active", season !== "none");
 
-  ensureSeasonalLayer();
+  const seasonalLayer = ensureSeasonalLayer();
+  ensureFireworksField(seasonalLayer);
 
   const badge = ensurePreviewBadge();
   if (badge) {

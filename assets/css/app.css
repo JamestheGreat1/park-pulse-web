@@ -2815,3 +2815,240 @@ body{
   }
 }
 
+
+/* v1.8.0-preview.21 — real-particle July 4 engine.
+   Individual trail twinkles + radial sparks with subtle drift and gravity. */
+
+/* Retire the legacy pseudo-element firework particles. */
+:root[data-season="july4"] .seasonal-layer > .seasonal-particle{
+  display:none!important;
+}
+.fireworks-field{
+  position:absolute;
+  inset:0;
+  display:none;
+  overflow:hidden;
+  pointer-events:none;
+  z-index:2;
+}
+:root[data-season="july4"] .fireworks-field{display:block}
+:root[data-season="july4"][data-season-intensity="subtle"] .firework:nth-child(n+4){display:none}
+:root[data-season="july4"][data-season-intensity="normal"] .firework:nth-child(n+6){display:none}
+
+.firework{
+  position:absolute;
+  left:var(--fw-left);
+  top:var(--fw-top);
+  width:1px;
+  height:1px;
+  color:var(--fw-color);
+}
+.firework-rocket,
+.firework-burst{
+  position:absolute;
+  left:0;
+  top:0;
+  width:1px;
+  height:1px;
+}
+
+/* Smooth rocket group; the child sparks shimmer independently. */
+.firework-rocket{
+  opacity:0;
+  animation:fw-rocket-flight var(--fw-duration) cubic-bezier(.22,.55,.24,1) infinite;
+  animation-delay:var(--fw-delay);
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+.firework-trail-spark{
+  position:absolute;
+  left:var(--trail-x);
+  top:var(--trail-y);
+  width:var(--spark-size);
+  height:var(--spark-size);
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:0 0 4px currentColor;
+  animation:fw-trail-twinkle var(--twinkle-duration) ease-in-out infinite;
+  animation-delay:var(--twinkle-delay);
+  will-change:transform,opacity,filter;
+}
+.firework-trail-spark.star::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:2px;
+  height:2px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:
+    0 -5px 4px -1px rgba(255,255,255,.95),
+    0 5px 4px -1px rgba(255,255,255,.82),
+    -5px 0 4px -1px rgba(255,255,255,.88),
+    5px 0 4px -1px rgba(255,255,255,.88);
+  transform:translate(-50%,-50%) scale(.25);
+  opacity:0;
+  animation:fw-star-flash calc(var(--twinkle-duration) * 1.7) ease-in-out infinite;
+  animation-delay:var(--twinkle-delay);
+}
+
+/* Every burst spark moves separately instead of scaling one shared sprite. */
+.firework-burst-spark{
+  position:absolute;
+  left:0;
+  top:0;
+  width:0;
+  height:0;
+  opacity:0;
+  animation:fw-burst-flight var(--fw-duration) linear infinite;
+  animation-delay:var(--fw-delay);
+  will-change:transform,opacity;
+}
+.firework-burst-spark i{
+  position:absolute;
+  left:0;
+  top:0;
+  display:block;
+  width:var(--spark-size);
+  height:var(--spark-size);
+  margin:calc(var(--spark-size) / -2) 0 0 calc(var(--spark-size) / -2);
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:0 0 5px currentColor;
+  animation:fw-burst-twinkle var(--twinkle-duration) ease-in-out infinite;
+  animation-delay:var(--twinkle-delay);
+  will-change:transform,opacity,filter;
+}
+
+@keyframes fw-rocket-flight{
+  0%,33%{
+    opacity:0;
+    transform:translate3d(var(--rocket-x0),100vh,0) scale(.82);
+  }
+  35%{
+    opacity:.22;
+    transform:translate3d(var(--rocket-x0),96vh,0) scale(.86);
+  }
+  41%{
+    opacity:.72;
+    transform:translate3d(var(--rocket-x1),77vh,0) scale(.90);
+  }
+  48%{
+    opacity:.95;
+    transform:translate3d(var(--rocket-x1),57vh,0) scale(.94);
+  }
+  54%{
+    opacity:1;
+    transform:translate3d(var(--rocket-x2),39vh,0) scale(.97);
+  }
+  59%{
+    opacity:1;
+    transform:translate3d(var(--rocket-x3),23vh,0) scale(1);
+  }
+  63%{
+    opacity:.98;
+    transform:translate3d(0,10vh,0) scale(1);
+  }
+  65%{
+    opacity:.72;
+    transform:translate3d(0,3vh,0) scale(.96);
+  }
+  65.8%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.88);
+  }
+  66%,100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.82);
+  }
+}
+
+@keyframes fw-trail-twinkle{
+  0%,100%{
+    opacity:.44;
+    transform:scale(.72);
+    filter:brightness(.92) drop-shadow(0 0 1px currentColor);
+  }
+  26%{
+    opacity:.94;
+    transform:scale(1.04);
+    filter:brightness(1.32) drop-shadow(0 0 3px currentColor);
+  }
+  49%{
+    opacity:.58;
+    transform:scale(.82);
+    filter:brightness(1) drop-shadow(0 0 2px currentColor);
+  }
+  74%{
+    opacity:1;
+    transform:scale(1.24);
+    filter:brightness(1.62) drop-shadow(0 0 4px currentColor);
+  }
+}
+@keyframes fw-star-flash{
+  0%,52%,100%{opacity:0;transform:translate(-50%,-50%) scale(.20)}
+  59%{opacity:.88;transform:translate(-50%,-50%) scale(1.05)}
+  67%{opacity:.12;transform:translate(-50%,-50%) scale(.52)}
+}
+
+/* Mostly radial motion, but the last leg includes per-spark drift + gravity. */
+@keyframes fw-burst-flight{
+  0%,65%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.42);
+  }
+  66.5%{
+    opacity:.86;
+    transform:translate3d(var(--dx1),var(--dy1),0) scale(.78);
+  }
+  70%{
+    opacity:1;
+    transform:translate3d(var(--dx2),var(--dy2),0) scale(1);
+  }
+  76%{
+    opacity:.92;
+    transform:translate3d(var(--dx3),var(--dy3),0) scale(1.02);
+  }
+  84%{
+    opacity:.72;
+    transform:translate3d(var(--dx4),var(--dy4),0) scale(.96);
+  }
+  91%{
+    opacity:.36;
+    transform:translate3d(var(--dx4),var(--dy4),0) scale(.84);
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(var(--dx4),var(--dy4),0) scale(.72);
+  }
+}
+
+@keyframes fw-burst-twinkle{
+  0%,100%{
+    opacity:.74;
+    transform:scale(.88);
+    filter:brightness(.95);
+  }
+  31%{
+    opacity:1;
+    transform:scale(1.08);
+    filter:brightness(1.30);
+  }
+  61%{
+    opacity:.80;
+    transform:scale(.94);
+    filter:brightness(1.02);
+  }
+  79%{
+    opacity:1;
+    transform:scale(1.14);
+    filter:brightness(1.48);
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .fireworks-field{display:none!important}
+}
+

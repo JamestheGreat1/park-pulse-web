@@ -1,4 +1,5 @@
 const PREVIEW_HOSTS = new Set(["preview.useparkpulse.com", "localhost", "127.0.0.1"]);
+const PREVIEW_WORKERS_SUFFIX = "-park-pulse-web.jamesp5297.workers.dev";
 const PREVIEW_SEASON_KEY = "parkpulse.preview.season";
 const PREVIEW_INTENSITY_KEY = "parkpulse.preview.seasonIntensity";
 
@@ -27,7 +28,7 @@ function safeSet(key, value) {
 }
 
 export function isSeasonPreviewEnabled() {
-  return PREVIEW_HOSTS.has(location.hostname);
+  return PREVIEW_HOSTS.has(location.hostname) || location.hostname.endsWith(PREVIEW_WORKERS_SUFFIX);
 }
 
 function easterSunday(year) {

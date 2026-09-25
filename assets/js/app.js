@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.8.3";
-import { store } from "./store.js?v=1.8.3";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.8.3";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.8.3";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.8.3";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.0-preview.1";
+import { store } from "./store.js?v=1.9.0-preview.1";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.0-preview.1";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.0-preview.1";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.0-preview.1";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.8.3";
+const APP_VERSION = "1.9.0-preview.1";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -24,6 +24,8 @@ let serviceWorkerRegistration = null;
 let pendingServiceWorker = null;
 let sheetReturnFocus = null;
 let installHelpReturnFocus = null;
+let quickActionReturnFocus = null;
+let nextUpOffset = 0;
 
 const FIRST_RUN_KEY = "parkpulse.quickStart.v1";
 
@@ -403,6 +405,157 @@ function typicalComparisonBadge(ride) {
 
   return null;
 }
+
+function activeParkDay(state = store.snapshot) {
+  const parkDay = state.parkDay;
+  if (!parkDay?.active) return null;
+  if (parkDay.expiresAt && Number(parkDay.expiresAt) <= Date.now()) return null;
+  return parkDay;
+}
+
+function recommendationScore(ride, state = store.snapshot) {
+  if (!ride || !ride.isOpen || isRideStale(ride) || ride.sourceMissing) return -Infinity;
+  const id = String(ride.id);
+  const comparison = rideComparison(ride);
+  const wait = Number(ride.waitTime);
+  let score = 0;
+
+  if (state.mustDo.includes(id)) score += 500;
+  if (state.favorites.includes(id)) score += 220;
+  if (comparison) score += Math.max(-180, Math.min(300, (1 - comparison.ratio) * 320));
+  if (Number.isFinite(wait)) score += Math.max(-80, 120 - wait) * 1.15;
+
+  return score;
+}
+
+function recommendationReason(ride, state = store.snapshot) {
+  if (!ride) return "No live ride data yet.";
+  if (isRideStale(ride)) return "Live data is stale right now.";
+  if (!ride.isOpen) return "Currently unavailable.";
+  const id = String(ride.id);
+  const comparison = rideComparison(ride);
+  const wait = Number(ride.waitTime);
+  const priority = state.mustDo.includes(id) ? "Must-do" : state.favorites.includes(id) ? "Favorite" : "";
+
+  if (comparison?.percentDelta <= -25) {
+    return `${priority ? priority + " · " : ""}${Math.abs(comparison.percentDelta)}% below typical right now`;
+  }
+  if (comparison?.percentDelta <= -10) {
+    return `${priority ? priority + " · " : ""}${Math.abs(comparison.percentDelta)}% better than typical right now`;
+  }
+  if (Number.isFinite(wait) && wait <= 20) {
+    return `${priority ? priority + " · " : ""}${wait} min right now`;
+  }
+  if (priority && Number.isFinite(wait)) return `${priority} · open at ${wait} min`;
+  if (Number.isFinite(wait)) return `Open at ${wait} min right now`;
+  return "Open right now.";
+}
+
+function recommendationCandidates(state = store.snapshot) {
+  const parkDay = activeParkDay(state);
+  const completed = new Set((parkDay?.completedRideIds || []).map(String));
+  return rideData.ridesForPark(state.selectedParkId)
+    .filter(ride => ride.isOpen && !isRideStale(ride) && !ride.sourceMissing && Number.isFinite(Number(ride.waitTime)) && !completed.has(String(ride.id)))
+    .sort((a, b) =>
+      recommendationScore(b, state) - recommendationScore(a, state) ||
+      Number(a.waitTime ?? Infinity) - Number(b.waitTime ?? Infinity) ||
+      a.name.localeCompare(b.name)
+    );
+}
+
+function nextUpRide(state = store.snapshot) {
+  const parkDay = activeParkDay(state);
+  if (parkDay?.currentRideId) {
+    const current = rideData.rideById(parkDay.currentRideId);
+    if (current && Number(current.parkId) === Number(state.selectedParkId) && !(parkDay.completedRideIds || []).includes(String(current.id))) {
+      return { ride: current, current: true };
+    }
+  }
+  const candidates = recommendationCandidates(state);
+  if (!candidates.length) return { ride: null, current: false };
+  const index = ((nextUpOffset % candidates.length) + candidates.length) % candidates.length;
+  return { ride: candidates[index], current: false };
+}
+
+function parkDayStats(state = store.snapshot) {
+  const parkDay = activeParkDay(state);
+  if (!parkDay) return null;
+  const parkRideIds = new Set(rideData.ridesForPark(state.selectedParkId).map(ride => String(ride.id)));
+  const completed = new Set((parkDay.completedRideIds || []).map(String));
+  return {
+    ridden: [...completed].filter(id => parkRideIds.has(id)).length,
+    mustDoLeft: state.mustDo.filter(id => parkRideIds.has(String(id)) && !completed.has(String(id))).length,
+    watching: state.rules.filter(rule => Number(rule.parkId) === Number(state.selectedParkId)).length
+  };
+}
+
+function nextUpMarkup(state = store.snapshot) {
+  const parkDay = activeParkDay(state);
+  const { ride, current } = nextUpRide(state);
+  if (!ride && !parkDay) return "";
+
+  const stats = parkDayStats(state);
+  if (!ride) {
+    return `<section class="next-up-card liquid-glass park-day-active">
+      <div class="next-up-head"><div><span class="eyebrow">Park Day</span><h3>No strong Next Up pick right now</h3><p>ParkPulse will keep looking as waits and ride status change.</p></div><button class="next-up-end" type="button" data-end-park-day>End Park Day</button></div>
+      <div class="park-day-stats"><span><b>${stats?.mustDoLeft || 0}</b> must-dos left</span><span><b>${stats?.watching || 0}</b> watched</span><span><b>${stats?.ridden || 0}</b> ridden</span></div>
+    </section>`;
+  }
+
+  const status = rideStatus(ride);
+  const reason = recommendationReason(ride, state);
+  const comparison = rideComparison(ride);
+  const label = current ? "Next Up" : comparison?.percentDelta <= -25 ? "Great right now" : state.mustDo.includes(String(ride.id)) ? "Must-do pick" : state.favorites.includes(String(ride.id)) ? "Favorite pick" : "ParkPulse pick";
+
+  return `<section class="next-up-card liquid-glass ${parkDay ? "park-day-active" : ""}">
+    <div class="next-up-head">
+      <div><span class="eyebrow">${parkDay ? "Park Day · " : ""}${escapeHtml(label)}</span><h3>${parkDay && current ? "You’re heading to" : "What should I ride next?"}</h3><p>${escapeHtml(reason)}</p></div>
+      ${parkDay ? '<button class="next-up-end" type="button" data-end-park-day>End Park Day</button>' : ""}
+    </div>
+    <div class="next-up-ride-row">
+      <button class="next-up-ride" type="button" data-open-ride="${ride.id}">
+        <span class="ride-land">${escapeHtml(ride.land)}</span>
+        <strong>${escapeHtml(ride.name)}</strong>
+      </button>
+      <div class="next-up-wait"><b class="${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</b><span>${escapeHtml(status.label)}</span></div>
+    </div>
+    ${parkDay ? `<div class="park-day-stats"><span><b>${stats.mustDoLeft}</b> must-dos left</span><span><b>${stats.watching}</b> watched</span><span><b>${stats.ridden}</b> ridden</span></div>` : '<p class="next-up-footnote">Pick it and Park Day Lite starts automatically — no itinerary required.</p>'}
+    <div class="next-up-actions">
+      ${current
+        ? `<button class="primary-button next-up-primary" type="button" data-mark-ridden="${ride.id}">Mark ridden</button><button class="secondary-button" type="button" data-next-up-another>Pick another</button>`
+        : `<button class="primary-button next-up-primary" type="button" data-next-up-go="${ride.id}">I’m heading there</button><button class="secondary-button" type="button" data-next-up-another>Show another</button>`}
+    </div>
+  </section>`;
+}
+
+function setRideAsNextUp(id) {
+  const ride = rideData.rideById(id);
+  if (!ride) return;
+  const parkDay = activeParkDay();
+  if (!parkDay) store.startParkDay(ride.parkId, easternParkDayEnd());
+  nextUpOffset = 0;
+  store.setParkDayCurrent(String(id), ride.parkId);
+  toast(`${ride.name} is Next Up`);
+}
+
+function cycleNextUp() {
+  nextUpOffset += 1;
+  const parkDay = activeParkDay();
+  if (parkDay?.currentRideId) {
+    store.setParkDayCurrent(null);
+    return;
+  }
+  renderExplore();
+  bindDynamic();
+}
+
+function markRideRidden(id) {
+  const ride = rideData.rideById(id);
+  nextUpOffset = 0;
+  store.completeParkDayRide(id);
+  toast(ride ? `${ride.name} marked ridden` : "Ride marked ridden");
+}
+
 function rideStatus(ride) {
   if (!ride) return { stale:true, wait:"—", label:"No live data", updated:"Unavailable" };
   const stale = isRideStale(ride);
@@ -587,32 +740,41 @@ function sortedRides(rides, state) {
   });
   return list;
 }
-function rideCard(ride) {
-  const favorite = store.snapshot.favorites.includes(String(ride.id));
+function rideCard(ride, state = store.snapshot, index = 0) {
+  const favorite = state.favorites.includes(String(ride.id));
   const rule = store.ruleForRide(ride.id);
   const status = rideStatus(ride);
   const valueBadge = typicalComparisonBadge(ride);
+  const explanation = ["recommended", "personal"].includes(state.sort) && index < 3 && ride.isOpen && !status.stale
+    ? recommendationReason(ride, state)
+    : "";
   return `<article class="ride-card liquid-glass ${rule ? "watching" : ""} ${status.stale ? "stale" : ""}" data-ride-id="${ride.id}">
     <button class="ride-main" type="button" data-open-ride="${ride.id}">
-      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${rule ? `<span class="watch-badge">Watching</span>` : ""}${valueBadge ? `<span class="value-badge ${valueBadge.tone}">${escapeHtml(valueBadge.text)}</span>` : ""}</div></div>
+      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${rule ? `<span class="watch-badge">Watching</span>` : ""}${valueBadge ? `<span class="value-badge ${valueBadge.tone}">${escapeHtml(valueBadge.text)}</span>` : ""}</div>${explanation ? `<div class="recommendation-hint"><span aria-hidden="true">✦</span>${escapeHtml(explanation)}</div>` : ""}</div>
       <div class="ride-status"><span class="wait ${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><span class="status-label">${escapeHtml(status.label)}</span></div>
     </button>
-    <div class="ride-actions"><button class="favorite-button ${favorite ? "active" : ""}" type="button" data-favorite="${ride.id}" aria-pressed="${favorite}" aria-label="${favorite ? "Unfavorite" : "Favorite"} ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
-    <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button></div>
+    <div class="ride-actions">
+      <button class="favorite-button ${favorite ? "active" : ""}" type="button" data-favorite="${ride.id}" aria-pressed="${favorite}" aria-label="${favorite ? "Unfavorite" : "Favorite"} ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
+      <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button>
+      <button class="quick-action-button" type="button" data-quick-actions="${ride.id}" aria-label="Quick actions for ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+    </div>
   </article>`;
 }
 function rideListMarkup(state = store.snapshot) {
   const rides = sortedRides(rideData.ridesForPark(state.selectedParkId), state);
   return rides.length
-    ? rides.map(rideCard).join("")
+    ? rides.map((ride, index) => rideCard(ride, state, index)).join("")
     : `<div class="empty liquid-glass">${rideData.error || "No rides match that search."}</div>`;
 }
 function bindRideCards(root = views.explore) {
-  $$('[data-favorite]', root).forEach(button => {
+  $('[data-favorite]', root).forEach(button => {
     button.onclick = () => store.toggleFavorite(button.dataset.favorite);
   });
-  $$('[data-open-ride]', root).forEach((button) => {
+  $('[data-open-ride]', root).forEach((button) => {
     button.onclick = () => openRide(button.dataset.openRide);
+  });
+  $('[data-quick-actions]', root).forEach((button) => {
+    button.onclick = () => openQuickActions(button.dataset.quickActions, button);
   });
 }
 function renderRideResults() {
@@ -643,6 +805,7 @@ function renderExplore() {
       <button class="filter-button ${state.favoritesOnly ? "active" : ""}" type="button" data-toggle-favorites aria-pressed="${state.favoritesOnly}">Favorites</button>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="personal" ${state.sort === "personal" ? "selected" : ""}>For me</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
+    ${nextUpMarkup(state)}
     <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
     ${state.sort === "personal" ? '<p class="personal-copy">Open, fresh rides first. Then your must-dos, favorites, and the best waits versus normal. Set a must-do on any ride’s page.</p>' : ""}
     <div class="ride-list">${rideListMarkup(state)}</div>`;
@@ -817,7 +980,11 @@ function render() {
   setTheme(); bindDynamic();
 }
 function bindDynamic() {
-  $$('[data-park]').forEach((b) => b.onclick = () => { store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
+  $('[data-park]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
+  $('[data-next-up-go]').forEach((b) => b.onclick = () => setRideAsNextUp(b.dataset.nextUpGo));
+  $('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
+  $('[data-mark-ridden]').forEach((b) => b.onclick = () => markRideRidden(b.dataset.markRidden));
+  $('[data-end-park-day]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.endParkDay(); toast("Park Day ended"); });
   bindRideCards();
   $$('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
   $$('[data-view-jump]').forEach((b) => b.onclick = () => selectView(b.dataset.viewJump));
@@ -868,6 +1035,91 @@ async function copyText(value) {
   document.execCommand("copy");
   area.remove();
 }
+function closeQuickActions() {
+  const menu = $("#quickActionMenu");
+  const menuBackdrop = $("#quickActionBackdrop");
+  if (!menu || menu.classList.contains("hidden")) return;
+  menu.classList.add("hidden");
+  menu.setAttribute("aria-hidden", "true");
+  menuBackdrop?.classList.add("hidden");
+  menuBackdrop?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("quick-actions-open");
+  const returnTo = quickActionReturnFocus;
+  quickActionReturnFocus = null;
+  if (returnTo?.isConnected) requestAnimationFrame(() => returnTo.focus({ preventScroll: true }));
+}
+
+function ensureQuickActionMenu() {
+  let menuBackdrop = $("#quickActionBackdrop");
+  let menu = $("#quickActionMenu");
+  if (!menuBackdrop) {
+    menuBackdrop = document.createElement("div");
+    menuBackdrop.id = "quickActionBackdrop";
+    menuBackdrop.className = "quick-action-backdrop hidden";
+    menuBackdrop.setAttribute("aria-hidden", "true");
+    document.body.append(menuBackdrop);
+  }
+  if (!menu) {
+    menu = document.createElement("section");
+    menu.id = "quickActionMenu";
+    menu.className = "quick-action-menu liquid-glass hidden";
+    menu.setAttribute("role", "dialog");
+    menu.setAttribute("aria-modal", "true");
+    menu.setAttribute("aria-hidden", "true");
+    document.body.append(menu);
+  }
+  menuBackdrop.onclick = closeQuickActions;
+  return { menu, menuBackdrop };
+}
+
+function openQuickActions(id, trigger = null) {
+  const ride = rideData.rideById(id);
+  if (!ride) return;
+  const state = store.snapshot;
+  const favorite = state.favorites.includes(String(id));
+  const mustDo = state.mustDo.includes(String(id));
+  const rule = store.ruleForRide(id);
+  const parkDay = activeParkDay(state);
+  const completed = Boolean(parkDay?.completedRideIds?.includes(String(id)));
+  const current = String(parkDay?.currentRideId || "") === String(id);
+  const { menu, menuBackdrop } = ensureQuickActionMenu();
+  quickActionReturnFocus = trigger || (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+
+  menu.innerHTML = `
+    <div class="quick-action-handle" aria-hidden="true"></div>
+    <div class="quick-action-head"><div><span class="ride-land">${escapeHtml(ride.land)}</span><h2>${escapeHtml(ride.name)}</h2><p>${escapeHtml(recommendationReason(ride, state))}</p></div><button type="button" class="quick-action-close" data-close-quick-actions aria-label="Close">×</button></div>
+    <div class="quick-action-list">
+      <button type="button" data-quick-action="favorite"><span>★</span><div><strong>${favorite ? "Remove favorite" : "Favorite"}</strong><small>Save it without creating an alert.</small></div></button>
+      <button type="button" data-quick-action="must-do"><span>✓</span><div><strong>${mustDo ? "Remove must-do" : "Must-do ride"}</strong><small>Prioritize it in For me and Next Up.</small></div></button>
+      <button type="button" data-quick-action="watch"><span>♟</span><div><strong>${rule ? "Edit watch" : "Watch ride"}</strong><small>Reopening and wait-target alerts.</small></div></button>
+      ${completed
+        ? '<button type="button" data-quick-action="unride"><span>↺</span><div><strong>Mark not ridden</strong><small>Put it back into Park Day recommendations.</small></div></button>'
+        : `<button type="button" data-quick-action="next" ${current ? "disabled" : ""}><span>→</span><div><strong>${current ? "Already Next Up" : "Set as Next Up"}</strong><small>${parkDay ? "Make this your current Park Day pick." : "Starts Park Day Lite with this ride."}</small></div></button>`}
+      <button type="button" data-quick-action="share"><span>↗</span><div><strong>Share</strong><small>Send a ParkPulse link to this ride.</small></div></button>
+    </div>`;
+
+  menu.classList.remove("hidden");
+  menu.setAttribute("aria-hidden", "false");
+  menuBackdrop.classList.remove("hidden");
+  menuBackdrop.setAttribute("aria-hidden", "false");
+  document.body.classList.add("quick-actions-open");
+
+  $('[data-close-quick-actions]', menu).onclick = closeQuickActions;
+  $('[data-quick-action]', menu).forEach(button => {
+    button.onclick = async () => {
+      const action = button.dataset.quickAction;
+      if (action === "favorite") store.toggleFavorite(id);
+      if (action === "must-do") store.setMustDo(id, !mustDo);
+      if (action === "watch") { closeQuickActions(); openRide(id); return; }
+      if (action === "next") { closeQuickActions(); setRideAsNextUp(id); return; }
+      if (action === "unride") { store.uncompleteParkDayRide(id); toast(`${ride.name} is back in Park Day`); }
+      if (action === "share") { closeQuickActions(); await shareRide(id); return; }
+      closeQuickActions();
+    };
+  });
+  requestAnimationFrame(() => $('[data-close-quick-actions]', menu)?.focus({ preventScroll: true }));
+}
+
 async function shareRide(id) {
   const ride = rideData.rideById(id) || store.ruleForRide(id);
   if (!ride) return;
@@ -902,6 +1154,11 @@ function focusableInSheet() {
     .filter((el) => !el.classList.contains("hidden") && el.offsetParent !== null);
 }
 function handleDialogKeydown(event) {
+  if (event.key === "Escape" && $("#quickActionMenu") && !$("#quickActionMenu").classList.contains("hidden")) {
+    event.preventDefault();
+    closeQuickActions();
+    return;
+  }
   if (event.key === "Escape" && installHelpSheet && !installHelpSheet.classList.contains("hidden")) {
     event.preventDefault();
     closeInstallHelp();
@@ -938,6 +1195,7 @@ function openRide(id) {
   sheetReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(model.name || model.rideName)}</h2></div><div class="sheet-actions"><button class="sheet-action" type="button" data-share-ride="${id}" aria-label="Share ${escapeHtml(model.name || model.rideName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div></div>
     <div class="sheet-status"><span class="wait ${rideStatus(ride).stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(rideStatus(ride).wait)}</span><small>${escapeHtml(rideStatus(ride).label)}</small></div>
+    ${ride ? `<div class="sheet-recommendation"><span>ParkPulse context</span><strong>${escapeHtml(recommendationReason(ride, store.snapshot))}</strong></div>` : ""}
     <div id="rideInsights" class="ride-insights"><span class="insight-loading">Checking the trend data…</span></div>
     <section class="ride-history"><div class="history-heading"><h3>Wait history</h3><select id="historyRange" aria-label="History range"><option value="today">Today</option><option value="7d">7 days</option><option value="30d">30 days</option></select></div><div id="rideHistory" aria-live="polite"></div></section>
     <label class="toggle-row"><div><strong>Must-do ride</strong><small>Put it first in “For me.” This doesn’t create an alert.</small></div><input id="mustDoToggle" type="checkbox" ${store.snapshot.mustDo.includes(String(id)) ? "checked" : ""}><span class="switch"></span></label>
@@ -1446,6 +1704,7 @@ setupSheetDismissGesture();
   });
   store.addEventListener("change", (e) => {
     if (["rules", "expired", "rule-migration"].includes(e.detail.reason)) rulesSynced = false;
+    if (["park", "park-day"].includes(e.detail.reason)) nextUpOffset = 0;
     if (e.detail.reason === "search") renderRideResults();
     else if (e.detail.reason !== "view") render();
   });
@@ -1473,6 +1732,8 @@ setupSheetDismissGesture();
       refreshPushState({ sync: true });
       if (!analyticsState?.ok) refreshAnalyticsState();
     }
+    const parkDay = store.snapshot.parkDay;
+    if (parkDay?.active && parkDay.expiresAt && Number(parkDay.expiresAt) <= Date.now()) store.endParkDay();
     renderParkHours();
     renderRideResults();
   }, 60 * 1000);

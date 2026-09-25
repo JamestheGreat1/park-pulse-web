@@ -39,6 +39,7 @@ export class Store extends EventTarget {
     this.state = { ...defaults, ...saved };
     this.state.favorites = [...new Set((Array.isArray(saved.favorites) ? saved.favorites : []).filter(id => typeof id === "string" && id.length < 120))];
     this.state.mustDo = [...new Set((Array.isArray(saved.mustDo) ? saved.mustDo : []).filter(id => typeof id === "string" && id.length < 120))];
+    if (!["recommended","wait","name"].includes(this.state.sort)) this.state.sort = "recommended";
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
     if (!["blue","cyan","violet","pink","orange","green","red","gold"].includes(this.state.accent)) this.state.accent = "blue";
     this.pruneExpired(false);

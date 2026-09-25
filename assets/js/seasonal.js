@@ -186,7 +186,7 @@ function stopFireworkEmitter() {
   removeEmittedFireworkSparks();
 }
 
-function emitTrailSpark(field, head, rocketIndex) {
+function emitTrailSpark(field, fieldRect, head, rocketIndex) {
   if (!field.isConnected || !head.isConnected || head.getClientRects().length === 0) return;
 
   const rocket = head.closest(".firework-rocket");
@@ -196,7 +196,6 @@ function emitTrailSpark(field, head, rocketIndex) {
   const rocketOpacity = Number.parseFloat(getComputedStyle(rocket).opacity || "0");
   if (rocketOpacity < .16) return;
 
-  const fieldRect = field.getBoundingClientRect();
   const headRect = head.getBoundingClientRect();
   const x = headRect.left - fieldRect.left + headRect.width / 2;
   const y = headRect.top - fieldRect.top + headRect.height / 2;
@@ -215,8 +214,8 @@ function emitTrailSpark(field, head, rocketIndex) {
 
   const spark = document.createElement("span");
   spark.className = `firework-emitted-spark${star ? " star" : ""}`;
-  spark.style.left = `${(x + jitterX).toFixed(1)}px`;
-  spark.style.top = `${(y + jitterY).toFixed(1)}px`;
+  spark.style.left = `${(x + jitterX - size / 2).toFixed(1)}px`;
+  spark.style.top = `${(y + jitterY - size / 2).toFixed(1)}px`;
   spark.style.setProperty("--spark-size", `${size.toFixed(1)}px`);
   spark.style.setProperty("--spark-life", `${life.toFixed(2)}s`);
   spark.style.setProperty("--spark-twinkle", `${twinkle.toFixed(2)}s`);
@@ -230,9 +229,13 @@ function emitTrailSpark(field, head, rocketIndex) {
   spark.innerHTML = "<i></i>";
   field.append(spark);
 
-  spark.addEventListener("animationend", (event) => {
-    if (event.animationName === "fw-emitted-spark") spark.remove();
-  }, { once: true });
+  const cleanup = (event) => {
+    if (event.animationName !== "fw-emitted-spark") return;
+    spark.removeEventListener("animationend", cleanup);
+    spark.remove();
+  };
+  spark.addEventListener("animationend", cleanup);
+  window.setTimeout(() => spark.remove(), Math.ceil(life * 1000) + 250);
 }
 
 function fireworkEmitterTick(now) {
@@ -249,12 +252,13 @@ function fireworkEmitterTick(now) {
 
   if (now - fireworkEmitterLastFrame >= 36) {
     fireworkEmitterLastFrame = now;
+    const fieldRect = field.getBoundingClientRect();
     field.querySelectorAll(".firework-head").forEach((head, index) => {
       const last = fireworkEmitterLastByRocket.get(head) || 0;
       const interval = 48 + (index % 3) * 7;
       if (now - last >= interval) {
         fireworkEmitterLastByRocket.set(head, now);
-        emitTrailSpark(field, head, index);
+        emitTrailSpark(field, fieldRect, head, index);
       }
     });
   }

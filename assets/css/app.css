@@ -2193,3 +2193,227 @@ body{
     transform:rotate(var(--burst-rotate)) scale(1.28) scaleX(var(--burst-x)) scaleY(var(--burst-y));
   }
 }
+
+
+/* v1.8.0-preview.16 — Minecraft-inspired July 4 fireworks.
+   Pixel spark ascent, discrete blocky explosions, twinkle/fade. */
+:root[data-season="july4"] .seasonal-particle{
+  --mc-cycle:6.8s;
+  --mc-lean:0px;
+  --mc-rotate:0deg;
+  --mc-burst-scale:1;
+  --mc-rocket-sparks:
+      0 12px 0 0 currentColor,
+      2px 25px 0 -1px currentColor,
+     -2px 39px 0 -1px rgba(255,255,255,.86),
+      3px 54px 0 -1px currentColor,
+     -3px 70px 0 -1px rgba(255,255,255,.58),
+      1px 88px 0 -1px currentColor;
+  --mc-burst:
+      0 -34px 0 -1px currentColor,
+     12px -28px 0 -1px currentColor,
+     27px -17px 0 -1px currentColor,
+     34px   0 0 -1px currentColor,
+     25px  20px 0 -1px currentColor,
+     10px  31px 0 -1px currentColor,
+    -10px  30px 0 -1px currentColor,
+    -27px  18px 0 -1px currentColor,
+    -34px   0 0 -1px currentColor,
+    -24px -19px 0 -1px currentColor,
+    -10px -30px 0 -1px currentColor;
+  display:none;
+  top:var(--particle-top);
+  bottom:auto;
+  width:4px;
+  height:4px;
+  margin:-2px 0 0 -2px;
+  border-radius:0;
+  background:transparent!important;
+  color:#ff6d7f;
+  opacity:1!important;
+  filter:none!important;
+  box-shadow:none!important;
+  animation:none!important;
+  -webkit-mask-image:none!important;
+  mask-image:none!important;
+}
+:root[data-season="july4"] .seasonal-particle:nth-child(4n+1){display:block}
+
+/* Blue: wider "burst" style. */
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+1){
+  color:#70b8ff;
+  --mc-cycle:6.2s;
+  --mc-lean:8px;
+  --mc-rotate:7deg;
+  --mc-burst-scale:1.08;
+  --mc-rocket-sparks:
+      0 10px 0 0 currentColor,
+     -2px 22px 0 -1px rgba(255,255,255,.92),
+      3px 35px 0 -1px currentColor,
+     -4px 49px 0 -1px currentColor,
+      2px 66px 0 -1px rgba(255,255,255,.62),
+     -1px 84px 0 -1px currentColor;
+  --mc-burst:
+      0 -38px 0 -1px currentColor,
+      7px -25px 0 -1px currentColor,
+     25px -31px 0 -1px currentColor,
+     21px -12px 0 -1px currentColor,
+     39px  -4px 0 -1px currentColor,
+     24px   9px 0 -1px currentColor,
+     33px  25px 0 -1px currentColor,
+     11px  22px 0 -1px currentColor,
+      2px  40px 0 -1px currentColor,
+    -12px  23px 0 -1px currentColor,
+    -31px  28px 0 -1px currentColor,
+    -24px   8px 0 -1px currentColor,
+    -41px  -5px 0 -1px currentColor,
+    -19px -14px 0 -1px currentColor,
+    -26px -31px 0 -1px currentColor,
+     -7px -25px 0 -1px currentColor;
+}
+
+/* White: star-ish shape. */
+:root[data-season="july4"] .seasonal-particle:nth-child(8n+5){
+  color:#fff;
+  --mc-cycle:7.3s;
+  --mc-lean:-11px;
+  --mc-rotate:-9deg;
+  --mc-burst-scale:.96;
+  --mc-rocket-sparks:
+      1px 11px 0 0 rgba(255,255,255,.96),
+     -2px 24px 0 -1px currentColor,
+      2px 38px 0 -1px currentColor,
+     -1px 51px 0 -1px rgba(117,184,255,.74),
+      3px 68px 0 -1px currentColor,
+     -3px 86px 0 -1px rgba(255,255,255,.52);
+  --mc-burst:
+       0 -42px 0 -1px currentColor,
+       7 -16px 0 -1px currentColor,
+      32 -25px 0 -1px currentColor,
+      17  -7px 0 -1px currentColor,
+      40   4px 0 -1px currentColor,
+      16  11px 0 -1px currentColor,
+      24  35px 0 -1px currentColor,
+       5  19px 0 -1px currentColor,
+     -12  38px 0 -1px currentColor,
+     -12  15px 0 -1px currentColor,
+     -37  21px 0 -1px currentColor,
+     -19   2px 0 -1px currentColor,
+     -34 -22px 0 -1px currentColor,
+      -8 -18px 0 -1px currentColor;
+}
+
+/* Gold: compact ball with a little twinkle. */
+:root[data-season="july4"] .seasonal-particle:nth-child(12n+1){
+  color:#ffd45f;
+  --mc-cycle:6.6s;
+  --mc-lean:4px;
+  --mc-rotate:13deg;
+  --mc-burst-scale:.88;
+  --mc-burst:
+      0 -29px 0 -1px currentColor,
+     12px -24px 0 -1px currentColor,
+     25px -12px 0 -1px currentColor,
+     28px   5px 0 -1px currentColor,
+     17px  23px 0 -1px currentColor,
+      0    30px 0 -1px currentColor,
+    -16px  23px 0 -1px currentColor,
+    -29px   6px 0 -1px currentColor,
+    -24px -13px 0 -1px currentColor,
+    -11px -25px 0 -1px currentColor;
+}
+
+/* Pixel rocket: a handful of discrete square sparks, not a beam. */
+:root[data-season="july4"] .seasonal-particle::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:4px;
+  height:4px;
+  border-radius:1px;
+  background:currentColor;
+  box-shadow:var(--mc-rocket-sparks);
+  filter:drop-shadow(0 0 3px currentColor);
+  opacity:0;
+  animation:mc-rocket-rise var(--mc-cycle) cubic-bezier(.18,.72,.24,1) infinite;
+  animation-delay:var(--particle-delay);
+}
+
+/* Blocky burst particles. */
+:root[data-season="july4"] .seasonal-particle::after{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:5px;
+  height:5px;
+  border-radius:1px;
+  background:currentColor;
+  box-shadow:var(--mc-burst);
+  filter:drop-shadow(0 0 3px currentColor);
+  opacity:0;
+  animation:mc-firework-pop var(--mc-cycle) steps(1,end) infinite;
+  animation-delay:var(--particle-delay);
+  transform-origin:center;
+}
+
+@keyframes mc-rocket-rise{
+  0%,43%{
+    opacity:0;
+    transform:translate3d(var(--mc-lean),96vh,0) scale(.75);
+  }
+  45%{opacity:.35}
+  50%{
+    opacity:.92;
+    transform:translate3d(calc(var(--mc-lean) * .7),58vh,0) scale(.9);
+  }
+  56%{
+    opacity:1;
+    transform:translate3d(calc(var(--mc-lean) * .35),27vh,0) scale(1);
+  }
+  61%{
+    opacity:.95;
+    transform:translate3d(0,4vh,0) scale(1);
+  }
+  62%,100%{
+    opacity:0;
+    transform:translate3d(0,0,0) scale(.7);
+  }
+}
+
+@keyframes mc-firework-pop{
+  0%,61%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(.08);
+  }
+  62%{
+    opacity:1;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * .38));
+  }
+  66%{
+    opacity:.96;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * .72));
+  }
+  71%{
+    opacity:.90;
+    transform:rotate(var(--mc-rotate)) scale(var(--mc-burst-scale));
+  }
+  76%{
+    opacity:.30;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * 1.08));
+  }
+  78%{
+    opacity:.82;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * 1.10));
+  }
+  82%{
+    opacity:.18;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * 1.13));
+  }
+  100%{
+    opacity:0;
+    transform:rotate(var(--mc-rotate)) scale(calc(var(--mc-burst-scale) * 1.15));
+  }
+}
+

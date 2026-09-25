@@ -4744,6 +4744,7 @@ body{
 /* v1.8.13 — robust ride-sheet threshold geometry */
 /* The Liquid Glass inner rim is decorative, but on scrollable ride sheets it can
    draw a curved edge through form controls. Keep the outer glass treatment only. */
+:root[data-preview-surface="liquid"] .ride-sheet::before,
 :root[data-preview-surface="liquid"] .ride-sheet::after{
   display:none!important;
 }

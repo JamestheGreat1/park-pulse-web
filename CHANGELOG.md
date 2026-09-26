@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.16 — 2026-09-26
+
+- Improved light-mode readability inside ride sheets without changing the glass backgrounds or layout.
+- Darkened muted helper text, trend labels, chart labels, and summary captions that could wash out over bright glass.
+- Uses a darker accent-text variant for ride land labels, comparison callouts, and the share icon while preserving the selected accent color.
+- Bumped frontend cache/version keys so installed PWAs receive the update.
+- Frontend-only update; no Worker deployment required.
+
 ## 1.8.15 — 2026-09-26
 
 - Fixed Frosted Glass color changes so accent and theme updates snap immediately, matching the existing Liquid Glass behavior.

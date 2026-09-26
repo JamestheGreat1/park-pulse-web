@@ -514,6 +514,38 @@ select option:disabled{color:var(--muted)}
 .history-average-line{stroke:var(--blue);stroke-width:1;stroke-dasharray:5 5;opacity:.42}
 .history-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 10px}.history-stats>div{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.025)}.history-stats span{font-size:.68rem;color:var(--muted);font-weight:700}.history-stats strong{font-size:1rem;color:var(--text)}
 .history-note{display:block;line-height:1.45;color:var(--muted)}
+
+
+/* v1.8.16 — keep light-mode ride-sheet labels readable over bright glass. */
+:root[data-theme="light"] .ride-sheet{
+  --sheet-muted-readable:#43536a;
+  --sheet-accent-readable:color-mix(in srgb,var(--blue2) 78%,var(--text));
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"] .ride-sheet{
+    --sheet-muted-readable:#43536a;
+    --sheet-accent-readable:color-mix(in srgb,var(--blue2) 78%,var(--text));
+  }
+}
+.ride-sheet .ride-land,
+.ride-sheet .sheet-action,
+.ride-sheet .insight-head>b{
+  color:var(--sheet-accent-readable,var(--blue));
+}
+.ride-sheet .sheet-recommendation span,
+.ride-sheet .insight-loading,
+.ride-sheet .insight-head,
+.ride-sheet .insight-grid span,
+.ride-sheet .ride-insights small,
+.ride-sheet .ride-history,
+.ride-sheet .history-stats span,
+.ride-sheet .history-note{
+  color:var(--sheet-muted-readable,var(--muted));
+}
+.ride-sheet .history-grid text,
+.ride-sheet .history-x-label{
+  fill:var(--sheet-muted-readable,var(--muted));
+}
 @media(max-width:600px){#view-explore .toolbar{grid-template-columns:1fr 1fr}#view-explore .toolbar .search{grid-column:1/-1}#sortSelect{grid-column:1/-1}}
 
 

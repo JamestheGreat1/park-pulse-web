@@ -143,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.8.17`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.8.17' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.8.18`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.8.18' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -529,4 +529,25 @@ test('light mode ride sheets use readable milky glass in both surface styles', (
   assert.match(light, /\.ride-sheet \.mini-toggle\.active/);
   assert.match(light, /\.ride-sheet \.history-chart \.history-line/);
   assert.match(light, /data-theme="system"/);
+});
+
+
+test('light mode has darker accent variants without changing glow colors', () => {
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const marker = css.lastIndexOf('dedicated high-contrast accent palette for light mode');
+  assert.ok(marker >= 0);
+  const light = css.slice(marker);
+  assert.match(light, /data-theme="light"\]\[data-accent="blue"\][\s\S]*--blue:#1769c2/);
+  assert.match(light, /data-theme="light"\]\[data-accent="cyan"\][\s\S]*--blue:#087a8c/);
+  assert.match(light, /data-theme="light"\]\[data-accent="violet"\][\s\S]*--blue:#6846c6/);
+  assert.match(light, /data-theme="light"\]\[data-accent="pink"\][\s\S]*--blue:#b93e83/);
+  assert.match(light, /data-theme="light"\]\[data-accent="orange"\][\s\S]*--blue:#ad520d/);
+  assert.match(light, /data-theme="light"\]\[data-accent="green"\][\s\S]*--blue:#147a51/);
+  assert.match(light, /data-theme="light"\]\[data-accent="red"\][\s\S]*--blue:#c13f4b/);
+  assert.match(light, /data-theme="light"\]\[data-accent="gold"\][\s\S]*--blue:#946700/);
+  assert.match(light, /--muted:#4b5b70/);
+  assert.match(light, /--green:#167a4a/);
+  assert.match(light, /--red:#b2394b/);
+  assert.match(light, /data-theme="system"/);
+  assert.doesNotMatch(light, /--accent-glow1:/);
 });

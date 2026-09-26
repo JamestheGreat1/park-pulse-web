@@ -4107,49 +4107,49 @@ body{
 }
 
 /* Color changes must snap. Only transforms/opacity keep motion easing. */
-:root[data-preview-surface="liquid"] .ride-card,
-:root[data-preview-surface="liquid"] .watch-card,
-:root[data-preview-surface="liquid"] .park-chip,
-:root[data-preview-surface="liquid"] .nav-item,
-:root[data-preview-surface="liquid"] .filter-button,
-:root[data-preview-surface="liquid"] .setting-action,
-:root[data-preview-surface="liquid"] .mini-toggle,
-:root[data-preview-surface="liquid"] .icon-button,
-:root[data-preview-surface="liquid"] .watch-button,
-:root[data-preview-surface="liquid"] .liquid-glass,
-:root[data-preview-surface="liquid"] .glass-control{
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .ride-card,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .watch-card,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .park-chip,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .nav-item,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .filter-button,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .setting-action,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .mini-toggle,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .icon-button,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .watch-button,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .liquid-glass,
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .glass-control{
   transition-property:transform,opacity!important;
 }
 
 /* One-frame repaint state used when accent/theme/season/surface changes. */
-:root.glass-color-snap[data-preview-surface="liquid"] .ride-card,
-:root.glass-color-snap[data-preview-surface="liquid"] .watch-card,
-:root.glass-color-snap[data-preview-surface="liquid"] .hero-card,
-:root.glass-color-snap[data-preview-surface="liquid"] .settings-group,
-:root.glass-color-snap[data-preview-surface="liquid"] .toolbar,
-:root.glass-color-snap[data-preview-surface="liquid"] .bottom-nav,
-:root.glass-color-snap[data-preview-surface="liquid"] .ride-sheet,
-:root.glass-color-snap[data-preview-surface="liquid"] .install-help-sheet,
-:root.glass-color-snap[data-preview-surface="liquid"] .seasonal-layer,
-:root.glass-color-snap[data-preview-surface="liquid"] .ambient{
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .ride-card,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .watch-card,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .hero-card,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .settings-group,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .toolbar,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .bottom-nav,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .ride-sheet,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .install-help-sheet,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .seasonal-layer,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .ambient{
   transition:none!important;
 }
-:root.glass-color-snap[data-preview-surface="liquid"] .ride-card::before,
-:root.glass-color-snap[data-preview-surface="liquid"] .watch-card::before,
-:root.glass-color-snap[data-preview-surface="liquid"] .hero-card::before,
-:root.glass-color-snap[data-preview-surface="liquid"] .settings-group::before,
-:root.glass-color-snap[data-preview-surface="liquid"] .toolbar::before,
-:root.glass-color-snap[data-preview-surface="liquid"] .bottom-nav::before,
-:root.glass-color-snap[data-preview-surface="liquid"] .ride-sheet::before,
-:root.glass-color-snap[data-preview-surface="liquid"] .install-help-sheet::before,
-:root.glass-color-snap[data-preview-surface="liquid"] .ride-card::after,
-:root.glass-color-snap[data-preview-surface="liquid"] .watch-card::after,
-:root.glass-color-snap[data-preview-surface="liquid"] .hero-card::after,
-:root.glass-color-snap[data-preview-surface="liquid"] .settings-group::after,
-:root.glass-color-snap[data-preview-surface="liquid"] .toolbar::after,
-:root.glass-color-snap[data-preview-surface="liquid"] .bottom-nav::after,
-:root.glass-color-snap[data-preview-surface="liquid"] .ride-sheet::after,
-:root.glass-color-snap[data-preview-surface="liquid"] .install-help-sheet::after{
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .ride-card::before,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .watch-card::before,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .hero-card::before,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .settings-group::before,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .toolbar::before,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .bottom-nav::before,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .ride-sheet::before,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .install-help-sheet::before,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .ride-card::after,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .watch-card::after,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .hero-card::after,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .settings-group::after,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .toolbar::after,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .bottom-nav::after,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .ride-sheet::after,
+:root.glass-color-snap:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .install-help-sheet::after{
   transition:none!important;
 }
 

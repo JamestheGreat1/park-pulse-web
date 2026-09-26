@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.17 — 2026-09-26
+
+- Reworked light-mode ride sheets into denser, more neutral milky glass so text stays readable over bright ambient backgrounds.
+- Reduced backdrop saturation for both Liquid and Frosted Glass while preserving blur, translucency, and the selected accent.
+- Darkened secondary/helper copy throughout the sheet, including watch controls, chart labels, metrics, and contextual text.
+- Strengthened light-mode chart lines and gave selects/buttons subtle neutral surfaces so controls no longer disappear into the glass.
+- Dark mode and non-sheet surfaces are unchanged.
+- Bumped frontend cache/version keys so installed PWAs receive the update.
+- Frontend-only update; no Worker deployment required.
+
 ## 1.8.16 — 2026-09-26
 
 - Improved light-mode readability inside ride sheets without changing the glass backgrounds or layout.

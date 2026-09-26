@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.18 — 2026-09-26
+
+- Added dedicated darker accent colors for Light mode across all eight ParkPulse color profiles.
+- Kept the ambient glow palette bright, so backgrounds still feel colorful while text, icons, selected states, and controls gain contrast.
+- Darkened Light-mode muted copy and semantic green/red so helper text and status labels remain readable on bright glass.
+- Applied the same palette automatically when System theme resolves to Light.
+- Dark mode is unchanged.
+- Bumped frontend cache/version keys so installed PWAs receive the update.
+- Frontend-only update; no Worker deployment required.
+
 ## 1.8.17 — 2026-09-26
 
 - Reworked light-mode ride sheets into denser, more neutral milky glass so text stays readable over bright ambient backgrounds.

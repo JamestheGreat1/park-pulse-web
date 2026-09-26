@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.15 — 2026-09-26
+
+- Fixed Frosted Glass color changes so accent and theme updates snap immediately, matching the existing Liquid Glass behavior.
+- Extended the existing one-frame glass repaint handling to Frosted Glass without changing its styling or layout.
+- Bumped frontend cache/version keys so installed PWAs receive the fix.
+- Frontend-only update; no Worker deployment required.
+
 ## 1.8.14 — 2026-09-25
 
 - Removed the remaining Liquid Glass specular/caustic overlay from ride sheets, eliminating the dark shaded band that could appear near the bottom while scrolling.

@@ -4813,3 +4813,192 @@ body{
     white-space:nowrap;
   }
 }
+
+
+/* v1.8.17 — light-mode ride sheets favor readable milky glass over saturated backdrop bleed. */
+:root[data-theme="light"] .ride-sheet,
+:root[data-theme="light"][data-preview-surface="liquid"] .ride-sheet,
+:root[data-theme="light"][data-preview-surface="neutral"] .ride-sheet{
+  --sheet-muted-readable:#314158;
+  --sheet-accent-readable:color-mix(in srgb,var(--blue2) 64%,var(--text));
+  --sheet-control-bg:rgba(255,255,255,.58);
+  --sheet-control-border:rgba(31,51,76,.16);
+  --sheet-subtle-bg:rgba(255,255,255,.30);
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"] .ride-sheet,
+  :root[data-theme="system"][data-preview-surface="liquid"] .ride-sheet,
+  :root[data-theme="system"][data-preview-surface="neutral"] .ride-sheet{
+    --sheet-muted-readable:#314158;
+    --sheet-accent-readable:color-mix(in srgb,var(--blue2) 64%,var(--text));
+    --sheet-control-bg:rgba(255,255,255,.58);
+    --sheet-control-border:rgba(31,51,76,.16);
+    --sheet-subtle-bg:rgba(255,255,255,.30);
+  }
+}
+
+/* Liquid stays translucent, but stops amplifying the background color beneath text. */
+:root[data-theme="light"][data-preview-surface="liquid"] .ride-sheet{
+  background:
+    linear-gradient(150deg,rgba(255,255,255,.42),rgba(255,255,255,.16) 46%,rgba(255,255,255,.28)),
+    rgba(255,255,255,.62)!important;
+  border-color:rgba(255,255,255,.94)!important;
+  backdrop-filter:blur(54px) saturate(115%) contrast(104%) brightness(1.01)!important;
+  -webkit-backdrop-filter:blur(54px) saturate(115%) contrast(104%) brightness(1.01)!important;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="liquid"] .ride-sheet{
+    background:
+      linear-gradient(150deg,rgba(255,255,255,.42),rgba(255,255,255,.16) 46%,rgba(255,255,255,.28)),
+      rgba(255,255,255,.62)!important;
+    border-color:rgba(255,255,255,.94)!important;
+    backdrop-filter:blur(54px) saturate(115%) contrast(104%) brightness(1.01)!important;
+    -webkit-backdrop-filter:blur(54px) saturate(115%) contrast(104%) brightness(1.01)!important;
+  }
+}
+
+/* Frosted gets a denser neutral veil so it reads as soft glass, not tinted plastic. */
+:root[data-theme="light"][data-preview-surface="neutral"] .ride-sheet{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.50),rgba(248,250,253,.25)),
+    rgba(248,250,253,.74)!important;
+  border-color:rgba(255,255,255,.96)!important;
+  backdrop-filter:blur(32px) saturate(105%) contrast(103%)!important;
+  -webkit-backdrop-filter:blur(32px) saturate(105%) contrast(103%)!important;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="neutral"] .ride-sheet{
+    background:
+      linear-gradient(145deg,rgba(255,255,255,.50),rgba(248,250,253,.25)),
+      rgba(248,250,253,.74)!important;
+    border-color:rgba(255,255,255,.96)!important;
+    backdrop-filter:blur(32px) saturate(105%) contrast(103%)!important;
+    -webkit-backdrop-filter:blur(32px) saturate(105%) contrast(103%)!important;
+  }
+}
+
+/* Keep the light-mode sheet's reflective edges neutral as well. */
+:root[data-theme="light"][data-preview-surface="neutral"] .ride-sheet::before{
+  background:linear-gradient(118deg,rgba(255,255,255,.34),rgba(255,255,255,.08) 24%,transparent 52%,rgba(255,255,255,.10))!important;
+  opacity:.62;
+}
+:root[data-theme="light"][data-preview-surface="liquid"] .ride-sheet::before{
+  background:linear-gradient(118deg,rgba(255,255,255,.34),rgba(255,255,255,.08) 22%,transparent 50%,rgba(255,255,255,.12))!important;
+}
+:root[data-theme="light"][data-preview-surface="liquid"] .ride-sheet::after{
+  background:linear-gradient(135deg,rgba(255,255,255,.72),rgba(255,255,255,.14) 28%,rgba(255,255,255,.06) 68%,rgba(255,255,255,.30))!important;
+  backdrop-filter:saturate(110%) contrast(104%) brightness(1.02) blur(1px)!important;
+  -webkit-backdrop-filter:saturate(110%) contrast(104%) brightness(1.02) blur(1px)!important;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"][data-preview-surface="neutral"] .ride-sheet::before{
+    background:linear-gradient(118deg,rgba(255,255,255,.34),rgba(255,255,255,.08) 24%,transparent 52%,rgba(255,255,255,.10))!important;
+    opacity:.62;
+  }
+  :root[data-theme="system"][data-preview-surface="liquid"] .ride-sheet::before{
+    background:linear-gradient(118deg,rgba(255,255,255,.34),rgba(255,255,255,.08) 22%,transparent 50%,rgba(255,255,255,.12))!important;
+  }
+  :root[data-theme="system"][data-preview-surface="liquid"] .ride-sheet::after{
+    background:linear-gradient(135deg,rgba(255,255,255,.72),rgba(255,255,255,.14) 28%,rgba(255,255,255,.06) 68%,rgba(255,255,255,.30))!important;
+    backdrop-filter:saturate(110%) contrast(104%) brightness(1.02) blur(1px)!important;
+    -webkit-backdrop-filter:saturate(110%) contrast(104%) brightness(1.02) blur(1px)!important;
+  }
+}
+
+/* Secondary copy now has one consistent readable tone throughout the sheet. */
+.ride-sheet .sheet-status small,
+.ride-sheet .toggle-row small,
+.ride-sheet .threshold-head small,
+.ride-sheet .duration-row small,
+.ride-sheet .sheet-recommendation span,
+.ride-sheet .insight-loading,
+.ride-sheet .insight-head,
+.ride-sheet .insight-grid span,
+.ride-sheet .ride-insights small,
+.ride-sheet .ride-history,
+.ride-sheet .history-stats span,
+.ride-sheet .history-note{
+  color:var(--sheet-muted-readable,var(--muted));
+}
+.ride-sheet .history-grid text,
+.ride-sheet .history-x-label{
+  fill:var(--sheet-muted-readable,var(--muted));
+}
+.ride-sheet .ride-land,
+.ride-sheet .sheet-action,
+.ride-sheet .insight-head>b,
+.ride-sheet .mini-toggle.active{
+  color:var(--sheet-accent-readable,var(--blue))!important;
+}
+
+/* Charts and controls stay visibly separate from the milky sheet without becoming solid UI blocks. */
+:root[data-theme="light"] .ride-sheet .history-grid line{
+  stroke:rgba(35,55,80,.14);
+}
+:root[data-theme="light"] .ride-sheet .history-chart .history-line{
+  stroke:var(--sheet-accent-readable,var(--blue));
+  opacity:.92;
+}
+:root[data-theme="light"] .ride-sheet .history-chart circle{
+  fill:var(--sheet-accent-readable,var(--blue));
+}
+:root[data-theme="light"] .ride-sheet .history-average-line{
+  stroke:var(--sheet-accent-readable,var(--blue));
+  opacity:.46;
+}
+:root[data-theme="light"] .ride-sheet .sheet-action,
+:root[data-theme="light"] .ride-sheet .sheet-close,
+:root[data-theme="light"] .ride-sheet .mini-toggle,
+:root[data-theme="light"] .ride-sheet .threshold-controls button,
+:root[data-theme="light"] .ride-sheet .duration-row select,
+:root[data-theme="light"] .ride-sheet .history-heading select{
+  background:var(--sheet-control-bg)!important;
+  border-color:var(--sheet-control-border)!important;
+}
+:root[data-theme="light"] .ride-sheet .mini-toggle.active{
+  background:rgba(var(--blue2-rgb),.10)!important;
+  border-color:color-mix(in srgb,var(--sheet-accent-readable) 35%,transparent)!important;
+}
+:root[data-theme="light"] .ride-sheet .ride-insights,
+:root[data-theme="light"] .ride-sheet .insight-grid>div,
+:root[data-theme="light"] .ride-sheet .history-stats>div,
+:root[data-theme="light"] .ride-sheet .sheet-recommendation{
+  background:var(--sheet-subtle-bg)!important;
+  border-color:rgba(31,51,76,.10)!important;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"] .ride-sheet .history-grid line{
+    stroke:rgba(35,55,80,.14);
+  }
+  :root[data-theme="system"] .ride-sheet .history-chart .history-line{
+    stroke:var(--sheet-accent-readable,var(--blue));
+    opacity:.92;
+  }
+  :root[data-theme="system"] .ride-sheet .history-chart circle{
+    fill:var(--sheet-accent-readable,var(--blue));
+  }
+  :root[data-theme="system"] .ride-sheet .history-average-line{
+    stroke:var(--sheet-accent-readable,var(--blue));
+    opacity:.46;
+  }
+  :root[data-theme="system"] .ride-sheet .sheet-action,
+  :root[data-theme="system"] .ride-sheet .sheet-close,
+  :root[data-theme="system"] .ride-sheet .mini-toggle,
+  :root[data-theme="system"] .ride-sheet .threshold-controls button,
+  :root[data-theme="system"] .ride-sheet .duration-row select,
+  :root[data-theme="system"] .ride-sheet .history-heading select{
+    background:var(--sheet-control-bg)!important;
+    border-color:var(--sheet-control-border)!important;
+  }
+  :root[data-theme="system"] .ride-sheet .mini-toggle.active{
+    background:rgba(var(--blue2-rgb),.10)!important;
+    border-color:color-mix(in srgb,var(--sheet-accent-readable) 35%,transparent)!important;
+  }
+  :root[data-theme="system"] .ride-sheet .ride-insights,
+  :root[data-theme="system"] .ride-sheet .insight-grid>div,
+  :root[data-theme="system"] .ride-sheet .history-stats>div,
+  :root[data-theme="system"] .ride-sheet .sheet-recommendation{
+    background:var(--sheet-subtle-bg)!important;
+    border-color:rgba(31,51,76,.10)!important;
+  }
+}

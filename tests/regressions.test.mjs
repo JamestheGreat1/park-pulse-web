@@ -143,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.8.16`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.8.16' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.8.17`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.8.17' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -512,14 +512,21 @@ test('Liquid Glass ride sheets have no internal pseudo-layer shading', () => {
 });
 
 
-test('light mode ride sheet uses darker readable helper and accent text', () => {
+test('light mode ride sheets use readable milky glass in both surface styles', () => {
   const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
-  const marker = css.lastIndexOf('keep light-mode ride-sheet labels readable over bright glass');
+  const marker = css.lastIndexOf('light-mode ride sheets favor readable milky glass over saturated backdrop bleed');
   assert.ok(marker >= 0);
   const light = css.slice(marker);
-  assert.match(light, /--sheet-muted-readable:#43536a/);
-  assert.match(light, /--sheet-accent-readable:color-mix\(in srgb,var\(--blue2\) 78%,var\(--text\)\)/);
-  assert.match(light, /data-theme="light"\] \.ride-sheet/);
-  assert.match(light, /data-theme="system"\] \.ride-sheet/);
-  assert.match(light, /\.ride-sheet \.history-grid text,[\s\S]*fill:var\(--sheet-muted-readable,var\(--muted\)\)/);
+  assert.match(light, /--sheet-muted-readable:#314158/);
+  assert.match(light, /--sheet-accent-readable:color-mix\(in srgb,var\(--blue2\) 64%,var\(--text\)\)/);
+  assert.match(light, /data-theme="light"\]\[data-preview-surface="liquid"\] \.ride-sheet/);
+  assert.match(light, /rgba\(255,255,255,\.62\)!important/);
+  assert.match(light, /saturate\(115%\)/);
+  assert.match(light, /data-theme="light"\]\[data-preview-surface="neutral"\] \.ride-sheet/);
+  assert.match(light, /rgba\(248,250,253,\.74\)!important/);
+  assert.match(light, /saturate\(105%\)/);
+  assert.match(light, /\.ride-sheet \.toggle-row small/);
+  assert.match(light, /\.ride-sheet \.mini-toggle\.active/);
+  assert.match(light, /\.ride-sheet \.history-chart \.history-line/);
+  assert.match(light, /data-theme="system"/);
 });

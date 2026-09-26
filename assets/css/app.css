@@ -5002,3 +5002,75 @@ body{
     border-color:rgba(31,51,76,.10)!important;
   }
 }
+
+
+/* v1.8.18 — dedicated high-contrast accent palette for light mode.
+   Glow colors stay vivid; text, icons and controls use darker accent values. */
+:root[data-theme="light"]{
+  --muted:#4b5b70;
+  --green:#167a4a;
+  --red:#b2394b;
+  --blue:#1769c2;
+  --blue2:#0e5aad;
+  --blue-rgb:23,105,194;
+  --blue2-rgb:14,90,173;
+}
+:root[data-theme="light"][data-accent="blue"]{
+  --blue:#1769c2;--blue2:#0e5aad;--blue-rgb:23,105,194;--blue2-rgb:14,90,173;
+}
+:root[data-theme="light"][data-accent="cyan"]{
+  --blue:#087a8c;--blue2:#006a7a;--blue-rgb:8,122,140;--blue2-rgb:0,106,122;
+}
+:root[data-theme="light"][data-accent="violet"]{
+  --blue:#6846c6;--blue2:#5635b8;--blue-rgb:104,70,198;--blue2-rgb:86,53,184;
+}
+:root[data-theme="light"][data-accent="pink"]{
+  --blue:#b93e83;--blue2:#a62f71;--blue-rgb:185,62,131;--blue2-rgb:166,47,113;
+}
+:root[data-theme="light"][data-accent="orange"]{
+  --blue:#ad520d;--blue2:#944406;--blue-rgb:173,82,13;--blue2-rgb:148,68,6;
+}
+:root[data-theme="light"][data-accent="green"]{
+  --blue:#147a51;--blue2:#0f6843;--blue-rgb:20,122,81;--blue2-rgb:15,104,67;
+}
+:root[data-theme="light"][data-accent="red"]{
+  --blue:#c13f4b;--blue2:#af3440;--blue-rgb:193,63,75;--blue2-rgb:175,52,64;
+}
+:root[data-theme="light"][data-accent="gold"]{
+  --blue:#946700;--blue2:#7e5800;--blue-rgb:148,103,0;--blue2-rgb:126,88,0;
+}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"]{
+    --muted:#4b5b70;
+    --green:#167a4a;
+    --red:#b2394b;
+    --blue:#1769c2;
+    --blue2:#0e5aad;
+    --blue-rgb:23,105,194;
+    --blue2-rgb:14,90,173;
+  }
+  :root[data-theme="system"][data-accent="blue"]{
+    --blue:#1769c2;--blue2:#0e5aad;--blue-rgb:23,105,194;--blue2-rgb:14,90,173;
+  }
+  :root[data-theme="system"][data-accent="cyan"]{
+    --blue:#087a8c;--blue2:#006a7a;--blue-rgb:8,122,140;--blue2-rgb:0,106,122;
+  }
+  :root[data-theme="system"][data-accent="violet"]{
+    --blue:#6846c6;--blue2:#5635b8;--blue-rgb:104,70,198;--blue2-rgb:86,53,184;
+  }
+  :root[data-theme="system"][data-accent="pink"]{
+    --blue:#b93e83;--blue2:#a62f71;--blue-rgb:185,62,131;--blue2-rgb:166,47,113;
+  }
+  :root[data-theme="system"][data-accent="orange"]{
+    --blue:#ad520d;--blue2:#944406;--blue-rgb:173,82,13;--blue2-rgb:148,68,6;
+  }
+  :root[data-theme="system"][data-accent="green"]{
+    --blue:#147a51;--blue2:#0f6843;--blue-rgb:20,122,81;--blue2-rgb:15,104,67;
+  }
+  :root[data-theme="system"][data-accent="red"]{
+    --blue:#c13f4b;--blue2:#af3440;--blue-rgb:193,63,75;--blue2-rgb:175,52,64;
+  }
+  :root[data-theme="system"][data-accent="gold"]{
+    --blue:#946700;--blue2:#7e5800;--blue-rgb:148,103,0;--blue2-rgb:126,88,0;
+  }
+}

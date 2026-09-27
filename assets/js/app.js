@@ -1013,7 +1013,7 @@ async function shareRide(id) {
   if (!ride) return;
 
   const name = ride.name || ride.rideName || "this ride";
-  const url = new URL(location.origin + location.pathname);
+  const url = new URL("https://app.useparkpulse.com/");
   url.searchParams.set("ride", String(id));
   const payload = {
     title: `${name} · ParkPulse`,

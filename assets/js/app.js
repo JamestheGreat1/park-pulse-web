@@ -199,6 +199,22 @@ function installSetting() {
   }
   return { visible: false, installed: false, copy: "", action: "" };
 }
+function sharedRidePwaHint(id) {
+  const platform = platformInfo();
+  if (!platform.mobile || platform.standalone) return "";
+  const sharedRide = new URL(location.href).searchParams.get("ride");
+  if (!sharedRide || sharedRide !== String(id)) return "";
+
+  const action = platform.ios ? "Add" : "Install";
+  const copy = platform.ios
+    ? "For the full ParkPulse experience, add it to your Home Screen. If you already have it installed, you’re all set — iPhone may still open shared links here."
+    : "Install ParkPulse for app-style launch, ride alerts, and a cleaner full-screen experience.";
+
+  return `<aside class="shared-link-pwa-hint" aria-label="ParkPulse app install">
+    <div><strong>Use ParkPulse as an app</strong><small>${copy}</small></div>
+    <button type="button" data-shared-install>${action}</button>
+  </aside>`;
+}
 function iconBell(active = false) {
   if (active) {
     return `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="bell-solid" d="M12 2a6 6 0 0 0-6 6v3.35c0 1.92-.67 3.78-1.9 5.25l-.68.81A1 1 0 0 0 4.2 19h15.6a1 1 0 0 0 .78-1.59l-.68-.81A8.15 8.15 0 0 1 18 11.35V8a6 6 0 0 0-6-6Zm-2.75 18a3 3 0 0 0 5.5 0h-5.5Z"/></svg>`;
@@ -1078,6 +1094,7 @@ function openRide(id) {
   sheetReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(model.name || model.rideName)}</h2></div><div class="sheet-actions"><button class="sheet-action" type="button" data-share-ride="${id}" aria-label="Share ${escapeHtml(model.name || model.rideName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div></div>
     <div class="sheet-status"><span class="wait ${rideStatus(ride).stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(rideStatus(ride).wait)}</span><small>${escapeHtml(rideStatus(ride).label)}</small></div>
+    ${sharedRidePwaHint(id)}
     ${ride ? `<div class="sheet-recommendation"><span>ParkPulse context</span><strong>${escapeHtml(recommendationReason(ride, store.snapshot))}</strong></div>` : ""}
     <div id="rideInsights" class="ride-insights"><span class="insight-loading">Checking the trend data…</span></div>
     <section class="ride-history"><div class="history-heading"><h3>Wait history</h3><select id="historyRange" aria-label="History range"><option value="today">Today</option><option value="7d">7 days</option><option value="30d">30 days</option></select></div><div id="rideHistory" aria-live="polite"></div></section>
@@ -1094,6 +1111,7 @@ function openRide(id) {
   backdrop.setAttribute("aria-hidden", "false");
   document.body.classList.add("sheet-open");
   $('[data-share-ride]', sheet)?.addEventListener("click", () => shareRide(id));
+  $('[data-shared-install]', sheet)?.addEventListener("click", installApp);
   requestAnimationFrame(() => $('[data-close-sheet]', sheet)?.focus({ preventScroll: true }));
   loadRideInsights(id);
   loadRideHistory(id);

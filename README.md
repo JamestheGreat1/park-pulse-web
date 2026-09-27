@@ -8,7 +8,7 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.9.0**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.9.1**
 
 ## What ParkPulse does
 
@@ -18,7 +18,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Favorites** let you save rides without turning on notifications.
 - **Next Up** suggests one useful open ride at a time using current waits, normal wait context, and your favorites.
 - **Wait history** shows how a ride has moved today, over the past 7 days, or over the past 30 days.
-- **Shared ride links** use the canonical ParkPulse URL and can open the native iOS app directly when it is installed, with the web app as the fallback.
+- **Shared ride links** open the right ride immediately and gently steer mobile browser users toward the installable ParkPulse PWA.
 - **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both. Watched rides use a solid bell so they’re easy to spot at a glance.
 - **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
 - **Park context** includes today's hours, closing information, ticketed events, and observed ride downtime.

@@ -5074,3 +5074,48 @@ body{
     --blue:#946700;--blue2:#7e5800;--blue-rgb:148,103,0;--blue2-rgb:126,88,0;
   }
 }
+
+
+/* v1.9.1 — shared ride links gently steer mobile browser users toward the PWA. */
+.shared-link-pwa-hint{
+  margin:-4px 0 14px;
+  padding:11px 12px;
+  border:1px solid rgba(var(--blue-rgb),.18);
+  border-radius:15px;
+  background:rgba(var(--blue2-rgb),.075);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.shared-link-pwa-hint>div{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.shared-link-pwa-hint strong{
+  font-size:.78rem;
+  line-height:1.25;
+}
+.shared-link-pwa-hint small{
+  color:var(--muted);
+  font-size:.69rem;
+  line-height:1.4;
+}
+.shared-link-pwa-hint button{
+  flex:0 0 auto;
+  min-height:38px;
+  padding:8px 12px;
+  border-radius:12px;
+  border:1px solid rgba(var(--blue-rgb),.24);
+  background:rgba(var(--blue2-rgb),.12);
+  color:var(--blue);
+  font-weight:850;
+  font-size:.72rem;
+}
+@media(max-width:380px){
+  .shared-link-pwa-hint{
+    align-items:flex-start;
+  }
+}

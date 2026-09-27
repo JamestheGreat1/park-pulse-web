@@ -18,6 +18,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Favorites** let you save rides without turning on notifications.
 - **Next Up** suggests one useful open ride at a time using current waits, normal wait context, and your favorites.
 - **Wait history** shows how a ride has moved today, over the past 7 days, or over the past 30 days.
+- **Shared ride links** use the canonical ParkPulse URL and can open the native iOS app directly when it is installed, with the web app as the fallback.
 - **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both. Watched rides use a solid bell so they’re easy to spot at a glance.
 - **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
 - **Park context** includes today's hours, closing information, ticketed events, and observed ride downtime.

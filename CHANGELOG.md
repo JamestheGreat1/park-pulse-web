@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.0 — 2026-09-26
+
+- Added Apple Universal Link support for shared ParkPulse ride URLs.
+- Shared rides now always use the canonical `https://app.useparkpulse.com/?ride=...` URL, including links created from preview or alternate hosts.
+- Published the Apple App Site Association file for the ParkPulse native iOS app so matching ride links can open the installed app directly.
+- Kept the same URL as the web fallback when the native app is not installed or the link is opened in a browser context.
+- Added regression coverage for the canonical share host and Apple association rules.
+- Bumped frontend cache/version keys so installed PWAs receive the 1.9.0 update.
+- Frontend-only web release; no Worker deployment required.
+
 ## 1.8.18 — 2026-09-26
 
 - Added dedicated darker accent colors for Light mode across all eight ParkPulse color profiles.

@@ -143,8 +143,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.8.18`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.8.18' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.0`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.0' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -550,4 +550,22 @@ test('light mode has darker accent variants without changing glow colors', () =>
   assert.match(light, /--red:#b2394b/);
   assert.match(light, /data-theme="system"/);
   assert.doesNotMatch(light, /--accent-glow1:/);
+});
+
+
+test('shared rides use the canonical Universal Link host', () => {
+  const app = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  const shareStart = app.indexOf('async function shareRide');
+  assert.ok(shareStart >= 0);
+  const share = app.slice(shareStart, app.indexOf('function focusableInSheet', shareStart));
+  assert.match(share, /new URL\("https:\/\/app\.useparkpulse\.com\/"\)/);
+  assert.match(share, /url\.searchParams\.set\("ride", String\(id\)\)/);
+});
+
+test('Apple App Site Association only claims shared ride links', () => {
+  const aasa = JSON.parse(fs.readFileSync(new URL('../.well-known/apple-app-site-association', import.meta.url), 'utf8'));
+  const detail = aasa.applinks.details[0];
+  assert.deepEqual(detail.appIDs, ['7UC57RCA76.com.james.ParkPulse']);
+  assert.equal(detail.components[0]['/'], '/');
+  assert.equal(detail.components[0]['?'].ride, '?*');
 });

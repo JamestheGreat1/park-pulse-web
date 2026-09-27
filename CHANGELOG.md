@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.9.1 — 2026-09-26
+
+- Removed the native iOS Universal Link association so shared ride URLs no longer prefer the native app.
+- Kept canonical `https://app.useparkpulse.com/?ride=...` sharing and immediate ride-detail deep linking on the web.
+- Added a compact PWA handoff inside ride details when a shared link opens on a mobile browser.
+- iPhone/iPad shared links now explain the Home Screen experience and reuse ParkPulse's existing Add to Home Screen guide.
+- Android shared links reuse the existing install flow when available.
+- The PWA handoff is hidden when ParkPulse is already running in standalone mode.
+- Bumped frontend cache/version keys so installed PWAs receive the 1.9.1 update.
+- Frontend-only update; no Worker deployment required.
+
 ## 1.9.0 — 2026-09-26
 
 - Added Apple Universal Link support for shared ParkPulse ride URLs.

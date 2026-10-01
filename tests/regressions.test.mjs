@@ -33,6 +33,51 @@ test('unknown waits never trigger threshold notifications; numeric zero is valid
   assert.equal((await evaluate(60, 0)).sent.length, 1);
   assert.deepEqual((await evaluate(60, 30)).checkpoints, [false, true]);
 });
+test('ThemeParks attraction waits stay live when the parent park is closed', async () => {
+  const code = section('async function fetchThemeParksRides(', 'async function fetchQueueTimesRides(');
+  const catalogRide = { key: 'mk:test', name: 'Test Ride', land: 'Tomorrowland', aliases: [] };
+  const context = vm.createContext({
+    VERSION: 'test',
+    Number, String, Map,
+    findCatalogRide: () => catalogRide,
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        status: 'CLOSED',
+        liveData: [{
+          name: 'Test Ride',
+          entityId: 'themeparks:test',
+          status: 'OPERATING',
+          lastUpdated: '2026-10-01T22:30:00Z',
+          queue: { STANDBY: { waitTime: 30 } }
+        }]
+      })
+    })
+  });
+  const rides = await vm.runInContext(code + ';fetchThemeParksRides(6, { themeParksId: "mk", rides: [] }, {})', context);
+  assert.equal(rides.length, 1);
+  assert.equal(rides[0].isOpen, true);
+  assert.equal(rides[0].waitTime, 30);
+  assert.equal(rides[0].operationalStatus, 'OPERATING');
+});
+
+test('ticketed-event state distinguishes the handoff from the active event', () => {
+  const code = section('function ticketedEventState(', 'function crowdMedian(');
+  const context = vm.createContext({ Date, Number, String });
+  vm.runInContext(code, context);
+  context.hours = {
+    closingTime: '2026-10-01T18:00:00-04:00',
+    ticketedEvents: [{
+      name: "Mickey's Not-So-Scary Halloween Party",
+      openingTime: '2026-10-01T19:00:00-04:00',
+      closingTime: '2026-10-02T00:00:00-04:00'
+    }]
+  };
+  assert.equal(vm.runInContext('ticketedEventState(hours, Date.parse("2026-10-01T17:59:00-04:00"))', context), null);
+  assert.equal(vm.runInContext('ticketedEventState(hours, Date.parse("2026-10-01T18:30:00-04:00")).phase', context), 'transition');
+  assert.equal(vm.runInContext('ticketedEventState(hours, Date.parse("2026-10-01T19:30:00-04:00")).phase', context), 'active');
+});
+
 test('manual refresh never advances the notification checkpoint', async () => {
   const calls = [];
   const context = vm.createContext({
@@ -143,8 +188,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.1`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.1' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.2`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.2' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -178,6 +223,7 @@ test('crowd estimates only display within current known park hours', () => {
   const code = app.slice(app.indexOf('function crowdMarkup('), app.indexOf('function zonedDateToUtc('));
   const context = vm.createContext({ Date, Number,
     dateKeyInZone: (date, timezone) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(date),
+    ticketedEventState: () => null,
     crowdPresentation: () => ({ kind: 'note', text: 'estimate' }), escapeHtml: x => x
   });
   const markup = vm.runInContext(code + ';crowdMarkup', context);
@@ -188,6 +234,55 @@ test('crowd estimates only display within current known park hours', () => {
   assert.equal(markup({}, { ...hours, closedToday: true }, Date.parse(hours.openingTime)), '');
   assert.equal(markup({}, null, Date.parse(hours.openingTime)), '');
   assert.equal(markup({}, { ...hours, openingTime: 'invalid' }, Date.parse(hours.openingTime)), '');
+});
+
+test('ticketed-event handoff keeps live waits but pauses normal-day comparisons', () => {
+  const helpers = app.slice(app.indexOf('function zoneParts('), app.indexOf('function zonedDateToUtc('));
+  const context = vm.createContext({
+    Date, Intl, Number, String, Math,
+    document: { querySelector: () => null },
+    escapeHtml: value => String(value),
+    isRideStale: () => false
+  });
+  vm.runInContext(helpers, context);
+  context.hours = {
+    date: '2026-10-01',
+    timezone: 'America/New_York',
+    openingTime: '2026-10-01T09:00:00-04:00',
+    closingTime: '2026-10-01T18:00:00-04:00',
+    closedToday: false,
+    ticketedEvents: [{
+      name: "Mickey's Not-So-Scary Halloween Party",
+      openingTime: '2026-10-01T19:00:00-04:00',
+      closingTime: '2026-10-02T00:00:00-04:00'
+    }]
+  };
+  context.rideData = { hoursForPark: () => context.hours };
+  context.ride = {
+    id: 'mk:test', parkId: 6, isOpen: true, waitTime: 30,
+    typicalWait: 60, baselineReady: true, baselineDays: 10, baselineMinutes: 300
+  };
+
+  assert.match(
+    vm.runInContext('formatParkHours(hours, Date.parse("2026-10-01T18:30:00-04:00"))', context),
+    /Event transition/
+  );
+  assert.match(
+    vm.runInContext('formatParkHours(hours, Date.parse("2026-10-01T19:30:00-04:00"))', context),
+    /Special event now/
+  );
+  assert.equal(
+    vm.runInContext('rideComparison(ride, Date.parse("2026-10-01T18:30:00-04:00"))', context),
+    null
+  );
+  assert.equal(
+    vm.runInContext('rideComparison(ride, Date.parse("2026-10-01T19:30:00-04:00"))', context),
+    null
+  );
+  assert.equal(
+    vm.runInContext('rideComparison(ride, Date.parse("2026-10-01T17:30:00-04:00")).percentDelta', context),
+    -50
+  );
 });
 
 test('favorites persist independently of notification watches', () => {

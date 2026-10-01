@@ -1,6 +1,6 @@
 import { sendNotification } from "web-push-neo";
 
-const VERSION = "1.7.3";
+const VERSION = "1.7.4";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -135,8 +135,13 @@ export default {
             return null;
           })
         ]);
+        const specialEvent = ticketedEventState(parkHours);
         const displayRides = await addDisplayFallbacks(env, parkId, park, snapshot);
-        let rides = await attachCurrentBaselines(env, displayRides);
+        // Attraction-level live data stays authoritative during ticketed-event
+        // handoffs. Normal-day baselines are intentionally withheld.
+        let rides = specialEvent
+          ? displayRides
+          : await attachCurrentBaselines(env, displayRides);
         rides = await attachDowntimeContext(env, rides);
         let crowdLevel = calculateCrowdLevel(rides, park.rides.length, parkHours);
         crowdLevel = await attachCrowdTrend(env, parkId, crowdLevel, parkHours);
@@ -150,6 +155,7 @@ export default {
           primaryAvailable: snapshot.primaryAvailable,
           fallbackUsed: snapshot.fallbackUsed,
           parkHours,
+          specialEvent,
           crowdLevel,
           generatedAt: new Date().toISOString(),
           rides
@@ -727,18 +733,40 @@ async function attachCurrentBaselines(env, rides) {
   }
 }
 
-function activeTicketedEvent(parkHours, now = Date.now()) {
+function ticketedEventState(parkHours, now = Date.now()) {
   if (!parkHours?.ticketedEvents?.length) return null;
 
-  for (const event of parkHours.ticketedEvents) {
-    const start = new Date(event?.openingTime || 0).getTime();
-    const end = new Date(event?.closingTime || 0).getTime();
-    if (Number.isFinite(start) && Number.isFinite(end) && now >= start && now < end) {
-      return event;
-    }
+  const events = parkHours.ticketedEvents
+    .map((event) => ({
+      event,
+      start: new Date(event?.openingTime || 0).getTime(),
+      end: new Date(event?.closingTime || 0).getTime()
+    }))
+    .filter(({ start, end }) => Number.isFinite(start) && Number.isFinite(end) && end > start)
+    .sort((a, b) => a.start - b.start);
+
+  const active = events.find(({ start, end }) => now >= start && now < end);
+  if (active) {
+    return {
+      phase: "active",
+      name: String(active.event?.name || "Special Ticketed Event"),
+      openingTime: active.event.openingTime,
+      closingTime: active.event.closingTime
+    };
   }
 
-  return null;
+  const normalClose = new Date(parkHours?.closingTime || 0).getTime();
+  if (!Number.isFinite(normalClose) || now < normalClose) return null;
+
+  const upcoming = events.find(({ start }) => start > now);
+  if (!upcoming) return null;
+
+  return {
+    phase: "transition",
+    name: String(upcoming.event?.name || "Special Ticketed Event"),
+    openingTime: upcoming.event.openingTime,
+    closingTime: upcoming.event.closingTime
+  };
 }
 
 function crowdMedian(values) {
@@ -777,10 +805,11 @@ function calculateCrowdLevel(rides, totalCatalogRides, parkHours, now = Date.now
     ? CROWD_MIN_LARGE_PARK
     : CROWD_MIN_SMALL_PARK;
 
-  if (activeTicketedEvent(parkHours, now)) {
+  const specialEvent = ticketedEventState(parkHours, now);
+  if (specialEvent) {
     return {
       available: false,
-      reason: "ticketed-event",
+      reason: specialEvent.phase === "active" ? "ticketed-event" : "ticketed-event-transition",
       samples: 0,
       requiredSamples
     };
@@ -885,7 +914,7 @@ async function attachDowntimeContext(env, rides, now = Date.now()) {
 }
 
 async function attachCrowdTrend(env, parkId, crowdLevel, parkHours, now = Date.now()) {
-  if (!crowdLevel?.available || activeTicketedEvent(parkHours, now)) return crowdLevel;
+  if (!crowdLevel?.available || ticketedEventState(parkHours, now)) return crowdLevel;
 
   const target = now - 30 * 60 * 1000;
   const windowStart = target - 10 * 60 * 1000;

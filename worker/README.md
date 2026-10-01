@@ -71,3 +71,10 @@ A CPU-limit outcome does not identify the expensive stage by itself. Workers Fre
 Worker 1.7.3 adds a tiny `worker_state` table for alert-engine and history-sampler health. Status endpoints now read one metadata row instead of scanning the 31-day `ride_history` table. Ride insights also skip the raw 30-day history query whenever a ready baseline already exists.
 
 The Worker creates `worker_state` automatically on scheduled/manual refresh, and `schema.sql` includes it for fresh deployments. Deploy the Worker after pulling this change.
+
+
+### Ticketed-event handoff (Worker 1.7.4)
+
+ParkPulse now treats fresh attraction-level `OPERATING` records as live even when the park's regular operating window has ended before a same-day ticketed event. The Worker recognizes the transition window and the active ticketed event from ThemeParks.wiki schedule data, keeps the attraction waits/statuses live, and withholds normal-day baselines/crowd comparisons during those special-event periods.
+
+No D1 migration is required. Pull the latest repo and deploy from `worker/` with `npm ci && npx wrangler deploy`. After deployment, `/health` should report Worker `1.7.4`.

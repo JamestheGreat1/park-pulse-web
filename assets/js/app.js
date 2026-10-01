@@ -273,18 +273,19 @@ function ticketedEventState(hours, now = Date.now()) {
 function formatParkHours(hours, now = Date.now()) {
   if (!hours?.timezone || !hours?.date) return "";
   if (hours.date !== dateKeyInZone(new Date(now), hours.timezone)) return "";
+
+  const formatter = parkTimeFormatter(hours.timezone);
+  const eventState = ticketedEventState(hours, now);
+  if (eventState?.phase === "active") {
+    return `Special event now · Until ${formatter.format(new Date(eventState.closingTime))}`;
+  }
   if (hours.closedToday) return "Closed today";
   if (!hours.openingTime || !hours.closingTime) return "";
 
-  const formatter = parkTimeFormatter(hours.timezone);
   const range = `${formatter.format(new Date(hours.openingTime))}–${formatter.format(new Date(hours.closingTime))}`;
-  const eventState = ticketedEventState(hours, now);
   if (eventState?.phase === "transition") {
     const startsIn = Math.max(0, Math.ceil((Date.parse(eventState.openingTime) - now) / 60000));
     return `Event transition · Starts in ${compactDuration(startsIn)}`;
-  }
-  if (eventState?.phase === "active") {
-    return `Special event now · Until ${formatter.format(new Date(eventState.closingTime))}`;
   }
 
   const openMs = new Date(hours.openingTime).getTime();

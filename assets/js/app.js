@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.1";
-import { store } from "./store.js?v=1.9.1";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.1";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.1";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.1";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.2";
+import { store } from "./store.js?v=1.9.2";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.2";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.2";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.2";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.1";
+const APP_VERSION = "1.9.2";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -249,6 +249,27 @@ function compactDuration(minutes) {
   const remainder = mins % 60;
   return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
 }
+function ticketedEventState(hours, now = Date.now()) {
+  if (!hours?.timezone || !hours?.date || hours.date !== dateKeyInZone(new Date(now), hours.timezone)) return null;
+
+  const events = (Array.isArray(hours.ticketedEvents) ? hours.ticketedEvents : [])
+    .map((event) => ({
+      event,
+      start: Date.parse(event?.openingTime),
+      end: Date.parse(event?.closingTime)
+    }))
+    .filter(({ start, end }) => Number.isFinite(start) && Number.isFinite(end) && end > start)
+    .sort((a, b) => a.start - b.start);
+
+  const active = events.find(({ start, end }) => now >= start && now < end);
+  if (active) return { phase: "active", ...active.event };
+
+  const regularClose = Date.parse(hours.closingTime);
+  if (!Number.isFinite(regularClose) || now < regularClose) return null;
+
+  const upcoming = events.find(({ start }) => start > now);
+  return upcoming ? { phase: "transition", ...upcoming.event } : null;
+}
 function formatParkHours(hours, now = Date.now()) {
   if (!hours?.timezone || !hours?.date) return "";
   if (hours.date !== dateKeyInZone(new Date(now), hours.timezone)) return "";
@@ -257,6 +278,15 @@ function formatParkHours(hours, now = Date.now()) {
 
   const formatter = parkTimeFormatter(hours.timezone);
   const range = `${formatter.format(new Date(hours.openingTime))}–${formatter.format(new Date(hours.closingTime))}`;
+  const eventState = ticketedEventState(hours, now);
+  if (eventState?.phase === "transition") {
+    const startsIn = Math.max(0, Math.ceil((Date.parse(eventState.openingTime) - now) / 60000));
+    return `Event transition · Starts in ${compactDuration(startsIn)}`;
+  }
+  if (eventState?.phase === "active") {
+    return `Special event now · Until ${formatter.format(new Date(eventState.closingTime))}`;
+  }
+
   const openMs = new Date(hours.openingTime).getTime();
   const closeMs = new Date(hours.closingTime).getTime();
   const remainingMinutes = Math.floor((closeMs - now) / 60000);
@@ -322,6 +352,15 @@ function crowdPresentation(crowd) {
   return { kind: "none", text: "" };
 }
 function crowdMarkup(crowd, hours, now = Date.now()) {
+  // Ticketed-event waits stay live, but normal-day pressure comparisons do not.
+  const specialEvent = ticketedEventState(hours, now);
+  if (specialEvent) {
+    const copy = specialEvent.phase === "active"
+      ? "Normal-day comparisons paused for the ticketed event"
+      : "Normal-day comparisons paused during the event transition";
+    return `<div class="park-crowd crowd-note"><span class="crowd-detail">${escapeHtml(copy)}</span></div>`;
+  }
+
   // Never present cached wait pressure as a live estimate outside today's hours.
   if (!hours?.timezone || !hours?.date || hours.date !== dateKeyInZone(new Date(now), hours.timezone)) return "";
   const opening = Date.parse(hours.openingTime);
@@ -365,8 +404,9 @@ function remaining(rule) {
   if (mins < 24 * 60) return `${Math.round(mins / 60)} hr left`;
   return "Today";
 }
-function rideComparison(ride) {
+function rideComparison(ride, now = Date.now()) {
   if (!ride || isRideStale(ride) || !ride.isOpen || !ride.baselineReady) return null;
+  if (ticketedEventState(rideData.hoursForPark(ride.parkId), now)) return null;
 
   const wait = Number(ride.waitTime);
   const typical = Number(ride.typicalWait);

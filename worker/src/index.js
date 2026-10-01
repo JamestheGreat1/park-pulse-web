@@ -755,7 +755,7 @@ function ticketedEventState(parkHours, now = Date.now()) {
     };
   }
 
-  const normalClose = new Date(parkHours?.closingTime || 0).getTime();
+  const normalClose = Date.parse(parkHours?.closingTime);
   if (!Number.isFinite(normalClose) || now < normalClose) return null;
 
   const upcoming = events.find(({ start }) => start > now);

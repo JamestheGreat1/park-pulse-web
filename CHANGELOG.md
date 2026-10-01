@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.2 — 2026-10-01
+
+- Keep fresh attraction-level wait times visible when regular park hours end before a same-day ticketed event.
+- Recognize the ticketed-event transition window separately from the active event.
+- Label the handoff as **Event transition** and the active period as **Special event now** while preserving the named ticketed-event schedule below it.
+- Pause normal-day wait comparisons and crowd-pressure analytics during the handoff and ticketed event instead of comparing party waits against normal operations.
+- Added regression coverage proving that an attraction can remain `OPERATING` with a live standby wait even when the parent park entity reports `CLOSED`.
+- Worker 1.7.4 is required for backend-side comparison suppression. No D1/schema migration is required.
+
 ## 1.9.1 — 2026-09-26
 
 - Removed the native iOS Universal Link association so shared ride URLs no longer prefer the native app.

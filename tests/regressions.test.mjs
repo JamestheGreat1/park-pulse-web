@@ -244,7 +244,10 @@ test('ticketed-event handoff keeps live waits but pauses normal-day comparisons'
     escapeHtml: value => String(value),
     isRideStale: () => false
   });
-  vm.runInContext(helpers, context);
+  vm.runInContext(
+    helpers + "\n" + app.slice(app.indexOf('function rideComparison('), app.indexOf('function typicalComparisonBadge(')),
+    context
+  );
   context.hours = {
     date: '2026-10-01',
     timezone: 'America/New_York',

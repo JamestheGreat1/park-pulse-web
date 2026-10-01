@@ -8,7 +8,7 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.9.1**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.9.2**
 
 ## What ParkPulse does
 
@@ -150,7 +150,9 @@ This is based on ride waits, not a literal count of how many people are inside t
 
 A low crowd rating also does not mean every single ride will have a short line. Cosmic Rewind can still choose violence.
 
-ParkPulse hides the normal crowd estimate when the park is closed, when current operating hours are unavailable, or during an active ticketed event where the normal comparison would not make much sense.
+ParkPulse hides the normal crowd estimate when the park is closed, when current operating hours are unavailable, or during a ticketed-event handoff / active ticketed event where the normal comparison would not make much sense.
+
+On ticketed-event nights, fresh attraction-level waits can keep updating even after regular park hours end. ParkPulse keeps showing those live waits, labels the handoff / event in the park header, and pauses normal-day wait comparisons until regular operations resume.
 
 If there is not enough reliable history yet, ParkPulse will say so instead of inventing a number.
 

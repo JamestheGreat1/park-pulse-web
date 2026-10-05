@@ -5119,3 +5119,147 @@ body{
     align-items:flex-start;
   }
 }
+
+
+/* v1.9.3 — park operating status */
+.park-feature-slot{display:contents}
+.park-title-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  min-width:0;
+}
+.park-title-row h2{min-width:0}
+.park-status-slot:empty{display:none}
+.park-status-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:24px;
+  padding:4px 8px;
+  border:1px solid var(--hair);
+  border-radius:999px;
+  font-size:.62rem;
+  font-weight:900;
+  letter-spacing:.08em;
+  line-height:1;
+  white-space:nowrap;
+}
+.park-status-pill i{
+  width:7px;
+  height:7px;
+  flex:0 0 7px;
+  border-radius:50%;
+  background:currentColor;
+}
+.park-status-pill.status-open{
+  color:var(--good);
+  background:rgba(var(--good-rgb),.10);
+  border-color:rgba(var(--good-rgb),.24);
+}
+.park-status-pill.status-closed{
+  color:var(--bad);
+  background:rgba(var(--bad-rgb),.10);
+  border-color:rgba(var(--bad-rgb),.26);
+}
+.park-status-pill.status-event{
+  color:var(--blue);
+  background:rgba(var(--blue-rgb),.10);
+  border-color:rgba(var(--blue-rgb),.24);
+}
+.park-chip{
+  display:inline-flex;
+  align-items:center;
+}
+.park-chip .park-chip-icon{margin-right:7px}
+.park-chip .park-chip-status{
+  width:7px;
+  height:7px;
+  flex:0 0 7px;
+  margin-left:8px;
+  margin-right:0;
+  border-radius:50%;
+}
+.park-chip .park-chip-status.status-open{
+  background:var(--good);
+  box-shadow:0 0 0 3px rgba(var(--good-rgb),.10);
+}
+.park-chip .park-chip-status.status-closed{
+  background:var(--bad);
+  box-shadow:0 0 0 3px rgba(var(--bad-rgb),.10);
+}
+.park-chip .park-chip-status.status-event{
+  background:var(--blue);
+  box-shadow:0 0 0 3px rgba(var(--blue-rgb),.10);
+}
+.park-chip .park-chip-status.status-unknown{display:none}
+
+.park-closed-card{
+  grid-column:1/-1;
+  margin:0 0 18px;
+  padding:16px 18px;
+  border-radius:22px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  border-color:rgba(var(--bad-rgb),.28);
+  background:
+    linear-gradient(145deg,rgba(var(--bad-rgb),.09),rgba(var(--bad-rgb),.025)),
+    var(--glass);
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.12),
+    0 12px 34px rgba(var(--bad-rgb),.06);
+}
+.park-closed-icon{
+  width:46px;
+  height:46px;
+  flex:0 0 46px;
+  border-radius:15px;
+  display:grid;
+  place-items:center;
+  background:rgba(var(--bad-rgb),.10);
+  border:1px solid rgba(var(--bad-rgb),.20);
+  font-size:1.3rem;
+}
+.park-closed-copy{min-width:0}
+.park-closed-copy .eyebrow{color:var(--bad)}
+.park-closed-copy h3{
+  margin:3px 0 4px;
+  font-size:1.03rem;
+  letter-spacing:-.02em;
+}
+.park-closed-copy p{
+  color:var(--muted);
+  font-size:.79rem;
+  line-height:1.4;
+}
+.park-closed-hours{
+  display:block;
+  margin-top:5px;
+  color:var(--bad);
+  font-size:.72rem;
+  font-weight:780;
+}
+@media(max-width:640px){
+  .park-title-row{gap:8px}
+  .park-status-pill{
+    min-height:22px;
+    padding:4px 7px;
+    font-size:.58rem;
+  }
+  .park-closed-card{
+    margin-top:-4px;
+    padding:14px 15px;
+    border-radius:20px;
+  }
+  .park-closed-icon{
+    width:42px;
+    height:42px;
+    flex-basis:42px;
+    border-radius:13px;
+    font-size:1.15rem;
+  }
+  .park-closed-copy h3{font-size:.98rem}
+  .park-closed-copy p{font-size:.75rem}
+}

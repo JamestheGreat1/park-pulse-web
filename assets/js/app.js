@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.3";
-import { store } from "./store.js?v=1.9.3";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.3";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.3";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.3";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.4";
+import { store } from "./store.js?v=1.9.4";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.4";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.4";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.4";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.3";
+const APP_VERSION = "1.9.4";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -242,6 +242,31 @@ function parkTimeFormatter(timeZone) {
     minute: "2-digit"
   });
 }
+function resolvedLocalTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+function displayTimeZone(parkTimeZone, useLocalTime = true, localTimeZone = resolvedLocalTimeZone()) {
+  return useLocalTime && localTimeZone ? localTimeZone : parkTimeZone;
+}
+function timeZoneAbbreviation(date, timeZone) {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "short"
+    }).formatToParts(date).find((part) => part.type === "timeZoneName")?.value || "";
+  } catch {
+    return "";
+  }
+}
+function formatTimeRange(start, end, timeZone) {
+  const formatter = parkTimeFormatter(timeZone);
+  const zone = timeZoneAbbreviation(new Date(start), timeZone);
+  return `${formatter.format(new Date(start))}–${formatter.format(new Date(end))}${zone ? ` ${zone}` : ""}`;
+}
 function compactDuration(minutes) {
   const mins = Math.max(0, Math.floor(Number(minutes) || 0));
   if (mins < 60) return `${mins}m`;
@@ -309,19 +334,21 @@ function parkStatusPillMarkup(status) {
 function parkChipStatusClass(status) {
   return status && status.key !== "unknown" ? `status-${status.tone}` : "status-unknown";
 }
-function formatParkHours(hours, now = Date.now()) {
+function formatParkHours(hours, now = Date.now(), useLocalTime = true, localTimeZone = resolvedLocalTimeZone()) {
   if (!hours?.timezone || !hours?.date) return "";
   if (hours.date !== dateKeyInZone(new Date(now), hours.timezone)) return "";
 
-  const formatter = parkTimeFormatter(hours.timezone);
+  const timeZone = displayTimeZone(hours.timezone, useLocalTime, localTimeZone);
+  const formatter = parkTimeFormatter(timeZone);
   const eventState = ticketedEventState(hours, now);
   if (eventState?.phase === "active") {
-    return `Special event now · Until ${formatter.format(new Date(eventState.closingTime))}`;
+    const zone = timeZoneAbbreviation(new Date(eventState.closingTime), timeZone);
+    return `Special event now · Until ${formatter.format(new Date(eventState.closingTime))}${zone ? ` ${zone}` : ""}`;
   }
   if (hours.closedToday) return "Closed today";
   if (!hours.openingTime || !hours.closingTime) return "";
 
-  const range = `${formatter.format(new Date(hours.openingTime))}–${formatter.format(new Date(hours.closingTime))}`;
+  const range = formatTimeRange(hours.openingTime, hours.closingTime, timeZone);
   if (eventState?.phase === "transition") {
     const startsIn = Math.max(0, Math.ceil((Date.parse(eventState.openingTime) - now) / 60000));
     return `Event transition · Starts in ${compactDuration(startsIn)}`;
@@ -337,16 +364,16 @@ function formatParkHours(hours, now = Date.now()) {
 
   return `Today · ${range}`;
 }
-function formatTicketedEvents(hours) {
+function formatTicketedEvents(hours, useLocalTime = true, localTimeZone = resolvedLocalTimeZone(), now = Date.now()) {
   if (!hours?.timezone || !hours?.date) return [];
-  if (hours.date !== dateKeyInZone(new Date(), hours.timezone)) return [];
+  if (hours.date !== dateKeyInZone(new Date(now), hours.timezone)) return [];
 
-  const formatter = parkTimeFormatter(hours.timezone);
+  const timeZone = displayTimeZone(hours.timezone, useLocalTime, localTimeZone);
   return (Array.isArray(hours.ticketedEvents) ? hours.ticketedEvents : [])
     .filter((event) => event?.openingTime && event?.closingTime)
     .map((event) => ({
       name: String(event.name || "Special Ticketed Event"),
-      hours: `${formatter.format(new Date(event.openingTime))}–${formatter.format(new Date(event.closingTime))}`
+      hours: formatTimeRange(event.openingTime, event.closingTime, timeZone)
     }));
 }
 function crowdPresentation(crowd) {
@@ -506,7 +533,7 @@ function closedParkMarkup(state, schedule, status = parkOperatingState(schedule)
   const park = PARKS.find((item) => item.id === Number(state.selectedParkId));
   const name = park?.name || parkName(state.selectedParkId);
   const emoji = park?.emoji || "●";
-  const hours = formatParkHours(schedule);
+  const hours = formatParkHours(schedule, Date.now(), state.useLocalTime);
   const reason = status?.phase === "before-open"
     ? "Regular operations haven’t started yet."
     : status?.phase === "closed-today"
@@ -845,9 +872,9 @@ function renderExplore() {
   const state = store.snapshot;
   const activeCount = state.rules.length;
   const parkSchedule = rideData.hoursForPark(state.selectedParkId);
-  const parkHours = formatParkHours(parkSchedule);
+  const parkHours = formatParkHours(parkSchedule, Date.now(), state.useLocalTime);
   const parkStatus = parkOperatingState(parkSchedule);
-  const ticketedEvents = formatTicketedEvents(parkSchedule);
+  const ticketedEvents = formatTicketedEvents(parkSchedule, state.useLocalTime);
   const crowd = rideData.crowdForPark(state.selectedParkId);
   views.explore.innerHTML = `
     <section class="hero-card liquid-glass">
@@ -1009,6 +1036,7 @@ function renderSettings() {
       <label class="setting-row"><div><strong>Appearance</strong><small>Follow your system, or pick light or dark yourself.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
       <div class="setting-row accent-setting"><div><strong>Accent color</strong><small>Changes the highlights and glow. Purely vibes.</small></div><div class="accent-picker" role="group" aria-label="Accent color">${ACCENTS.map((accent) => `<button type="button" class="accent-swatch accent-${accent.id} ${state.accent === accent.id ? "active" : ""}" data-accent-choice="${accent.id}" aria-label="${accent.label}" aria-pressed="${state.accent === accent.id}"><span></span></button>`).join("")}</div></div>
       <div class="setting-row glass-style-setting"><div><strong>Glass style</strong><small>Choose a softer frosted look or the clearer refractive Liquid Glass effect.</small></div><div class="glass-style-picker" role="group" aria-label="Glass style"><button type="button" data-glass-style="frosted" aria-pressed="${glassStyleSetting() === "frosted"}" class="${glassStyleSetting() === "frosted" ? "active" : ""}">Frosted</button><button type="button" data-glass-style="liquid" aria-pressed="${glassStyleSetting() === "liquid"}" class="${glassStyleSetting() === "liquid" ? "active" : ""}">Liquid</button></div></div>
+      <label class="setting-row local-time-setting"><div><strong>Use my local time</strong><small>Show park hours, event times, and history labels in this device’s time zone. Turn off for Orlando time.</small></div><span class="setting-switch"><input id="localTimeToggle" type="checkbox" ${state.useLocalTime ? "checked" : ""} aria-label="Use my local time"><span class="switch"></span></span></label>
       <label class="setting-row seasonal-effects-setting"><div><strong>Seasonal effects</strong><small>Automatically adds subtle holiday ambience when the season rolls around.</small></div><span class="setting-switch"><input id="seasonalEffectsToggle" type="checkbox" ${seasonalEffectsEnabled() ? "checked" : ""} aria-label="Seasonal effects"><span class="switch"></span></span></label>
     </section>
     <div class="settings-section-title">Status</div>
@@ -1051,7 +1079,7 @@ function renderParkHours() {
   const schedule = rideData.hoursForPark(parkId);
   const status = parkOperatingState(schedule);
   const hoursEl = $(".park-hours", views.explore);
-  if (hoursEl) hoursEl.textContent = formatParkHours(schedule);
+  if (hoursEl) hoursEl.textContent = formatParkHours(schedule, Date.now(), store.snapshot.useLocalTime);
 
   const statusSlot = $(".park-status-slot", views.explore);
   if (statusSlot) statusSlot.innerHTML = parkStatusPillMarkup(status);
@@ -1077,7 +1105,7 @@ function renderParkHours() {
 
   const eventsEl = $(".park-events", views.explore);
   if (eventsEl) {
-    const events = formatTicketedEvents(schedule);
+    const events = formatTicketedEvents(schedule, store.snapshot.useLocalTime);
     eventsEl.innerHTML = events.map((event) =>
       `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`
     ).join("");
@@ -1137,6 +1165,10 @@ function bindDynamic() {
       });
     };
   });
+  const localTime = $("#localTimeToggle");
+  if (localTime) localTime.onchange = () => store.update((state) => {
+    state.useLocalTime = localTime.checked;
+  }, "time-display");
   const seasonalEffects = $("#seasonalEffectsToggle");
   if (seasonalEffects) seasonalEffects.onchange = () => {
     setSeasonalEffectsEnabled(seasonalEffects.checked);
@@ -1358,8 +1390,9 @@ async function loadRideHistory(id, range = "today") {
   const avgY = yValue(average).toFixed(2);
   const averageLine = `<line class="history-average-line" x1="${plot.left}" y1="${avgY}" x2="${plot.right}" y2="${avgY}"/>`;
 
-  const timeFormat = value => new Date(value).toLocaleString([], { timeZone: data.timezone, hour: "numeric" });
-  const dateFormat = value => new Date(value).toLocaleString([], { timeZone: data.timezone, month: "short", day: "numeric" });
+  const historyTimeZone = displayTimeZone(data.timezone, store.snapshot.useLocalTime);
+  const timeFormat = value => new Date(value).toLocaleString([], { timeZone: historyTimeZone, hour: "numeric" });
+  const dateFormat = value => new Date(value).toLocaleString([], { timeZone: historyTimeZone, month: "short", day: "numeric" });
   const xTickCount = range === "today" ? 4 : 5;
   const xTicks = Array.from({ length: xTickCount }, (_, index) => {
     const ratio = xTickCount === 1 ? 0 : index / (xTickCount - 1);

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.4 — 2026-10-05
+
+- Added a **Use my local time** toggle under Settings → Customization, enabled by default.
+- Park hours, ticketed-event times, and wait-history labels now use the device's local time zone when the toggle is on.
+- Turning the toggle off restores Orlando / park-time display.
+- Time displays include a short time-zone label where space allows, while park open / closed / special-event logic always stays anchored to the park's own time zone.
+- Existing users automatically get local-time display unless they turn it off.
+- Frontend-only update; no Worker or D1 changes are required.
+- Bumped frontend cache/version keys so installed PWAs receive the 1.9.4 update.
+
 ## 1.9.3 — 2026-10-05
 
 - Added an explicit **OPEN**, **CLOSED**, **EVENT TRANSITION**, or **SPECIAL EVENT** pill beside the selected park name.

@@ -8,7 +8,7 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.9.3**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.9.4**
 
 ## What ParkPulse does
 
@@ -22,7 +22,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both. Watched rides use a solid bell so they’re easy to spot at a glance.
 - **Crowd pressure** gives each park a simple 1–10 estimate plus a trend when enough data is available.
 - **Park context** includes at-a-glance open / closed / special-event status, status dots in the park picker, today's hours, ticketed events, and observed ride downtime.
-- **Customization** includes light, dark, and system themes, eight accent colors, Frosted or Liquid Glass, and optional seasonal effects.
+- **Customization** includes light, dark, and system themes, eight accent colors, Frosted or Liquid Glass, local-or-park time display, and optional seasonal effects.
 - **Mobile-friendly controls** include pull-to-refresh and pull-down-to-close ride sheets.
 - **D1-efficient diagnostics** keep backend health checks lightweight instead of repeatedly scanning the full wait-history table.
 
@@ -176,6 +176,7 @@ You can choose:
 - **Appearance:** System, Dark, or Light
 - **Accent color:** Blue, Cyan, Violet, Pink, Orange, Green, Red, or Gold
 - **Glass style:** Frosted or Liquid
+- **Use my local time:** On by default; turn it off to show Orlando / park time instead
 - **Seasonal effects:** On or Off
 
 **Frosted** is the softer, blurrier glass style. **Liquid** is clearer and more refractive, with stronger edge highlights and more of the background showing through.

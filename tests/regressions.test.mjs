@@ -188,8 +188,8 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.3`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.3' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.4`));
+  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.4' }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -288,6 +288,40 @@ test('ticketed-event handoff keeps live waits but pauses normal-day comparisons'
   );
 });
 
+test('time display uses the device timezone by default without changing park-state logic', () => {
+  const helpers = app.slice(app.indexOf('function zoneParts('), app.indexOf('function zonedDateToUtc('));
+  const context = vm.createContext({ Date, Intl, Number, String, Math, escapeHtml: value => String(value), document: { querySelector: () => null } });
+  vm.runInContext(helpers, context);
+  context.hours = {
+    date: '2026-10-01',
+    timezone: 'America/New_York',
+    openingTime: '2026-10-01T09:00:00-04:00',
+    closingTime: '2026-10-01T18:00:00-04:00',
+    closedToday: false,
+    ticketedEvents: [{
+      name: "Mickey's Not-So-Scary Halloween Party",
+      openingTime: '2026-10-01T19:00:00-04:00',
+      closingTime: '2026-10-02T00:00:00-04:00'
+    }]
+  };
+
+  const now = '2026-10-01T17:30:00-04:00';
+  const localHours = vm.runInContext('formatParkHours(hours, Date.parse("' + now + '"), true, "America/Denver")', context);
+  const parkHours = vm.runInContext('formatParkHours(hours, Date.parse("' + now + '"), false, "America/Denver")', context);
+  assert.match(localHours, /7:00 AM–4:00 PM/);
+  assert.match(parkHours, /9:00 AM–6:00 PM/);
+
+  const localEvent = vm.runInContext('formatTicketedEvents(hours, true, "America/Denver", Date.parse("' + now + '"))[0].hours', context);
+  const parkEvent = vm.runInContext('formatTicketedEvents(hours, false, "America/Denver", Date.parse("' + now + '"))[0].hours', context);
+  assert.match(localEvent, /5:00 PM–10:00 PM/);
+  assert.match(parkEvent, /7:00 PM–12:00 AM/);
+
+  assert.equal(
+    vm.runInContext('parkOperatingState(hours, Date.parse("2026-10-01T18:30:00-04:00")).key', context),
+    'transition'
+  );
+});
+
 test('park status makes real closures distinct from event states', () => {
   const helpers = app.slice(app.indexOf('function zoneParts('), app.indexOf('function zonedDateToUtc('));
   const context = vm.createContext({ Date, Intl, Number, String, Math, escapeHtml: value => String(value), document: { querySelector: () => null } });
@@ -331,6 +365,7 @@ test('favorites persist independently of notification watches', () => {
   const state = JSON.parse(saved.values().next().value);
   assert.deepEqual(state.favorites, ['mk:test']);
   assert.deepEqual(state.rules, []);
+  assert.equal(state.useLocalTime, true);
   vm.runInContext('store.toggleFavorite("mk:test");', context);
   assert.deepEqual(JSON.parse(saved.values().next().value).favorites, []);
 });

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.3 — 2026-10-05
+
+- Added an explicit **OPEN**, **CLOSED**, **EVENT TRANSITION**, or **SPECIAL EVENT** pill beside the selected park name.
+- Added compact status dots to every park selector chip so closed parks are visible before switching tabs.
+- When a park is genuinely closed, **Next Up** is replaced with a compact closed-state card while ride history, favorites, and attraction details remain available.
+- Ticketed-event transitions and active special events stay distinct from true closures, so MNSSHP waits are not mislabeled as a closed park.
+- Park status refreshes from the existing schedule data without any Worker or D1 changes.
+- Bumped frontend cache/version keys so installed PWAs receive the 1.9.3 update.
+
 ## 1.9.2 — 2026-10-01
 
 - Keep fresh attraction-level wait times visible when regular park hours end before a same-day ticketed event.

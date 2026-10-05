@@ -8,6 +8,7 @@ const defaults = {
   sort: "recommended",
   theme: "system",
   accent: "blue",
+  useLocalTime: true,
   favorites: [],
   favoritesOnly: false,
   rules: []
@@ -41,6 +42,7 @@ export class Store extends EventTarget {
     if (!["recommended","wait","name"].includes(this.state.sort)) this.state.sort = "recommended";
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
     if (!["blue","cyan","violet","pink","orange","green","red","gold"].includes(this.state.accent)) this.state.accent = "blue";
+    if (typeof this.state.useLocalTime !== "boolean") this.state.useLocalTime = true;
     this.pruneExpired(false);
   }
   get snapshot() { return structuredClone(this.state); }

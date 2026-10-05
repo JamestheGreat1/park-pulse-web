@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.2";
-import { store } from "./store.js?v=1.9.2";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.2";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.2";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.2";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.3";
+import { store } from "./store.js?v=1.9.3";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.3";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.3";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.3";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.2";
+const APP_VERSION = "1.9.3";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -270,6 +270,45 @@ function ticketedEventState(hours, now = Date.now()) {
   const upcoming = events.find(({ start }) => start > now);
   return upcoming ? { phase: "transition", ...upcoming.event } : null;
 }
+function parkOperatingState(hours, now = Date.now()) {
+  if (!hours?.timezone || !hours?.date || hours.date !== dateKeyInZone(new Date(now), hours.timezone)) {
+    return { key: "unknown", label: "", tone: "unknown", phase: "unknown" };
+  }
+
+  const eventState = ticketedEventState(hours, now);
+  if (eventState?.phase === "active") {
+    return { key: "event", label: "SPECIAL EVENT", tone: "event", phase: "active", event: eventState };
+  }
+  if (eventState?.phase === "transition") {
+    return { key: "transition", label: "EVENT TRANSITION", tone: "event", phase: "transition", event: eventState };
+  }
+  if (hours.closedToday) {
+    return { key: "closed", label: "CLOSED", tone: "closed", phase: "closed-today" };
+  }
+
+  const opening = Date.parse(hours.openingTime);
+  const closing = Date.parse(hours.closingTime);
+  if (!Number.isFinite(opening) || !Number.isFinite(closing) || closing <= opening) {
+    return { key: "unknown", label: "", tone: "unknown", phase: "unknown" };
+  }
+  if (now >= opening && now < closing) {
+    return { key: "open", label: "OPEN", tone: "open", phase: "regular" };
+  }
+
+  return {
+    key: "closed",
+    label: "CLOSED",
+    tone: "closed",
+    phase: now < opening ? "before-open" : "after-close"
+  };
+}
+function parkStatusPillMarkup(status) {
+  if (!status || status.key === "unknown") return "";
+  return `<span class="park-status-pill status-${status.tone}"><i aria-hidden="true"></i>${escapeHtml(status.label)}</span>`;
+}
+function parkChipStatusClass(status) {
+  return status && status.key !== "unknown" ? `status-${status.tone}` : "status-unknown";
+}
 function formatParkHours(hours, now = Date.now()) {
   if (!hours?.timezone || !hours?.date) return "";
   if (hours.date !== dateKeyInZone(new Date(now), hours.timezone)) return "";
@@ -463,6 +502,32 @@ function typicalComparisonBadge(ride) {
 }
 
 
+function closedParkMarkup(state, schedule, status = parkOperatingState(schedule)) {
+  const park = PARKS.find((item) => item.id === Number(state.selectedParkId));
+  const name = park?.name || parkName(state.selectedParkId);
+  const emoji = park?.emoji || "●";
+  const hours = formatParkHours(schedule);
+  const reason = status?.phase === "before-open"
+    ? "Regular operations haven’t started yet."
+    : status?.phase === "closed-today"
+      ? "No regular operating hours are scheduled today."
+      : "Regular operations have ended for today.";
+
+  return `<section class="park-closed-card liquid-glass" aria-label="${escapeHtml(name)} is closed">
+    <span class="park-closed-icon" aria-hidden="true">${emoji}</span>
+    <div class="park-closed-copy">
+      <span class="eyebrow">Park status</span>
+      <h3>${escapeHtml(name)} is closed</h3>
+      <p>${escapeHtml(reason)}</p>
+      ${hours ? `<span class="park-closed-hours">${escapeHtml(hours)}</span>` : ""}
+    </div>
+  </section>`;
+}
+function parkFeatureMarkup(state = store.snapshot, schedule = rideData.hoursForPark(state.selectedParkId), status = parkOperatingState(schedule)) {
+  return status?.key === "closed"
+    ? closedParkMarkup(state, schedule, status)
+    : nextUpMarkup(state);
+}
 function recommendationScore(ride, state = store.snapshot) {
   if (!ride || !ride.isOpen || isRideStale(ride) || ride.sourceMissing) return -Infinity;
   const id = String(ride.id);
@@ -781,6 +846,7 @@ function renderExplore() {
   const activeCount = state.rules.length;
   const parkSchedule = rideData.hoursForPark(state.selectedParkId);
   const parkHours = formatParkHours(parkSchedule);
+  const parkStatus = parkOperatingState(parkSchedule);
   const ticketedEvents = formatTicketedEvents(parkSchedule);
   const crowd = rideData.crowdForPark(state.selectedParkId);
   views.explore.innerHTML = `
@@ -790,7 +856,11 @@ function renderExplore() {
     </section>
     ${firstRunVisible() ? `<section class="first-run-card liquid-glass" aria-label="ParkPulse quick start"><div class="first-run-mark" aria-hidden="true">✦</div><div class="first-run-copy"><span class="eyebrow">Quick start</span><h3>Best Now does the useful part for you.</h3><p>It compares each ride with what’s normal right now. Tap a ride to watch it, then let ParkPulse keep checking. That’s basically it.</p></div><button type="button" class="first-run-dismiss" data-dismiss-first-run>Got it</button></section>` : ""}
     <div class="park-strip" aria-label="Choose a park">
-      ${PARKS.map((p) => `<button type="button" class="park-chip ${p.id === state.selectedParkId ? "active" : ""}" data-park="${p.id}" aria-pressed="${p.id === state.selectedParkId}"><span aria-hidden="true">${p.emoji}</span>${p.short}</button>`).join("")}
+      ${PARKS.map((p) => {
+        const chipStatus = parkOperatingState(rideData.hoursForPark(p.id));
+        const statusLabel = chipStatus.key === "unknown" ? "" : `, ${chipStatus.label.toLowerCase()}`;
+        return `<button type="button" class="park-chip ${p.id === state.selectedParkId ? "active" : ""}" data-park="${p.id}" aria-pressed="${p.id === state.selectedParkId}" aria-label="${escapeHtml(p.name + statusLabel)}"><span class="park-chip-icon" aria-hidden="true">${p.emoji}</span>${p.short}<span class="park-chip-status ${parkChipStatusClass(chipStatus)}" aria-hidden="true"></span></button>`;
+      }).join("")}
     </div>
     <section class="toolbar liquid-glass">
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="Search rides in ${escapeHtml(parkName(state.selectedParkId))}" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
@@ -798,8 +868,8 @@ function renderExplore() {
       <button class="filter-button ${state.favoritesOnly ? "active" : ""}" type="button" data-toggle-favorites aria-pressed="${state.favoritesOnly}">Favorites</button>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
-    ${nextUpMarkup(state)}
-    <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
+    <div class="park-feature-slot" data-park-state="${parkStatus.key}">${parkFeatureMarkup(state, parkSchedule, parkStatus)}</div>
+    <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><div class="park-title-row"><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-status-slot">${parkStatusPillMarkup(parkStatus)}</span></div><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderWatching() {
@@ -979,8 +1049,31 @@ function renderRefreshCopy() {
 function renderParkHours() {
   const parkId = store.snapshot.selectedParkId;
   const schedule = rideData.hoursForPark(parkId);
+  const status = parkOperatingState(schedule);
   const hoursEl = $(".park-hours", views.explore);
   if (hoursEl) hoursEl.textContent = formatParkHours(schedule);
+
+  const statusSlot = $(".park-status-slot", views.explore);
+  if (statusSlot) statusSlot.innerHTML = parkStatusPillMarkup(status);
+
+  PARKS.forEach((park) => {
+    const button = $(`[data-park="${park.id}"]`, views.explore);
+    if (!button) return;
+    const chipStatus = parkOperatingState(rideData.hoursForPark(park.id));
+    const dot = $(".park-chip-status", button);
+    if (dot) dot.className = `park-chip-status ${parkChipStatusClass(chipStatus)}`;
+    const statusLabel = chipStatus.key === "unknown" ? "" : `, ${chipStatus.label.toLowerCase()}`;
+    button.setAttribute("aria-label", park.name + statusLabel);
+  });
+
+  const featureSlot = $(".park-feature-slot", views.explore);
+  if (featureSlot && featureSlot.dataset.parkState !== status.key) {
+    featureSlot.dataset.parkState = status.key;
+    featureSlot.innerHTML = parkFeatureMarkup(store.snapshot, schedule, status);
+    bindRideCards(featureSlot);
+    const another = $("[data-next-up-another]", featureSlot);
+    if (another) another.onclick = cycleNextUp;
+  }
 
   const eventsEl = $(".park-events", views.explore);
   if (eventsEl) {

@@ -128,6 +128,7 @@ test('startup binds navigation and renders before pending diagnostics or registr
     watchForServiceWorkerUpdate() {}, backendHealth: () => new Promise(() => {}), fetchAnalyticsStatus: () => new Promise(() => {}),
     refreshPushState: () => new Promise(() => {}), $$: () => [nav], $: () => ({}),
     window: { addEventListener() {} }, document: { addEventListener() {} }, handleDialogKeydown() {},
+    checkForAppUpdate() {},
     rideData: { addEventListener() {}, refresh: () => new Promise(() => {}) },
     store: { addEventListener() {}, snapshot: { activeView: 'explore' } }, views: { explore: {} },
     selectView() { rendered = true; }
@@ -214,7 +215,7 @@ test('editing a watch keeps its exact expiration unless a new duration is select
       sheet: element('sheet'), backdrop: element('backdrop'), sheetReturnFocus: null,
       $: element, $$: () => [], escapeHtml: x => x, parkName: () => 'MK', rideStatus: () => ({ wait: 30 }),
       requestAnimationFrame: callback => callback(), loadRideInsights() {}, loadRideHistory() {}, closeSheet() {}, shareRide() {},
-    sharedRidePwaHint: () => '', recommendationReason: () => 'A good wait',
+    sharedRidePwaHint: () => '', recommendationReason: () => 'A good wait', installApp() {},
       durationExpiry: () => 9999999999, pushOn: false, toast() {}, Date, Number, Boolean
     });
     vm.runInContext(app.slice(app.indexOf('function openRide('), app.indexOf('async function loadRideInsights(')) + ';openRide("mk:test")', context);

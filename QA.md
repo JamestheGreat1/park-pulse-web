@@ -1,39 +1,57 @@
-# ParkPulse 1.6.3 QA
+# ParkPulse release QA
 
-## Automated checks
+The release version is defined in `version.json`. **Do not hard-code release versions in tests.**
+This checklist covers the ParkPulse 1.9.4 feature set and should be revisited when features change.
 
-- Run `node --test tests/regressions.test.mjs` from the repository root.
-- For browser checks, install Playwright with `npm install --no-save --package-lock=false playwright` and `npx playwright install chromium`.
-- Serve the repository with `python3 -m http.server 8765`, then run `node tests/browser-smoke.cjs` in another terminal.
-- The browser test uses mocked park responses and a deliberately hanging health endpoint; it does not send real notifications.
+## Automated checks (required before a release)
 
-## Release checks on installed devices
+GitHub Actions runs both checks on every push to `main` and on pull requests:
+- **Regression:** `node --test tests/regressions.test.mjs` — Worker notification/state logic and source-level frontend regressions.
+- **Browser smoke:** `node tests/browser-smoke.cjs` — Chromium, mocked ride data, startup with an unresponsive health endpoint, navigation, watch expiration, offline shell and cached assets.
 
-- Install from https://app.useparkpulse.com/ on iPhone and Android; confirm standalone launch.
-- Upgrade an existing 1.6.2 installation, accept the update, close it, enable airplane mode, and relaunch. Confirm the shell and last-known rides load. Also interrupt an update and confirm the previous installed shell remains usable.
-- Start with slow or unavailable backend diagnostics and confirm navigation and onboarding remain usable.
-- Dismiss “Got it,” reload, and confirm it stays dismissed. Check Explore / Watching / Settings active navigation and view-jump buttons.
-- Switch all four parks; check search, Open only, and all three sort modes.
-- Create reopening-only, threshold-only, and combined watches. Edit a three-hour watch and confirm its original deadline is preserved; explicitly selecting another duration should change it.
-- Fail the subscription POST while saving/removing a watch. Confirm pending-sync copy, no false success toast, and automatic recovery when online. Verify D1 contains the latest rules after rapid edits.
-- Enable notifications, confirm “watches synced,” then use Settings → Send test with the app backgrounded. This checks device delivery, not cron evaluation.
-- After applying schema.sql and deploying the Worker, let the first five-minute cron seed its notification checkpoint. Confirm subsequent real or controlled staging transitions deliver while the PWA is closed.
-- Verify 60 → 30 triggers a target-40 alert; 60 → unknown does not; 60 → 0 does. Test reopening and morning opening suppression.
-- Run a manual refresh between a transition and cron; confirm it cannot consume the transition.
-- In staging, simulate a VAPID-key mismatch and replacement failure. Confirm no dead subscription is reported as synced. Do not rotate production keys for this test.
-- Tap notifications with the app closed and backgrounded; confirm the exact ride opens.
-- Verify light/dark/system themes, all accent colors, reduced motion, keyboard Tab/Shift+Tab/Escape in the ride dialog, and small-screen safe areas.
-
-## Deployment
-
-From the repository root in Codespaces:
+To run locally from the repository root:
 
 ```bash
-git pull --ff-only origin main
-cd worker
-npm install
-npx wrangler d1 execute parkpulse --remote --file=./schema.sql
-npm run deploy
+node --test tests/regressions.test.mjs
+npm install --no-save --package-lock=false playwright@1.56.1
+npx playwright install chromium
+python3 -m http.server 8765
 ```
 
-The schema adds `notification_ride_state`; it does not clear watches or history. The first scheduled run establishes a new baseline for notification transitions. Existing VAPID keys must be retained.
+In a second terminal run `node tests/browser-smoke.cjs`. The browser smoke test reads the current version from `version.json`, verifies the matching service-worker cache and its core assets, and does not send real notifications.
+
+These checks are **not** a substitute for device testing or production Worker monitoring. If a workflow fails, investigate and fix the test or product before shipping. GitHub branch protection can optionally require both checks before merging PRs.
+
+## Manual release checks on real devices
+
+### Installation, PWA, and basic behavior
+- On iPhone/iPad (Safari) and Android, verify browser use, standalone install and launch, and the update banner.
+- Upgrade an existing installed version; confirm the new shell appears, then test airplane-mode relaunch with last-known rides. Interrupt an update and ensure the previous shell remains usable.
+- With slow/unavailable diagnostics, confirm navigation, onboarding, and the rest of the interface remain usable.
+- Dismiss “Got it,” reload, and confirm it stays dismissed. Check Explore, Watching, Settings and in-view navigation.
+- Switch all four parks. Check search, Open only, Favorites, Best Now / Lowest wait / A–Z sorts, Next Up, and crowd-pressure labels.
+- Check narrow mobile and scaled desktop layouts, sheet scrolling/dismiss gestures, keyboards and focus/Escape behavior, safe areas, and reduced-motion support.
+
+### Time, event handoff, and visual preferences
+- With **Use my local time** on (default), verify park hours, event times and history timestamps show device-local time and an intelligible timezone label. Turn it off and verify Orlando time. Park open/closed logic must remain based on Orlando time.
+- Check OPEN, CLOSED, EVENT TRANSITION and SPECIAL EVENT status pills plus selector dots; a truly closed park must show a closed-state Next Up card.
+- During an event handoff, confirm attraction-level `OPERATING` waits remain visible even if the parent park reports `CLOSED`; suppress **normal-day** baselines and crowd comparisons during handoff/party.
+- Check Light/Dark/System, eight accent colors, Frosted/Liquid glass, high-contrast labels and reduced motion. Check seasonal effects on desktop and mobile.
+- Open a shared ride URL on desktop, mobile browser and installed PWA; confirm the exact ride opens and install handoff only appears in mobile browser mode.
+
+### Watches and backend (when Worker/notification code changes)
+- Test reopening-only, target-only, combined and expiring watches. Editing a three-hour watch must preserve its original deadline unless explicitly changed.
+- Fail subscription POST while creating/removing watches. Verify pending-sync state, no false success, and recovery when back online; verify D1's latest rules after rapid edits.
+- Send a background-device test notification. **Test push** proves device delivery, not scheduled cron evaluation.
+- On staging or controlled live data, verify 60 → 30 crosses a target of 40; 60 → unknown does not; 60 → 0 does. Test reopening and morning-opening suppression.
+- Confirm a manual refresh between a transition and the scheduled alert job does not consume that notification transition.
+- For Worker deployments, check `/health` reports the expected backend version, scheduled five-minute alert checks complete, hourly baseline maintenance runs, and D1 history/checkpoints advance without CPU-limit failures.
+- Test VAPID key mismatches only in staging; never rotate production VAPID keys for a test.
+
+## Deployment boundaries
+
+- **Frontend/test/docs-only change:** GitHub Pages publishes the site; no Worker deployment or D1 migration needed.
+- **Worker change:** deploy Worker separately from `worker/` using `npm ci` and `npm run deploy`; verify health and cron afterward.
+- **Database schema change:** run the documented migration only when the change requires it. Do not blindly reapply schema or rotate secrets for ordinary frontend releases.
+
+The current Worker initializes its notification checkpoint tables automatically. If deployed to a fresh environment, consult `worker/README.md` for the complete schema and secrets setup.

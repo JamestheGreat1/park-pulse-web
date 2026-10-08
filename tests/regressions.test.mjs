@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const worker = fs.readFileSync(new URL('../worker/src/index.js', import.meta.url), 'utf8');
+const VERSION = JSON.parse(fs.readFileSync(new URL('../version.json', import.meta.url), 'utf8')).version;
 function section(start, end) { return worker.slice(worker.indexOf(start), worker.indexOf(end)); }
 const watcher = section('async function runRideWatch(', 'function catalogRideByKey(');
 async function evaluate(beforeWait, currentWait) {
@@ -84,6 +85,7 @@ test('manual refresh never advances the notification checkpoint', async () => {
     Date, PARKS: new Map([[6, {}]]),
     fetchCurrentRideSnapshot: async () => ({ rides: [], primaryParks: 1, fallbackParks: 0 }),
     writeCurrentRideSnapshot: async (...args) => calls.push(args),
+    ensureNotificationSchema: async () => {},
     getAnalyticsStatus: async () => ({}), env: {}
   });
   await vm.runInContext(section('async function runManualRefresh(', 'async function runRideWatch(') + ';runManualRefresh(env)', context);
@@ -120,7 +122,8 @@ test('startup binds navigation and renders before pending diagnostics or registr
   let rendered = false;
   const nav = { dataset: { viewTarget: 'explore' } };
   const context = vm.createContext({
-    setTheme() {}, setupPullToRefresh() {}, renderStatusBanner() {},
+    setTheme() {}, setupLiquidGlassMotion() {}, setupPullToRefresh() {},
+    setupSheetDismissGesture() {}, renderStatusBanner() {},
     navigator: { serviceWorker: { addEventListener() {}, register: () => new Promise(() => {}) } },
     watchForServiceWorkerUpdate() {}, backendHealth: () => new Promise(() => {}), fetchAnalyticsStatus: () => new Promise(() => {}),
     refreshPushState: () => new Promise(() => {}), $$: () => [nav], $: () => ({}),
@@ -188,8 +191,10 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   let pending;
   handlers.install({ waitUntil: promise => { pending = promise; } });
   await pending;
-  for (const name of ['app', 'api', 'data', 'store', 'push', 'config']) assert(precached.includes(`./assets/js/${name}.js?v=1.9.4`));
-  handlers.fetch({ request: { method: 'GET', url: 'https://app.example/assets/js/data.js?v=1.9.4' }, respondWith: promise => { pending = promise; } });
+  for (const name of ['app', 'api', 'data', 'store', 'push', 'config', 'seasonal']) {
+    assert(precached.includes(`./assets/js/${name}.js?v=${VERSION}`));
+  }
+  handlers.fetch({ request: { method: 'GET', url: `https://app.example/assets/js/data.js?v=${VERSION}` }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
@@ -209,6 +214,7 @@ test('editing a watch keeps its exact expiration unless a new duration is select
       sheet: element('sheet'), backdrop: element('backdrop'), sheetReturnFocus: null,
       $: element, $$: () => [], escapeHtml: x => x, parkName: () => 'MK', rideStatus: () => ({ wait: 30 }),
       requestAnimationFrame: callback => callback(), loadRideInsights() {}, loadRideHistory() {}, closeSheet() {}, shareRide() {},
+    sharedRidePwaHint: () => '', recommendationReason: () => 'A good wait',
       durationExpiry: () => 9999999999, pushOn: false, toast() {}, Date, Number, Boolean
     });
     vm.runInContext(app.slice(app.indexOf('function openRide('), app.indexOf('async function loadRideInsights(')) + ';openRide("mk:test")', context);
@@ -448,7 +454,10 @@ test('notification schema and scheduler health from 1.6.6 remain intact', async 
   assert(schema.some(sql=>sql.includes('CREATE TABLE IF NOT EXISTS notification_log_v2')));
   const healthCode=section('async function getNotificationHealth(', 'async function readPriorRideState(');
   for (const [age,status] of [[0,'running'],[20*60000,'stale'],[null,'waiting']]) {
-    context.env={DB:{prepare:()=>({first:async()=>({rides:47,latest:age===null?0:Date.now()-age})})}};
+    context.env={DB:{prepare:()=>({first:async()=>({
+      updated_at: age === null ? 0 : Date.now()-age,
+      payload: JSON.stringify({checkpointRides:47,cadenceMinutes:5})
+    })})}};
     const result=await vm.runInContext(healthCode+';getNotificationHealth(env)',context);
     assert.equal(result.status,status);
   }

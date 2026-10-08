@@ -1,0 +1,45 @@
+name: ParkPulse checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run Worker and UI regression tests
+        run: node --test tests/regressions.test.mjs
+
+  browser:
+    name: PWA browser and offline smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned Playwright
+        run: npm install --no-save --package-lock=false playwright@1.56.1
+      - name: Install Chromium and OS dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Start local static server
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/parkpulse-http.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/version.json >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/parkpulse-http.log
+          exit 1
+      - name: Run browser smoke test
+        run: node tests/browser-smoke.cjs

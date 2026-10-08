@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { version } = require('../version.json');
 const { chromium } = require(require.resolve('playwright', { paths: [process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES || process.cwd()] }));
 (async () => {
   const browser = await chromium.launch({ headless: true });
@@ -35,8 +36,18 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.locator('#thresholdToggle').click();
     await page.locator('#watchForm button[type="submit"]').click();
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1')).rules[0].expiresAt), deadline);
-    const cached = await page.evaluate(async () => (await (await caches.open('parkpulse-1.7.1-alert-engine-shell')).keys()).map(r => r.url));
-    for (const module of ['app', 'api', 'data', 'store', 'push', 'config']) assert(cached.some(url => url.endsWith(`/assets/js/${module}.js?v=1.7.1`)));
+    // Match the cache/version emitted by the shipped service worker, not a past release.
+    const cacheName = `parkpulse-${version}`;
+    assert(await page.evaluate(name => caches.has(name), cacheName), `Missing offline cache: ${cacheName}`);
+    const cached = await page.evaluate(async name =>
+      (await (await caches.open(name)).keys()).map(request => request.url), cacheName);
+    for (const module of ['app', 'api', 'data', 'store', 'push', 'config', 'seasonal']) {
+      assert(cached.some(url => url.endsWith(`/assets/js/${module}.js?v=${version}`)),
+        `Missing cached module: ${module}`);
+    }
+    assert(cached.some(url => url.endsWith(`/assets/css/app.css?v=${version}`)),
+      'Missing cached stylesheet');
+    assert(cached.some(url => url.endsWith('/version.json')), 'Missing cached version manifest');
     await context.setOffline(true);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#view-explore [data-open-ride]', { timeout: 5000 });

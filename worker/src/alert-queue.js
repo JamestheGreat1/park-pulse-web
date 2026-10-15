@@ -35,7 +35,17 @@ export async function enqueueRideAlerts(env, alerts, now = Date.now()) {
   const writes = alerts.map((alert) => env.DB.prepare(
     `INSERT OR IGNORE INTO pending_ride_alerts
       (endpoint,ride_key,kind,payload,threshold,created_at,expires_at,next_attempt_at)
-     VALUES(?,?,?,?,?,?,?,?)`
+     VALUES(?,?,?,?,?,?,?,?)
+     ON CONFLICT(endpoint,ride_key,kind) DO UPDATE SET
+       payload=excluded.payload,
+       threshold=excluded.threshold,
+       created_at=excluded.created_at,
+       expires_at=excluded.expires_at,
+       attempts=0,
+       next_attempt_at=excluded.next_attempt_at,
+       lease_until=NULL
+     WHERE pending_ride_alerts.expires_at <= excluded.created_at
+        OR pending_ride_alerts.threshold IS NOT excluded.threshold`
   ).bind(
     alert.endpoint,
     String(alert.rideId),
@@ -103,7 +113,9 @@ export async function processPendingRideAlerts(env, {
 
     const watcher = byEndpoint.get(pending.endpoint);
     const ride = byRide.get(pending.ride_key);
-    const rule = watcher?.rules.find((candidate) => ride && matchesRule(candidate, ride));
+    const rule = watcher?.rules.find((candidate) =>
+      ride ? matchesRule(candidate, ride) : String(candidate.rideId) === pending.ride_key
+    );
     const discard = async () => {
       await env.DB.prepare(
         "DELETE FROM pending_ride_alerts WHERE endpoint=? AND ride_key=? AND kind=?"
@@ -111,19 +123,25 @@ export async function processPendingRideAlerts(env, {
       summary.discarded++;
     };
 
-    // Only send notifications that remain relevant to the CURRENT watch and
-    // CURRENT ride. In particular, edited thresholds must not use old targets.
-    if (!pendingAlertValid(pending, ride, rule, now)) {
+    // Removed or expired watches can be discarded immediately, even when a
+    // source temporarily loses a ride. Missing/stale source data cannot
+    // establish whether an alert is obsolete: defer it until data recovers.
+    if (!watcher || !rule || (rule.expiresAt != null && Number(rule.expiresAt) <= now)) {
       await discard();
       continue;
     }
-
-    // Don't send from a stale source; retain the pending event until it expires.
-    if (ride.sourceStale) {
+    if (!ride || ride.sourceMissing || ride.sourceStale) {
       await env.DB.prepare(
         `UPDATE pending_ride_alerts SET lease_until=NULL,next_attempt_at=?
          WHERE endpoint=? AND ride_key=? AND kind=?`
       ).bind(now + 5 * 60 * 1000, pending.endpoint, pending.ride_key, pending.kind).run();
+      continue;
+    }
+
+    // Only send notifications relevant to the CURRENT watch and ride.
+    // In particular, edited thresholds must not use old targets.
+    if (!pendingAlertValid(pending, ride, rule, now)) {
+      await discard();
       continue;
     }
 

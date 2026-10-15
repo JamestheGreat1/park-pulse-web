@@ -178,6 +178,43 @@ test('stale source does not send until fresh data becomes available', async () =
   assert.equal(fresh.delivered, 1);
 });
 
+test('expired and edited-threshold queue entries can be replaced by fresh transitions', async () => {
+  const env = await setup();
+  await enqueueRideAlerts(env, [makeAlert()], NOW);
+  await enqueueRideAlerts(env, [makeAlert({
+    threshold: 25,
+    payload: { title: 'A new threshold' }
+  })], NOW + 1000);
+  assert.equal(queued(env).length, 1);
+  assert.equal(queued(env)[0].threshold, 25);
+  assert.equal(queued(env)[0].created_at, NOW + 1000);
+  assert.equal(JSON.parse(queued(env)[0].payload).title, 'A new threshold');
+
+  const again = NOW + 25 * 60 * 1000;
+  await enqueueRideAlerts(env, [makeAlert()], again);
+  assert.equal(queued(env).length, 1);
+  assert.equal(queued(env)[0].threshold, 40);
+  assert.equal(queued(env)[0].created_at, again);
+  assert.equal(queued(env)[0].attempts, 0);
+});
+
+test('source-missing or temporarily absent rides defer instead of deleting valid alerts', async () => {
+  for (const rides of [
+    [{ ...baseRide(), isOpen: false, sourceMissing: true }],
+    []
+  ]) {
+    const env = await setup();
+    await enqueueRideAlerts(env, [makeAlert()], NOW);
+    const result = await processPendingRideAlerts(env, config(env, {
+      rides,
+      send: async () => { throw Error('Must not send without fresh data'); }
+    }));
+    assert.equal(result.pending, 1);
+    assert.equal(result.discarded, 0);
+    assert.equal(result.delivered, 0);
+  }
+});
+
 test('pending alerts expire and queued inserts are bounded before checkpoint', async () => {
   const env = await setup();
   await assert.rejects(enqueueRideAlerts(

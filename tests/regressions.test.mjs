@@ -20,7 +20,11 @@ async function evaluate(beforeWait, currentWait) {
     groupByPark: rows => new Map([[6, rows]]), normalizeRules: x => x,
     ruleMatchesRide: () => true, notificationRideName: () => 'Test', safeTag: x => x,
     cooldownActive: async () => false, sendPush: async (_, payload) => { sent.push(payload); return true; },
-    markNotification: async () => {},
+    enqueueRideAlerts: async (_, alerts) => { context.pending = alerts; return alerts.length; },
+    processPendingRideAlerts: async () => {
+      for (const alert of context.pending || []) sent.push(alert.payload);
+      return { delivered: (context.pending || []).length, retried: 0, failed: 0, discarded: 0, pending: 0 };
+    },
     writeCurrentRideSnapshot: async (_, rows, checkpoint = false) => checkpoints.push(checkpoint),
     env: { DB: { prepare: () => ({ all: async () => ({ results: [sub] }), bind: () => ({ run: async () => {} }) }) } }
   });
@@ -34,6 +38,48 @@ test('unknown waits never trigger threshold notifications; numeric zero is valid
   assert.equal((await evaluate(60, 0)).sent.length, 1);
   assert.deepEqual((await evaluate(60, 30)).checkpoints, [false, true]);
 });
+test('queued transitions are recorded before the notification checkpoint', async () => {
+  const ride = { id: 'mk:test', parkId: 6, isOpen: true, waitTime: 20 };
+  const events = [];
+  const sub = { endpoint: 'test', watch_ids: JSON.stringify([{ rideId: ride.id, threshold: 40, reopen: false }]) };
+  const context = vm.createContext({
+    Date, Intl, Map, JSON, Number, console, LIVE_FRESHNESS_MS: 1200000,
+    PARKS: new Map([[6, { name: 'Magic Kingdom' }]]),
+    ensureNotificationSchema: async () => {},
+    readPriorRideState: async () => [{ ...ride, waitTime: 55, updatedAt: Date.now() }],
+    fetchCurrentRideSnapshot: async () => ({ rides: [ride] }),
+    groupByPark: rows => new Map([[6, rows]]), normalizeRules: x => x,
+    ruleMatchesRide: () => true, notificationRideName: () => 'Test', safeTag: x => x,
+    enqueueRideAlerts: async (_, alerts) => { events.push('enqueue'); assert.equal(alerts.length, 1); return 1; },
+    processPendingRideAlerts: async () => ({ pending: 1, delivered: 0, retried: 0, failed: 1, discarded: 0 }),
+    writeCurrentRideSnapshot: async (_, rows, checkpoint = false) => events.push(checkpoint ? 'checkpoint' : 'history'),
+    env: { DB: { prepare: () => ({ all: async () => ({ results: [sub] }), bind: () => ({ run: async () => {} }) }) } }
+  });
+  await vm.runInContext(watcher + ';runRideWatch(env)', context);
+  assert.deepEqual(events, ['enqueue', 'history', 'checkpoint']);
+});
+
+test('failed queue insertion never advances ride checkpoint', async () => {
+  const ride = { id: 'mk:test', parkId: 6, isOpen: true, waitTime: 20 };
+  let checkpointed = false;
+  const sub = { endpoint: 'test', watch_ids: JSON.stringify([{ rideId: ride.id, threshold: 40, reopen: false }]) };
+  const context = vm.createContext({
+    Date, Intl, Map, JSON, Number, console, LIVE_FRESHNESS_MS: 1200000,
+    PARKS: new Map([[6, { name: 'Magic Kingdom' }]]),
+    ensureNotificationSchema: async () => {},
+    readPriorRideState: async () => [{ ...ride, waitTime: 55, updatedAt: Date.now() }],
+    fetchCurrentRideSnapshot: async () => ({ rides: [ride] }),
+    groupByPark: rows => new Map([[6, rows]]), normalizeRules: x => x,
+    ruleMatchesRide: () => true, notificationRideName: () => 'Test', safeTag: x => x,
+    enqueueRideAlerts: async () => { throw new Error('D1 unavailable'); },
+    processPendingRideAlerts: async () => { throw new Error('should not process'); },
+    writeCurrentRideSnapshot: async () => { checkpointed = true; },
+    env: { DB: { prepare: () => ({ all: async () => ({ results: [sub] }), bind: () => ({ run: async () => {} }) }) } }
+  });
+  await assert.rejects(vm.runInContext(watcher + ';runRideWatch(env)', context), /D1 unavailable/);
+  assert.equal(checkpointed, false);
+});
+
 test('ThemeParks attraction waits stay live when the parent park is closed', async () => {
   const code = section('async function fetchThemeParksRides(', 'async function fetchQueueTimesRides(');
   const catalogRide = { key: 'mk:test', name: 'Test Ride', land: 'Tomorrowland', aliases: [] };

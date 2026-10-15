@@ -25,7 +25,7 @@ function memoryD1() {
   function wrapper(sql, args = []) {
     return {
       bind(...next) { return wrapper(sql, next); },
-      async run() {
+      run() {
         const result = sqlite.prepare(sql).run(...args);
         return { meta: { changes: Number(result.changes || 0) } };
       },
@@ -41,7 +41,7 @@ function memoryD1() {
         sqlite.exec('BEGIN TRANSACTION');
         try {
           const results = [];
-          for (const query of queries) results.push(await query.run());
+          for (const query of queries) results.push(query.run());
           sqlite.exec('COMMIT');
           return results;
         } catch (error) {

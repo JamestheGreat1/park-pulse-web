@@ -78,3 +78,21 @@ The Worker creates `worker_state` automatically on scheduled/manual refresh, and
 ParkPulse now treats fresh attraction-level `OPERATING` records as live even when the park's regular operating window has ended before a same-day ticketed event. The Worker recognizes the transition window and the active ticketed event from ThemeParks.wiki schedule data, keeps the attraction waits/statuses live, and withholds normal-day baselines/crowd comparisons during those special-event periods.
 
 No D1 migration is required. Pull the latest repo and deploy from `worker/` with `npm ci && npx wrangler deploy`. After deployment, `/health` should report Worker `1.7.4`.
+
+### Durable ride-alert retries (Worker 1.7.5)
+
+Reopening and wait-threshold transitions are now saved into `pending_ride_alerts` in D1 **before** the notification checkpoint moves. A temporary Web Push error stays queued and is retried on later five-minute runs, up to a 20-minute freshness window. The Worker will not retry an obsolete wait target, expired/removed watch, closed ride, or invalid 404/410 subscription.
+
+The queue sends at most six pending notifications per scheduled run, uses a two-minute claim lease to avoid duplicate sends during overlapping cron invocations, and expires old jobs during hourly maintenance. Delivery is **at-least-once**, not exactly-once: if a push provider accepts a message and D1 fails before recording success, a duplicate may still be possible. This trade-off prevents dropped alerts without pretending external Web Push supports transactions.
+
+No destructive D1 migration or new Worker secrets are required. The Worker creates the table automatically; `schema.sql` includes the same additive table definition for fresh installs. Deploy after pulling this change:
+
+```bash
+cd worker
+npm ci
+npx wrangler deploy
+```
+
+Confirm the deployed Worker is `1.7.5`. The `/health` JSON includes `notificationEngine.delivery` with the previous run's `queued`, `delivered`, `retried`, `failed`, `discarded`, and `pending` counts. `pending` is a snapshot from that run, not a continuously updated queue length. A successful `/subscriptions/test` is useful for checking a device but does not exercise the transition queue.
+
+For troubleshooting, inspect `npx wrangler tail --format pretty` after the next scheduled alert run. Keep the existing five-minute and hourly cron triggers enabled.

@@ -120,3 +120,22 @@ CREATE TABLE IF NOT EXISTS worker_state (
   updated_at INTEGER NOT NULL,
   payload TEXT NOT NULL DEFAULT '{}'
 );
+
+-- Durable notification transitions survive temporary Web Push delivery failures.
+-- Created automatically by the Worker on scheduled runs; also safe to execute manually.
+CREATE TABLE IF NOT EXISTS pending_ride_alerts (
+  endpoint TEXT NOT NULL,
+  ride_key TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK(kind IN ('reopen', 'wait')),
+  payload TEXT NOT NULL,
+  threshold INTEGER,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at INTEGER NOT NULL,
+  lease_until INTEGER,
+  PRIMARY KEY (endpoint, ride_key, kind)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_ride_alerts_due
+  ON pending_ride_alerts(next_attempt_at, expires_at);

@@ -52,6 +52,7 @@ test('queued transitions are recorded before the notification checkpoint', async
     ruleMatchesRide: () => true, notificationRideName: () => 'Test', safeTag: x => x,
     enqueueRideAlerts: async (_, alerts) => { events.push('enqueue'); assert.equal(alerts.length, 1); return 1; },
     processPendingRideAlerts: async () => ({ pending: 1, delivered: 0, retried: 0, failed: 1, discarded: 0 }),
+    sendPush: async () => true,
     writeCurrentRideSnapshot: async (_, rows, checkpoint = false) => events.push(checkpoint ? 'checkpoint' : 'history'),
     env: { DB: { prepare: () => ({ all: async () => ({ results: [sub] }), bind: () => ({ run: async () => {} }) }) } }
   });
@@ -495,7 +496,7 @@ test('history keeps zero waits, null waits, and closures distinct and bounds que
 
 test('notification schema and scheduler health from 1.6.6 remain intact', async () => {
   let schema;
-  const context=vm.createContext({Date,Number,env:{DB:{prepare:sql=>sql,batch:async statements=>{schema=statements}}}});
+  const context=vm.createContext({Date,Number,ensureAlertQueueSchema:async()=>{},env:{DB:{prepare:sql=>sql,batch:async statements=>{schema=statements}}}});
   await vm.runInContext(section('async function ensureNotificationSchema(', 'async function getNotificationHealth(')+';ensureNotificationSchema(env)',context);
   assert(schema.some(sql=>sql.includes('CREATE TABLE IF NOT EXISTS notification_ride_state')));
   assert(schema.some(sql=>sql.includes('CREATE TABLE IF NOT EXISTS notification_log_v2')));

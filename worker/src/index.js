@@ -1,6 +1,7 @@
 import { sendNotification } from "web-push-neo";
+import { ensureAlertQueueSchema, enqueueRideAlerts, processPendingRideAlerts, pruneExpiredRideAlerts } from "./alert-queue.js";
 
-const VERSION = "1.7.4";
+const VERSION = "1.7.5";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -292,6 +293,9 @@ export default {
           .bind(body.endpoint).run();
 
         await env.DB.prepare("DELETE FROM notification_log_v2 WHERE endpoint = ?")
+          .bind(body.endpoint).run().catch(() => {});
+
+        await env.DB.prepare("DELETE FROM pending_ride_alerts WHERE endpoint = ?")
           .bind(body.endpoint).run().catch(() => {});
 
         return json({ ok: true }, 200, cors);
@@ -1172,6 +1176,7 @@ async function runRideWatch(env) {
   }
 
   const now = Date.now();
+  const alertsToQueue = [];
   const easternHour = Number(new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23"
   }).format(new Date(now)));
@@ -1244,25 +1249,46 @@ async function runRideWatch(env) {
           };
         }
 
-        if (payload && kind) {
-          try {
-            if (await cooldownActive(env, watcher.endpoint, ride.id, kind)) continue;
-
-            const delivered = await sendPush(watcher, payload, env);
-            if (delivered) {
-              await markNotification(env, watcher.endpoint, ride.id, kind);
-            } else {
-              await env.DB.prepare("DELETE FROM subscriptions WHERE endpoint=?")
-                .bind(watcher.endpoint).run();
-            }
-          } catch (error) {
-            console.warn("Push failed", error);
-          }
+        if (payload && kind && !ride.sourceStale && !ride.sourceMissing) {
+          alertsToQueue.push({
+            endpoint: watcher.endpoint,
+            rideId: ride.id,
+            kind,
+            payload,
+            threshold: kind === "wait" ? rule.threshold : null
+          });
         }
       }
     }
 
   }
+
+  // Persist the transitions BEFORE advancing the ride checkpoint. If D1
+  // rejects this insertion, the next cron can rediscover the same transition.
+  const queued = await enqueueRideAlerts(env, alertsToQueue, now);
+  const deliveries = await processPendingRideAlerts(env, {
+    rides: current,
+    subscriptions: parsedSubs,
+    matchesRule: ruleMatchesRide,
+    isCoolingDown: (endpoint, rideKey, kind) => cooldownActive(env, endpoint, rideKey, kind),
+    send: sendPush,
+    refreshPayload: (pending, ride, rule) => {
+      const payload = JSON.parse(pending.payload);
+      const shortName = notificationRideName(ride);
+      const parkName = PARKS.get(ride.parkId).name;
+      if (pending.kind === "wait") {
+        payload.title = `${shortName} • ${ride.waitTime} min`;
+        payload.body = `Target ≤${rule.threshold} • ${parkName}`;
+      } else {
+        payload.title = ride.waitTime > 0
+          ? `${shortName} reopened • ${ride.waitTime} min`
+          : `${shortName} reopened`;
+        payload.body = parkName;
+      }
+      return payload;
+    },
+    now
+  });
 
   console.log("Alert job: saving history and checkpoint");
   await writeCurrentRideSnapshot(env, current);
@@ -1273,12 +1299,18 @@ async function runRideWatch(env) {
      ON CONFLICT(state_key) DO UPDATE SET
        updated_at=excluded.updated_at,
        payload=excluded.payload`
-  ).bind(Date.now(), JSON.stringify({ checkpointRides: current.length, cadenceMinutes: 5 })).run();
-  console.log("Alert job: complete");
+  ).bind(Date.now(), JSON.stringify({
+    checkpointRides: current.length,
+    cadenceMinutes: 5,
+    delivery: { queued, ...deliveries }
+  })).run();
+  console.log("Alert job: complete", JSON.stringify({ queued, ...deliveries }));
 }
 
 async function runScheduledMaintenance(env) {
   console.log("Maintenance job: start");
+  await ensureAlertQueueSchema(env);
+  await pruneExpiredRideAlerts(env);
   await env.DB.prepare("DELETE FROM notification_log_v2 WHERE last_sent < ?")
     .bind(Date.now() - 7 * 86400000).run();
   await env.DB.prepare("DELETE FROM ride_history WHERE observed_at < ?")
@@ -2017,6 +2049,7 @@ async function ensureNotificationSchema(env) {
     )`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ride_history_observed_at ON ride_history(observed_at)")
   ]);
+  await ensureAlertQueueSchema(env);
 }
 
 function d1FailureReason(error) {
@@ -2063,6 +2096,7 @@ async function getNotificationHealth(env) {
       lastCheck: latestMs ? new Date(latestMs).toISOString() : null,
       checkpointRides: Number(payload?.checkpointRides || 0),
       cadenceMinutes: Number(payload?.cadenceMinutes || 5),
+      delivery: payload?.delivery || null,
       source: "worker-state"
     };
   } catch (error) {
@@ -2072,6 +2106,7 @@ async function getNotificationHealth(env) {
       lastCheck: null,
       checkpointRides: 0,
       cadenceMinutes: 5,
+      delivery: null,
       reason: d1FailureReason(error)
     };
   }
@@ -2102,28 +2137,12 @@ async function readPriorRideState(env) {
 }
 
 async function cooldownActive(env, endpoint, rideKey, kind) {
-  try {
-    const row = await env.DB.prepare(
-      "SELECT last_sent FROM notification_log_v2 WHERE endpoint=? AND ride_key=? AND kind=?"
-    ).bind(endpoint, String(rideKey), kind).first();
-
-    return Boolean(
-      row &&
-      Date.now() - Number(row.last_sent) < NOTIFICATION_COOLDOWN_MS
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function markNotification(env, endpoint, rideKey, kind) {
-  try {
-    await env.DB.prepare(
-      `INSERT INTO notification_log_v2(endpoint,ride_key,kind,last_sent)
-       VALUES(?,?,?,?)
-       ON CONFLICT(endpoint,ride_key,kind) DO UPDATE SET last_sent=excluded.last_sent`
-    ).bind(endpoint, String(rideKey), kind, Date.now()).run();
-  } catch {}
+  // Fail closed on D1 errors. Silently ignoring a failed cooldown read can
+  // duplicate notifications when the Worker is unhealthy.
+  const row = await env.DB.prepare(
+    "SELECT last_sent FROM notification_log_v2 WHERE endpoint=? AND ride_key=? AND kind=?"
+  ).bind(endpoint, String(rideKey), kind).first();
+  return Boolean(row && Date.now() - Number(row.last_sent) < NOTIFICATION_COOLDOWN_MS);
 }
 
 function groupByPark(rides) {

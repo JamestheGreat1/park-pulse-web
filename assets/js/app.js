@@ -1,8 +1,8 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.4";
-import { store } from "./store.js?v=1.9.4";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.4";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.4";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.4";
+import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
+import { store } from "./store.js?v=1.9.5";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.5";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.5";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.5";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.4";
+const APP_VERSION = "1.9.5";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -829,6 +829,22 @@ function sortedRides(rides, state) {
   });
   return list;
 }
+
+function rideTrendMarkup(ride, status) {
+  const trend = ride?.waitTrend;
+  if (status.stale || !ride?.isOpen || ride.sourceMissing || ride.operationalStatus === "DOWN" ||
+      !trend || !["up", "down"].includes(trend.direction)) return "";
+
+  const delta = Number(trend.deltaMinutes);
+  const windowMinutes = Number(trend.windowMinutes);
+  if (!Number.isInteger(delta) || delta < 5 ||
+      !Number.isInteger(windowMinutes) || windowMinutes < 10 || windowMinutes > 20) return "";
+
+  const down = trend.direction === "down";
+  const label = `Wait ${down ? "down" : "up"} ${delta} minutes over about ${windowMinutes} minutes`;
+  return `<span class="wait-trend ${trend.direction}" role="img" aria-label="${label}" title="${label}"><span class="trend-arrow" aria-hidden="true">${down ? "↘" : "↗"}</span><span aria-hidden="true">${delta}</span></span>`;
+}
+
 function rideCard(ride, state = store.snapshot, index = 0) {
   const favorite = state.favorites.includes(String(ride.id));
   const rule = store.ruleForRide(ride.id);
@@ -840,7 +856,7 @@ function rideCard(ride, state = store.snapshot, index = 0) {
   return `<article class="ride-card liquid-glass ${rule ? "watching" : ""} ${status.stale ? "stale" : ""}" data-ride-id="${ride.id}">
     <button class="ride-main" type="button" data-open-ride="${ride.id}">
       <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${rule ? `<span class="watch-badge">Watching</span>` : ""}${valueBadge ? `<span class="value-badge ${valueBadge.tone}">${escapeHtml(valueBadge.text)}</span>` : ""}</div>${explanation ? `<div class="recommendation-hint"><span aria-hidden="true">✦</span>${escapeHtml(explanation)}</div>` : ""}</div>
-      <div class="ride-status"><span class="wait ${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><span class="status-label">${escapeHtml(status.label)}</span></div>
+      <div class="ride-status"><div class="ride-wait-line"><span class="wait ${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span>${rideTrendMarkup(ride, status)}</div><span class="status-label">${escapeHtml(status.label)}</span></div>
     </button>
     <div class="ride-actions">
       <button class="favorite-button ${favorite ? "active" : ""}" type="button" data-favorite="${ride.id}" aria-pressed="${favorite}" aria-label="${favorite ? "Unfavorite" : "Favorite"} ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>

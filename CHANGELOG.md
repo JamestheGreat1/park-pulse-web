@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.5 — 2026-10-18
+
+- Added a compact wait trend beside live waits when they move at least five minutes in roughly 15 minutes.
+- Reads existing five-minute D1 history in one bounded query per park, with no per-ride requests or additional writes.
+- Suppresses trends for stale or unavailable rides, closures, interrupted data, or insufficient samples.
+- Keeps the existing ride-card dimensions, light/dark themes, and Liquid/Frosted Glass styles.
+- Worker 1.7.6 must be deployed for trend data; no D1 migration is needed.
+- Updated PWA cache keys to 1.9.5.
+
 ## 1.9.4 — 2026-10-05
 
 - Added a **Use my local time** toggle under Settings → Customization, enabled by default.

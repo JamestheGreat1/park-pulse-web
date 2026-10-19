@@ -8,13 +8,14 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.9.4**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.9.5**
 
 ## What ParkPulse does
 
 - **Live waits and ride status** for Magic Kingdom, EPCOT, Hollywood Studios, and Animal Kingdom.
 - **Best Now** compares the current wait with what is normally expected for that ride around the same time of day.
 - **Wait comparisons** quickly show when something is running better or worse than typical.
+- **Wait trends** add a subtle up/down arrow when the live wait moves by at least 5 minutes in about 15 minutes.
 - **Favorites** let you save rides without turning on notifications.
 - **Next Up** suggests one useful open ride at a time using current waits, normal wait context, and your favorites.
 - **Wait history** shows how a ride has moved today, over the past 7 days, or over the past 30 days.

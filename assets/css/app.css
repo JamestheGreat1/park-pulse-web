@@ -5263,3 +5263,12 @@ body{
   .park-closed-copy h3{font-size:.98rem}
   .park-closed-copy p{font-size:.75rem}
 }
+
+
+/* v1.9.5 — unobtrusive live wait movement; palette tokens work in both glass styles */
+.ride-wait-line{display:flex;align-items:baseline;justify-content:flex-end;gap:6px;white-space:nowrap}
+.wait-trend{display:inline-flex;align-items:baseline;gap:2px;flex:0 0 auto;font-size:.69rem;font-weight:800;letter-spacing:-.01em;line-height:1.1;font-variant-numeric:tabular-nums}
+.wait-trend.down{color:var(--good)}
+.wait-trend.up{color:var(--warn)}
+.wait-trend .trend-arrow{font-size:.78rem}
+@media(max-width:420px){.ride-wait-line{gap:4px}.wait-trend{font-size:.64rem}}

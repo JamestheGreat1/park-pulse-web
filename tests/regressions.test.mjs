@@ -798,3 +798,85 @@ test('shared ride deep links offer the PWA handoff only in mobile browser mode',
   assert.match(hint, /data-shared-install/);
   assert.match(app, /\$\('\[data-shared-install\]', sheet\)\?\.addEventListener\("click", installApp\)/);
 });
+
+
+test('15-minute trends are bounded and reject stale, closed, or interrupted rides', async () => {
+  const now = Date.parse('2026-10-18T18:30:00Z');
+  const sample = (id, minutesAgo, wait, open = true) => ({
+    ride_key: id, observed_at: now - minutesAgo * 60000, wait_time: wait, is_open: open ? 1 : 0
+  });
+  const rows = [
+    sample('down', 15, 45), sample('down', 5, 45),
+    sample('up', 15, 20), sample('up', 5, 20),
+    sample('flat', 15, 40), sample('flat', 5, 40),
+    sample('reopened', 15, 45), sample('reopened', 10, null, false), sample('reopened', 5, 30),
+    sample('zero', 15, 0), sample('zero', 5, 0),
+    sample('stale', 15, 30), sample('stale', 5, 30),
+    sample('old-source', 15, 30), sample('old-source', 5, 30),
+    sample('missing-history', 15, 30)
+  ];
+  const current = (id, waitTime, overrides = {}) => ({
+    id, isOpen: true, operationalStatus: 'OPERATING', waitTime,
+    sourceUpdatedAt: now - 2 * 60000, ...overrides
+  });
+  const rides = [
+    current('down', 30), current('up', 30), current('flat', 43),
+    current('reopened', 25), current('zero', 5),
+    current('stale', 15, { sourceStale: true }),
+    current('old-source', 15, { sourceUpdatedAt: now - 20 * 60000 }),
+    current('missing-history', 20), current('closed', null, { isOpen: false })
+  ];
+  let calls = 0;
+  let query = '';
+  let bindings = [];
+  const env = { DB: { prepare(sql) {
+    calls++; query = sql;
+    return { bind(...values) {
+      bindings = values;
+      return { all: async () => ({ results: rows }) };
+    } };
+  } } };
+  const context = vm.createContext({
+    Date, Number, Math, Map, env, now, rides,
+    WAIT_TREND_LOOKBACK_MS: 15 * 60000,
+    WAIT_TREND_TOLERANCE_MS: 5 * 60000,
+    WAIT_TREND_MAX_HISTORY_AGE_MS: 10 * 60000,
+    isFreshSourceRide: ride => !ride.sourceStale && !ride.sourceMissing && ride.sourceUpdatedAt > now - 15 * 60000,
+    sourceTimestampMs: ride => ride.sourceUpdatedAt
+  });
+  vm.runInContext(section('async function attachWaitTrends(', 'async function attachDowntimeContext('), context);
+  const output = await vm.runInContext('attachWaitTrends(env,6,rides,now)', context);
+  const trend = id => output.find(ride => ride.id === id).waitTrend;
+  assert.equal(calls, 1);
+  assert.match(query, /park_id=\?/);
+  assert.deepEqual(bindings, [6, now - 20 * 60000, now]);
+  assert.equal(trend('down').direction, 'down');
+  assert.equal(trend('down').deltaMinutes, 15);
+  assert.equal(trend('down').windowMinutes, 15);
+  assert.equal(trend('up').direction, 'up');
+  assert.equal(trend('up').deltaMinutes, 10);
+  assert.equal(trend('zero').deltaMinutes, 5);
+  for (const id of ['flat','reopened','stale','old-source','missing-history','closed']) {
+    assert.equal(trend(id), undefined, `Trend should be hidden for ${id}`);
+  }
+  const fail = vm.createContext({
+    ...context, env: { DB: { prepare() { throw Error('D1 unavailable'); } } }
+  });
+  vm.runInContext(section('async function attachWaitTrends(', 'async function attachDowntimeContext('), fail);
+  assert.equal((await vm.runInContext('attachWaitTrends(env,6,rides,now)', fail)).length, rides.length);
+});
+
+test('wait trend glyph stays compact and hides for stale cards', () => {
+  const script = app.slice(app.indexOf('function rideTrendMarkup('), app.indexOf('function rideCard('));
+  const context = vm.createContext({ Number });
+  vm.runInContext(script, context);
+  context.ride = { isOpen: true, waitTrend: { direction: 'down', deltaMinutes: 10, windowMinutes: 15 } };
+  context.status = { stale: false };
+  assert.match(vm.runInContext('rideTrendMarkup(ride,status)', context), /wait-trend down/);
+  assert.match(vm.runInContext('rideTrendMarkup(ride,status)', context), /aria-label="Wait down 10 minutes/);
+  context.status.stale = true;
+  assert.equal(vm.runInContext('rideTrendMarkup(ride,status)', context), '');
+  const card = app.slice(app.indexOf('function rideCard('), app.indexOf('function rideListMarkup('));
+  assert.match(card, /ride-wait-line/);
+  assert.match(card, /rideTrendMarkup\(ride, status\)/);
+});

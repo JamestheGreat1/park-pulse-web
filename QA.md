@@ -1,7 +1,7 @@
 # ParkPulse release QA
 
 The release version is defined in `version.json`. **Do not hard-code release versions in tests.**
-This checklist covers the ParkPulse 1.9.4 feature set and should be revisited when features change.
+This checklist covers the ParkPulse 1.9.5 feature set and should be revisited when features change.
 
 ## Automated checks (required before a release)
 

@@ -1,7 +1,7 @@
 import { sendNotification } from "web-push-neo";
 import { ensureAlertQueueSchema, enqueueRideAlerts, processPendingRideAlerts, pruneExpiredRideAlerts } from "./alert-queue.js";
 
-const VERSION = "1.7.5";
+const VERSION = "1.7.6";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -144,6 +144,7 @@ export default {
           ? displayRides
           : await attachCurrentBaselines(env, displayRides);
         rides = await attachDowntimeContext(env, rides);
+        rides = await attachWaitTrends(env, parkId, rides);
         let crowdLevel = calculateCrowdLevel(rides, park.rides.length, parkHours);
         crowdLevel = await attachCrowdTrend(env, parkId, crowdLevel, parkHours);
 
@@ -855,6 +856,67 @@ function calculateCrowdLevel(rides, totalCatalogRides, parkHours, now = Date.now
 function durationMinutesSince(startMs, now = Date.now()) {
   if (!Number.isFinite(startMs) || startMs <= 0 || startMs > now) return null;
   return Math.max(0, Math.floor((now - startMs) / 60000));
+}
+
+
+const WAIT_TREND_LOOKBACK_MS = 15 * 60 * 1000;
+const WAIT_TREND_TOLERANCE_MS = 5 * 60 * 1000;
+const WAIT_TREND_MAX_HISTORY_AGE_MS = 10 * 60 * 1000;
+
+// One bounded D1 read per park, with no additional scheduled writes.
+async function attachWaitTrends(env, parkId, rides, now = Date.now()) {
+  if (!rides?.some((ride) => ride.isOpen && ride.waitTime != null && isFreshSourceRide(ride, now))) {
+    return rides || [];
+  }
+  let rows;
+  try {
+    rows = (await env.DB.prepare(
+      `SELECT ride_key,wait_time,is_open,observed_at FROM ride_history
+       WHERE park_id=? AND observed_at>=? AND observed_at<=?
+       ORDER BY ride_key ASC,observed_at ASC`
+    ).bind(parkId, now - WAIT_TREND_LOOKBACK_MS - WAIT_TREND_TOLERANCE_MS, now).all()).results || [];
+  } catch {
+    return rides; // A history failure cannot break live waits.
+  }
+  const historyByRide = new Map();
+  for (const row of rows) {
+    const key = String(row.ride_key);
+    if (!historyByRide.has(key)) historyByRide.set(key, []);
+    historyByRide.get(key).push(row);
+  }
+  const target = now - WAIT_TREND_LOOKBACK_MS;
+  return rides.map((ride) => {
+    if (!ride.isOpen || ride.operationalStatus === "DOWN" ||
+        ride.waitTime == null || !Number.isFinite(Number(ride.waitTime)) ||
+        !isFreshSourceRide(ride, now)) return ride;
+
+    const history = historyByRide.get(String(ride.id)) || [];
+    const latest = history[history.length - 1];
+    if (!latest || now - Number(latest.observed_at) > WAIT_TREND_MAX_HISTORY_AGE_MS ||
+        Number(latest.is_open) !== 1 || latest.wait_time == null) return ride;
+
+    const previous = history
+      .filter((row) => Math.abs(Number(row.observed_at) - target) <= WAIT_TREND_TOLERANCE_MS)
+      .sort((a, b) => Math.abs(Number(a.observed_at) - target) - Math.abs(Number(b.observed_at) - target))[0];
+    if (!previous || Number(previous.is_open) !== 1 || previous.wait_time == null ||
+        !Number.isFinite(Number(previous.wait_time)) ||
+        sourceTimestampMs(ride) <= Number(previous.observed_at)) return ride;
+
+    // Do not compare across a recorded closure or unknown standby wait.
+    if (history.some((row) => Number(row.observed_at) >= Number(previous.observed_at) &&
+        (Number(row.is_open) !== 1 || row.wait_time == null))) return ride;
+
+    const delta = Math.round(Number(ride.waitTime) - Number(previous.wait_time));
+    if (!Number.isFinite(delta) || Math.abs(delta) < 5) return ride;
+    return {
+      ...ride,
+      waitTrend: {
+        direction: delta > 0 ? "up" : "down",
+        deltaMinutes: Math.abs(delta),
+        windowMinutes: Math.round((now - Number(previous.observed_at)) / 60000)
+      }
+    };
+  });
 }
 
 async function attachDowntimeContext(env, rides, now = Date.now()) {

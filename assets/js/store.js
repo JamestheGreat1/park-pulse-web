@@ -2,6 +2,7 @@ const KEY = "parkpulse.rideWatcher.v1";
 
 const defaults = {
   selectedParkId: Number(window.PARKPULSE_CONFIG?.DEFAULT_PARK_ID || 6),
+  selectedResortId: "wdw",
   activeView: "explore",
   query: "",
   openOnly: false,

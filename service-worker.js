@@ -1,7 +1,7 @@
 const CACHE_NAME = "parkpulse-1.9.5";
 const VERSION = "1.9.5";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
-  ...["app", "api", "data", "store", "push", "config", "seasonal"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
+  ...["app", "api", "data", "catalog", "store", "push", "config", "seasonal"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
   `./assets/css/app.css?v=${VERSION}`,
   ...["icon-192", "icon-512", "apple-touch-icon"].map(name => `./assets/icons/${name}.png?v=${VERSION}`)
 ];

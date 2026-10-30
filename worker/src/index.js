@@ -1,4 +1,5 @@
 import { sendNotification } from "web-push-neo";
+import { PARKS as ENABLED_PARKS, parkTimezone } from "../../assets/js/catalog.js";
 import { ensureAlertQueueSchema, enqueueRideAlerts, processPendingRideAlerts, pruneExpiredRideAlerts } from "./alert-queue.js";
 
 const VERSION = "1.7.6";
@@ -15,8 +16,6 @@ const CROWD_MIN_LARGE_PARK = 6;
 
 const PARKS = new Map([
   [5, {
-    name: "EPCOT",
-    themeParksId: "47f90d2c-e191-4239-a466-5892ef59a88b",
     rides: [
       ride("epcot:figment", "Journey Into Imagination With Figment", "World Celebration"),
       ride("epcot:spaceship-earth", "Spaceship Earth", "World Celebration"),
@@ -32,8 +31,6 @@ const PARKS = new Map([
     ]
   }],
   [6, {
-    name: "Magic Kingdom",
-    themeParksId: "75ea578a-adc8-4116-a54d-dccb60765ef9",
     rides: [
       ride("mk:jungle-cruise", "Jungle Cruise", "Adventureland"),
       ride("mk:pirates", "Pirates of the Caribbean", "Adventureland"),
@@ -59,8 +56,6 @@ const PARKS = new Map([
     ]
   }],
   [7, {
-    name: "Hollywood Studios",
-    themeParksId: "288747d1-8b4f-4a64-867e-ea7c9b27bad8",
     rides: [
       ride("dhs:star-tours", "Star Tours - The Adventures Continue", "Echo Lake", ["Star Tours – The Adventures Continue"]),
       ride("dhs:runaway-railway", "Mickey & Minnie's Runaway Railway", "Hollywood Boulevard"),
@@ -77,8 +72,6 @@ const PARKS = new Map([
     ]
   }],
   [8, {
-    name: "Animal Kingdom",
-    themeParksId: "1c84a229-8862-4648-9c71-378ddd2c7693",
     rides: [
       ride("ak:kilimanjaro-safaris", "Kilimanjaro Safaris", "Africa"),
       ride("ak:wildlife-express", "Wildlife Express Train", "Africa"),
@@ -88,7 +81,11 @@ const PARKS = new Map([
       ride("ak:navi-river-journey", "Na'vi River Journey", "Pandora - The World of Avatar")
     ]
   }]
-]);
+].map(([id, config]) => {
+  const park = ENABLED_PARKS.find((item) => item.id === id);
+  if (!park) throw new Error(`Missing enabled park metadata: ${id}`);
+  return [id, { ...config, name: park.name, themeParksId: park.themeParksId, timezone: parkTimezone(id) }];
+}));
 
 export default {
   async fetch(request, env) {
@@ -480,7 +477,7 @@ async function fetchParkHours(park, env) {
   }
 
   const payload = await response.json();
-  const timezone = String(payload?.timezone || "America/New_York");
+  const timezone = String(payload?.timezone || park.timezone);
   const date = dateKeyInZone(new Date(), timezone);
   const todayEntries = (payload?.schedule || []).filter((entry) => entry?.date === date);
   const operating = todayEntries.filter(
@@ -697,7 +694,7 @@ function rideHasUsableComparison(ride, now = Date.now()) {
 async function attachCurrentBaselines(env, rides) {
   if (!rides?.length) return rides || [];
 
-  const slotMinute = Math.floor(easternMinutes(Date.now()) / 15) * 15;
+  const slotMinute = Math.floor(minutesInZone(Date.now(), parkTimezone(rides[0].parkId)) / 15) * 15;
 
   try {
     const rows = (await env.DB.prepare(
@@ -926,7 +923,7 @@ async function attachDowntimeContext(env, rides, now = Date.now()) {
   if (!downRides.length) return rides || [];
 
   const rideKeys = downRides.map((ride) => String(ride.id));
-  const start = parkDayStartMs(new Date(now));
+  const start = parkDayStartMs(new Date(now), parkTimezone(downRides[0].parkId));
   let rows = [];
 
   try {
@@ -985,7 +982,7 @@ async function attachCrowdTrend(env, parkId, crowdLevel, parkHours, now = Date.n
   const target = now - 30 * 60 * 1000;
   const windowStart = target - 10 * 60 * 1000;
   const windowEnd = target + 10 * 60 * 1000;
-  const slotMinute = Math.floor(easternMinutes(target) / 15) * 15;
+  const slotMinute = Math.floor(minutesInZone(target, parkTimezone(parkId)) / 15) * 15;
 
   let rows = [];
   try {
@@ -1239,16 +1236,14 @@ async function runRideWatch(env) {
 
   const now = Date.now();
   const alertsToQueue = [];
-  const easternHour = Number(new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23"
-  }).format(new Date(now)));
   const parkActivity = new Map();
   for (const [parkId, rides] of currentByPark) {
+    const localHour = zoneParts(new Date(now), parkTimezone(parkId)).hour;
     const nowOpen = rides.filter(item => item.isOpen).length;
     const beforeOpen = (priorByPark.get(parkId) || []).filter(item =>
       item.isOpen && now - Number(item.updatedAt || 0) <= LIVE_FRESHNESS_MS).length;
     parkActivity.set(parkId, { operationalNow: nowOpen >= 3,
-      operationalBefore: beforeOpen >= 3, openingRamp: easternHour < 11 && nowOpen - beforeOpen >= 3 });
+      operationalBefore: beforeOpen >= 3, openingRamp: localHour < 11 && nowOpen - beforeOpen >= 3 });
   }
 
   for (const ride of current) {
@@ -1427,15 +1422,15 @@ function zonedDateToUtc(year, month, day, hour, timeZone = "America/New_York") {
   return guess;
 }
 
-function parkDayStartMs(now = new Date()) {
-  const p = zoneParts(now);
+function parkDayStartMs(now = new Date(), timeZone = "America/New_York") {
+  const p = zoneParts(now, timeZone);
   const date = new Date(Date.UTC(p.year, p.month - 1, p.day));
   if (p.hour < 3) date.setUTCDate(date.getUTCDate() - 1);
-  return zonedDateToUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), 3);
+  return zonedDateToUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), 3, timeZone);
 }
 
-function easternMinutes(ms) {
-  const p = zoneParts(new Date(ms));
+function minutesInZone(ms, timeZone = "America/New_York") {
+  const p = zoneParts(new Date(ms), timeZone);
   return p.hour * 60 + p.minute;
 }
 
@@ -1497,8 +1492,8 @@ function historyStateWait(state) {
   return wait == null || !Number.isFinite(Number(wait)) ? null : Math.max(0, Number(wait));
 }
 
-function buildTimeBaselines(historyPayload) {
-  const timezone = historyPayload?.timezone || "America/New_York";
+function buildTimeBaselines(historyPayload, fallbackTimezone = "America/New_York") {
+  const timezone = historyPayload?.timezone || fallbackTimezone;
   const endMs = localDayEndMs(historyPayload?.range?.to, timezone);
   const states = [];
 
@@ -1592,8 +1587,9 @@ async function fetchThemeParksHistory(env, ride) {
   // ThemeParks' 30-day credential window includes today. Because ParkPulse
   // intentionally builds baselines from completed park days only, the widest
   // default request is the previous 29 completed days.
-  let from = localDateOffset(-29);
-  const to = localDateOffset(-1);
+  const timeZone = parkTimezone(ride.parkId);
+  let from = localDateOffset(-29, Date.now(), timeZone);
+  const to = localDateOffset(-1, Date.now(), timeZone);
 
   let { response, payload } = await requestThemeParksHistory(env, ride, from, to);
 
@@ -1733,7 +1729,7 @@ async function refreshRideBaselines(env, currentRides, batchSize = BASELINE_BATC
   for (const ride of candidates) {
     try {
       const payload = await fetchThemeParksHistory(env, ride);
-      const rows = buildTimeBaselines(payload);
+      const rows = buildTimeBaselines(payload, parkTimezone(ride.parkId));
       await saveRideBaseline(env, ride, rows);
       refreshed++;
     } catch (error) {
@@ -1855,14 +1851,16 @@ async function getAnalyticsStatus(env) {
 // No averages masquerading as posted waits, and at most 1,441 points per response.
 async function getRideHistory(env, rideKey, range, now = Date.now()) {
   const bucketMinutes = range === "today" ? 5 : range === "7d" ? 15 : 30;
-  const start = range === "today" ? parkDayStartMs(new Date(now)) : now - (range === "7d" ? 7 : 30) * 86400000;
+  const catalog = catalogRideByKey(rideKey);
+  const timeZone = parkTimezone(catalog?.parkId);
+  const start = range === "today" ? parkDayStartMs(new Date(now), timeZone) : now - (range === "7d" ? 7 : 30) * 86400000;
   const rows = await env.DB.prepare(`SELECT h.wait_time,h.is_open,h.observed_at FROM ride_history h
     JOIN (SELECT MAX(observed_at) AS stamp FROM ride_history
       WHERE ride_key = ? AND observed_at >= ? AND observed_at <= ?
       GROUP BY CAST(observed_at / ? AS INTEGER)) buckets ON h.observed_at = buckets.stamp
     WHERE h.ride_key = ? ORDER BY h.observed_at LIMIT 1441`)
     .bind(rideKey, start, now, bucketMinutes * 60000, rideKey).all();
-  return { rideId: rideKey, range, timezone: "America/New_York", bucketMinutes,
+  return { rideId: rideKey, range, timezone: timeZone, bucketMinutes,
     startAt: new Date(start).toISOString(), endAt: new Date(now).toISOString(),
     points: (rows.results || []).map(row => ({ observedAt: new Date(row.observed_at).toISOString(),
       isOpen: row.is_open === 1, waitTime: row.wait_time == null ? null : Number(row.wait_time) })) };
@@ -1871,8 +1869,9 @@ async function getRideHistory(env, rideKey, range, now = Date.now()) {
 async function getRideInsights(env, rideKey) {
   const catalog = catalogRideByKey(rideKey);
   const now = Date.now();
-  const todayStart = parkDayStartMs(new Date(now));
-  const currentMinute = easternMinutes(now);
+  const timeZone = parkTimezone(catalog?.parkId);
+  const todayStart = parkDayStartMs(new Date(now), timeZone);
+  const currentMinute = minutesInZone(now, timeZone);
   const slotMinute = Math.floor(currentMinute / 15) * 15;
 
   let todayRows = [];
@@ -1926,7 +1925,7 @@ async function getRideInsights(env, rideKey) {
 
   const todayValues = todayRows.map((row) => Number(row.wait_time)).filter(Number.isFinite);
   const comparable = historyRows
-    .filter((row) => circularMinuteDifference(easternMinutes(Number(row.observed_at)), currentMinute) <= 30)
+    .filter((row) => circularMinuteDifference(minutesInZone(Number(row.observed_at), timeZone), currentMinute) <= 30)
     .map((row) => Number(row.wait_time))
     .filter(Number.isFinite);
 

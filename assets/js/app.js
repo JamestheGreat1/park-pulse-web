@@ -1,4 +1,4 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
+import { PARKS, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
 import { store } from "./store.js?v=1.9.5";
 import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.5";
 import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.5";
@@ -452,16 +452,16 @@ function zonedDateToUtc(year, month, day, hour, timeZone) {
   guess -= represented - guess;
   return guess;
 }
-function easternParkDayEnd() {
-  const timeZone = "America/New_York";
-  const nowParts = zoneParts(new Date(), timeZone);
+function parkDayEnd(parkId, now = new Date()) {
+  const timeZone = parkTimezone(parkId);
+  const nowParts = zoneParts(now, timeZone);
   const date = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day));
   if (nowParts.hour >= 3) date.setUTCDate(date.getUTCDate() + 1);
   return zonedDateToUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), 3, timeZone);
 }
-function durationExpiry(value) {
+function durationExpiry(value, parkId = store.snapshot.selectedParkId) {
   if (value === "3h") return Date.now() + 3 * 60 * 60 * 1000;
-  if (value === "today") return easternParkDayEnd();
+  if (value === "today") return parkDayEnd(parkId);
   return null;
 }
 function remaining(rule) {
@@ -1310,7 +1310,7 @@ function openRide(id) {
     const waitTarget = thresholdEnabled ? threshold : null;
     if (!reopen && !waitTarget) return toast("Choose at least one alert.");
     const duration = $("#durationSelect").value;
-    store.saveRule({ rideId: id, parkId: model.parkId, rideName: model.name || model.rideName, land: model.land || "", reopen, threshold: waitTarget, expiresAt: duration === "keep" ? existing.expiresAt : durationExpiry(duration), createdAt: existing?.createdAt || Date.now() });
+    store.saveRule({ rideId: id, parkId: model.parkId, rideName: model.name || model.rideName, land: model.land || "", reopen, threshold: waitTarget, expiresAt: duration === "keep" ? existing.expiresAt : durationExpiry(duration, model.parkId), createdAt: existing?.createdAt || Date.now() });
     if (!pushOn) toast("Watch saved — turn on notifications if you want it to buzz you.");
     else { if (await safeSync()) toast("Watch saved"); }
     closeSheet();

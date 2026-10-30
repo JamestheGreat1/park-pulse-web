@@ -478,7 +478,7 @@ test('Next Up skips stale, closed, and source-missing rides', () => {
 test('history keeps zero waits, null waits, and closures distinct and bounds queries', async () => {
   let bindings, query;
   const now = Date.parse('2026-09-24T12:00:00Z');
-  const context = vm.createContext({ Date, Number, parkDayStartMs: () => now-8*3600000,
+  const context = vm.createContext({ Date, Number, catalogRideByKey: () => ({ parkId: 6 }), parkTimezone: () => "America/New_York", parkDayStartMs: () => now-8*3600000,
     env: {DB:{prepare(sql){query=sql;return {bind(...args){bindings=args;return {all:async()=>({results:[
       {wait_time:0,is_open:1,observed_at:now-60000},
       {wait_time:null,is_open:1,observed_at:now-30000},
@@ -879,4 +879,69 @@ test('wait trend glyph stays compact and hides for stale cards', () => {
   const card = app.slice(app.indexOf('function rideCard('), app.indexOf('function rideListMarkup('));
   assert.match(card, /ride-wait-line/);
   assert.match(card, /rideTrendMarkup\(ride, status\)/);
+});
+
+test('shared catalog preserves WDW parks and gates Disneyland until Phase 2', async () => {
+  const source = fs.readFileSync(new URL('../assets/js/catalog.js', import.meta.url), 'utf8');
+  const catalog = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(source));
+  assert.deepEqual(catalog.PARKS.map(p => p.id), [6, 5, 7, 8]);
+  assert.deepEqual(catalog.parksForResort('wdw').map(p => p.id), [6,5,7,8]);
+  assert.deepEqual(catalog.parksForResort('dlr'), []);
+  assert.deepEqual(catalog.parksForResort('dlr', { includeDisabled: true }).map(p => p.id), [16,17]);
+  assert.equal(catalog.parkTimezone(6), 'America/New_York');
+  assert.equal(catalog.parkTimezone(16), 'America/Los_Angeles');
+  assert.equal(catalog.resortForPark(17).id, 'dlr');
+  assert.equal(catalog.parkName(5), 'EPCOT');
+  assert.equal(catalog.PARKS.some(p => p.resortId === 'dlr'), false);
+  const worker = fs.readFileSync(new URL('../worker/src/index.js', import.meta.url), 'utf8');
+  assert.match(worker, /import \{ PARKS as ENABLED_PARKS, parkTimezone \} from/);
+});
+
+test('park day and baseline slots use park-local time, including daylight saving', () => {
+  const script = section('const zoneFormatters =', 'function weightedQuantile(');
+  const context = vm.createContext({ Date, Intl, Number, Map, String, Math });
+  vm.runInContext(script, context);
+  const local = vm.runInContext('({ parkDayStartMs, minutesInZone, localDateOffset })', context);
+  const summer = new Date('2026-07-04T20:00:00Z');
+  assert.equal(new Date(local.parkDayStartMs(summer, 'America/New_York')).toISOString(), '2026-07-04T07:00:00.000Z');
+  assert.equal(new Date(local.parkDayStartMs(summer, 'America/Los_Angeles')).toISOString(), '2026-07-04T10:00:00.000Z');
+  assert.equal(local.minutesInZone(summer.getTime(), 'America/New_York'), 16*60);
+  assert.equal(local.minutesInZone(summer.getTime(), 'America/Los_Angeles'), 13*60);
+  const winter = new Date('2026-01-04T20:00:00Z');
+  assert.equal(new Date(local.parkDayStartMs(winter, 'America/Los_Angeles')).toISOString(), '2026-01-04T11:00:00.000Z');
+  assert.equal(local.localDateOffset(-1, Date.parse('2026-07-04T05:00:00Z'), 'America/Los_Angeles'), '2026-07-02');
+});
+
+test('today watch expiry is local to the ride park, not the current user resort', () => {
+  const app = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  const script = app.slice(app.indexOf('function zonedDateToUtc('), app.indexOf('function remaining('));
+  const context = vm.createContext({
+    Date, Math, Number, store: { snapshot: { selectedParkId: 6 } },
+    parkTimezone: (id) => id === 16 ? 'America/Los_Angeles' : 'America/New_York',
+    zoneParts: (date, timeZone) => {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone, year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle:'h23'
+      }).formatToParts(date);
+      return Object.fromEntries(parts.filter(p=>p.type!=='literal').map(p=>[p.type, Number(p.value)]));
+    }
+  });
+  vm.runInContext(script, context);
+  assert.equal(vm.runInContext('durationExpiry.toString().includes("parkDayEnd(parkId)")', context), true);
+  const timestamp = Date.parse('2026-07-04T20:00:00Z');
+  assert.equal(new Date(vm.runInContext('parkDayEnd(6, new Date('+timestamp+'))',context)).toISOString(), '2026-07-05T07:00:00.000Z');
+  assert.equal(new Date(vm.runInContext('parkDayEnd(16, new Date('+timestamp+'))',context)).toISOString(), '2026-07-05T10:00:00.000Z');
+  assert.match(app, /durationExpiry\(duration, model\.parkId\)/);
+});
+
+test('Worker uses per-park timezone for baselines, events, and history', () => {
+  const worker = fs.readFileSync(new URL('../worker/src/index.js', import.meta.url), 'utf8');
+  assert.match(worker, /minutesInZone\(Date\.now\(\), parkTimezone\(rides\[0\]\.parkId\)\)/);
+  assert.match(worker, /minutesInZone\(target, parkTimezone\(parkId\)\)/);
+  assert.match(worker, /localHour = zoneParts\(new Date\(now\), parkTimezone\(parkId\)\)\.hour/);
+  assert.match(worker, /localDateOffset\(-29, Date\.now\(\), timeZone\)/);
+  assert.match(worker, /parkDayStartMs\(new Date\(now\), timeZone\)/);
+  assert.doesNotMatch(worker, /easternMinutes|easternHour/);
+  const app = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(app, /easternParkDayEnd/);
 });

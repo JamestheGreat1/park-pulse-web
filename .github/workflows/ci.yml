@@ -43,3 +43,18 @@ jobs:
           exit 1
       - name: Run browser smoke test
         run: node tests/browser-smoke.cjs
+
+  worker-bundle:
+    name: Worker bundling smoke test (no deployment)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Worker dependencies
+        working-directory: worker
+        run: npm install --no-save --package-lock=false
+      - name: Dry-run Cloudflare Worker bundling
+        working-directory: worker
+        run: npx wrangler deploy --dry-run --outdir ./dry-run

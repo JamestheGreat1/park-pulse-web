@@ -1,5 +1,6 @@
 import { sendNotification } from "web-push-neo";
 import { PARKS as ENABLED_PARKS, parkTimezone } from "../../assets/js/catalog.js";
+import { disneylandRidesForPark } from "./disneyland-rides.js";
 import { ensureAlertQueueSchema, enqueueRideAlerts, processPendingRideAlerts, pruneExpiredRideAlerts } from "./alert-queue.js";
 
 const VERSION = "1.7.6";
@@ -84,8 +85,16 @@ const PARKS = new Map([
 ].map(([id, config]) => {
   const park = ENABLED_PARKS.find((item) => item.id === id);
   if (!park) throw new Error(`Missing enabled park metadata: ${id}`);
-  return [id, { ...config, name: park.name, themeParksId: park.themeParksId, timezone: parkTimezone(id) }];
+  return [id, { ...config, name: park.name, themeParksId: park.themeParksId, timezone: parkTimezone(id), resortId: park.resortId }];
 }));
+
+// The curated California catalog is staged here but remains completely inactive
+// while Disneyland Resort and its parks have enabled:false in catalog.js.
+for (const park of ENABLED_PARKS.filter((item) => item.resortId === "dlr")) {
+  const rides = disneylandRidesForPark(park.id);
+  if (!rides.length) throw new Error(`No curated rides for enabled park: ${park.id}`);
+  PARKS.set(park.id, { ...park, rides });
+}
 
 export default {
   async fetch(request, env) {
@@ -370,6 +379,29 @@ function findCatalogRide(park, name) {
   return null;
 }
 
+// An overlay and its base attraction can appear as separate provider entries.
+// Prefer the fresh operating variant; do not overwrite it with a closed base entry.
+function collapseRideVariants(results, now = Date.now()) {
+  const unique = new Map();
+  for (const candidate of results) {
+    const prior = unique.get(candidate.id);
+    if (!prior) { unique.set(candidate.id, candidate); continue; }
+    const freshCandidate = isFreshSourceRide(candidate, now);
+    const freshPrior = isFreshSourceRide(prior, now);
+    const candidateHasWait = freshCandidate && candidate.isOpen && candidate.waitTime != null;
+    const priorHasWait = freshPrior && prior.isOpen && prior.waitTime != null;
+    const better = candidateHasWait !== priorHasWait
+      ? candidateHasWait
+      : freshCandidate !== freshPrior
+        ? freshCandidate
+        : Boolean(candidate.isOpen) !== Boolean(prior.isOpen)
+          ? Boolean(candidate.isOpen)
+          : sourceTimestampMs(candidate) > sourceTimestampMs(prior);
+    if (better) unique.set(candidate.id, candidate);
+  }
+  return [...unique.values()];
+}
+
 function sourceTimestampMs(ride) {
   const value = new Date(ride?.lastUpdated || 0).getTime();
   return Number.isFinite(value) ? value : 0;
@@ -576,7 +608,9 @@ async function fetchThemeParksRides(parkId, park, env) {
     });
   }
 
-  return [...new Map(results.map((item) => [item.id, item])).values()];
+  return park.resortId === "dlr"
+    ? collapseRideVariants(results)
+    : [...new Map(results.map((item) => [item.id, item])).values()];
 }
 
 async function fetchQueueTimesRides(parkId, park) {
@@ -629,7 +663,9 @@ async function fetchQueueTimesRides(parkId, park) {
   }
   for (const item of payload?.rides || []) ingest(item);
 
-  return [...new Map(results.map((item) => [item.id, item])).values()];
+  return park.resortId === "dlr"
+    ? collapseRideVariants(results)
+    : [...new Map(results.map((item) => [item.id, item])).values()];
 }
 
 async function addDisplayFallbacks(env, parkId, park, snapshot) {

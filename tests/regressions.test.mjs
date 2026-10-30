@@ -948,3 +948,104 @@ test('Worker uses per-park timezone for baselines, events, and history', () => {
   const app = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
   assert.doesNotMatch(app, /easternParkDayEnd/);
 });
+
+
+test('Disneyland catalogs are curated, distinct and remain behind disabled resort gates', async () => {
+  const file = fs.readFileSync(new URL('../worker/src/disneyland-rides.js', import.meta.url), 'utf8');
+  const { DISNEYLAND_RIDES, disneylandRidesForPark } =
+    await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(file));
+  assert.equal(disneylandRidesForPark(16).length, 35);
+  assert.equal(disneylandRidesForPark(17).length, 19);
+  const all = [...DISNEYLAND_RIDES.values()].flat();
+  assert.equal(new Set(all.map(ride => ride.key)).size, all.length);
+  assert.equal(all.every(ride => /^(dl|dca):/.test(ride.key)), true);
+  assert.equal(all.every(ride => ride.name && ride.land && Array.isArray(ride.aliases)), true);
+  assert.equal(all.some(ride => /single rider|tiki room|phil(har)?magic|turtle talk|world of color|villains grove|treehouse/i.test(ride.name)), false);
+  assert.equal(disneylandRidesForPark(17).find(ride => ride.key === 'dca:guardians').aliases.includes('Guardians of the Galaxy - Monsters After Dark'), true);
+  assert.notEqual(disneylandRidesForPark(17).find(ride => ride.key === 'dca:pal-a-round-swinging'),
+                  disneylandRidesForPark(17).find(ride => ride.key === 'dca:pal-a-round-non-swinging'));
+  const catalog = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(
+    fs.readFileSync(new URL('../assets/js/catalog.js', import.meta.url), 'utf8')));
+  assert.deepEqual(catalog.PARKS.map(p => p.id), [6, 5, 7, 8]);
+  assert.equal(catalog.parksForResort('dlr').length, 0);
+  assert.match(worker, /ENABLED_PARKS\.filter\(\(item\) => item\.resortId === "dlr"\)/);
+});
+
+test('California ride name matching excludes single rider and non-rides', async () => {
+  const file = fs.readFileSync(new URL('../worker/src/disneyland-rides.js', import.meta.url), 'utf8');
+  const { disneylandRidesForPark } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(file));
+  const code = section('function normalizeName(', '// An overlay and its base attraction');
+  const context = vm.createContext({ String, Array, RegExp });
+  vm.runInContext(code, context);
+  const match = vm.runInContext('findCatalogRide', context);
+  const rejectsSingleRider = vm.runInContext('isSingleRiderName', context);
+  const dl = { rides: disneylandRidesForPark(16) };
+  const dca = { rides: disneylandRidesForPark(17) };
+  assert.equal(match(dl, 'Indiana Jones™ Adventure')?.key, 'dl:indiana-jones');
+  assert.equal(match(dl, 'Haunted Mansion Holiday')?.key, 'dl:haunted-mansion');
+  assert.equal(match(dl, 'Haunted Mansion')?.key, 'dl:haunted-mansion');
+  assert.equal(match(dl, 'Space Mountain')?.key, 'dl:space-mountain');
+  assert.equal(match(dca, 'Guardians of the Galaxy - Monsters After Dark')?.key, 'dca:guardians');
+  assert.equal(match(dca, 'Luigi\'s Honkin\' Haul-O-Ween')?.key, 'dca:luigis');
+  assert.equal(match(dca, 'Mater\'s Graveyard JamBOOree')?.key, 'dca:maters');
+  assert.equal(match(dca, 'Soarin’ Across America')?.key, 'dca:soarin');
+  assert.equal(match(dca, 'Pixar Pal-A-Round – Non-Swinging')?.key, 'dca:pal-a-round-non-swinging');
+  assert.equal(match(dca, 'Pixar Pal-A-Round - Swinging')?.key, 'dca:pal-a-round-swinging');
+  assert.equal(match(dca, 'WEB SLINGERS: A Spider-Man Adventure')?.key, 'dca:web-slingers');
+  assert.equal(match(dl, 'Walt Disney\'s Enchanted Tiki Room'), null);
+  assert.equal(match(dca, 'Mickey\'s PhilharMagic'), null);
+  assert.equal(match(dca, 'World of Color – ONE'), null);
+  assert.equal(rejectsSingleRider('WEB SLINGERS: A Spider-Man Adventure Single Rider'), true);
+});
+
+test('Seasonal overlays choose a fresh operating variant even if base entry follows', async () => {
+  const file = fs.readFileSync(new URL('../worker/src/disneyland-rides.js', import.meta.url), 'utf8');
+  const { disneylandRidesForPark } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(file));
+  const code = section('function normalizeName(', 'async function fetchFreshParkRides(');
+  const context = vm.createContext({ Date, Map, Number, String, Array, Math, LIVE_FRESHNESS_MS: 15 * 60 * 1000 });
+  vm.runInContext(code, context);
+  const collapse = vm.runInContext('collapseRideVariants', context);
+  const match = vm.runInContext('findCatalogRide', context);
+  const park = { rides: disneylandRidesForPark(17) };
+  const stamp = new Date().toISOString();
+  const sample = [
+    { id: match(park,'Guardians of the Galaxy - Monsters After Dark').key, rawName:'Guardians of the Galaxy - Monsters After Dark', isOpen:true, waitTime:40, lastUpdated:stamp },
+    { id: match(park,'Guardians of the Galaxy - Mission: BREAKOUT!').key, rawName:'Guardians of the Galaxy - Mission: BREAKOUT!', isOpen:false, waitTime:0, lastUpdated:stamp }
+  ];
+  assert.equal(collapse(sample).length, 1);
+  assert.equal(collapse(sample)[0].isOpen, true);
+  assert.equal(collapse([...sample].reverse())[0].isOpen, true);
+  assert.equal(collapse([...sample, { ...sample[0], id:'dca:soarin', waitTime:0 }]).length, 2);
+  assert.equal(collapse([{ ...sample[0], lastUpdated:'2020-01-01T00:00:00Z' }, sample[1]])[0].isOpen, false);
+});
+
+test('California provider normalization respects stable IDs, excludes shows, and retains fallback', async () => {
+  const file = fs.readFileSync(new URL('../worker/src/disneyland-rides.js', import.meta.url), 'utf8');
+  const { disneylandRidesForPark } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(file));
+  const code = section('function normalizeName(', 'async function fetchFreshParkRides(')
+    + section('async function fetchThemeParksRides(', 'async function addDisplayFallbacks(');
+  const now = new Date().toISOString();
+  const theme = { liveData: [
+    { id:'tp-haunted', name:'Haunted Mansion Holiday', status:'OPERATING', queue:{STANDBY:{waitTime:35}},lastUpdated:now },
+    { id:'tp-tiki', name:'Walt Disney\'s Enchanted Tiki Room',status:'OPERATING',queue:{STANDBY:{waitTime:0}},lastUpdated:now }
+  ] };
+  const queue = { lands:[{ name:'New Orleans Square', rides:[
+    {id:325,name:'Haunted Mansion Holiday',is_open:true,wait_time:30,last_updated:now },
+    {id:14326,name:'Tiana\'s Bayou Adventure Single Rider',is_open:true,wait_time:0,last_updated:now }
+  ]}], rides:[] };
+  const context=vm.createContext({
+    Date, Map, Number, String, Array, Math, LIVE_FRESHNESS_MS:15*60*1000,
+    VERSION:'test', fetch:async (url)=>({ok:true, json:async()=>String(url).includes('themeparks.wiki')?theme:queue})
+  });
+  vm.runInContext(code, context);
+  const park={id:16,themeParksId:'test-id',resortId:'dlr',rides:disneylandRidesForPark(16)};
+  const primary=await vm.runInContext('fetchThemeParksRides',context)(16,park,{});
+  const fallback=await vm.runInContext('fetchQueueTimesRides',context)(16,park);
+  assert.deepEqual(primary.map(ride => ride.id), ['dl:haunted-mansion']);
+  assert.equal(primary[0].sourceId,'tp-haunted');
+  assert.equal(primary[0].waitTime,35);
+  assert.deepEqual(fallback.map(ride => ride.id), ['dl:haunted-mansion']);
+  assert.equal(fallback[0].sourceId,'325');
+  assert.equal(fallback[0].waitTime,30);
+  assert.equal(primary.some(ride=>ride.id==='dl:tianas'),false);
+});

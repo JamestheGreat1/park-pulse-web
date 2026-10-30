@@ -58,3 +58,15 @@ jobs:
       - name: Dry-run Cloudflare Worker bundling
         working-directory: worker
         run: npx wrangler deploy --dry-run --outdir ./dry-run
+
+  source-audit:
+    name: Read-only Disneyland provider coverage audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Probe current Disneyland & DCA provider payloads (no secrets)
+        run: node worker/scripts/audit-disneyland-sources.mjs

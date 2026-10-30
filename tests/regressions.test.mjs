@@ -1041,10 +1041,10 @@ test('California provider normalization respects stable IDs, excludes shows, and
   const park={id:16,themeParksId:'test-id',resortId:'dlr',rides:disneylandRidesForPark(16)};
   const primary=await vm.runInContext('fetchThemeParksRides',context)(16,park,{});
   const fallback=await vm.runInContext('fetchQueueTimesRides',context)(16,park);
-  assert.deepEqual(primary.map(ride => ride.id), ['dl:haunted-mansion']);
+  assert.deepEqual(Array.from(primary, ride => ride.id), ['dl:haunted-mansion']);
   assert.equal(primary[0].sourceId,'tp-haunted');
   assert.equal(primary[0].waitTime,35);
-  assert.deepEqual(fallback.map(ride => ride.id), ['dl:haunted-mansion']);
+  assert.deepEqual(Array.from(fallback, ride => ride.id), ['dl:haunted-mansion']);
   assert.equal(fallback[0].sourceId,'325');
   assert.equal(fallback[0].waitTime,30);
   assert.equal(primary.some(ride=>ride.id==='dl:tianas'),false);

@@ -583,6 +583,7 @@ async function fetchThemeParksRides(parkId, park, env) {
   const results = [];
 
   for (const item of payload?.liveData || []) {
+    if (isSingleRiderName(item?.name)) continue;
     const catalogRide = findCatalogRide(park, item?.name);
     if (!catalogRide) continue;
 

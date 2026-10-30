@@ -1027,6 +1027,7 @@ test('California provider normalization respects stable IDs, excludes shows, and
   const now = new Date().toISOString();
   const theme = { liveData: [
     { id:'tp-haunted', name:'Haunted Mansion Holiday', status:'OPERATING', queue:{STANDBY:{waitTime:35}},lastUpdated:now },
+    { id:'tp-single', name:'Tiana\'s Bayou Adventure Single Rider', status:'OPERATING', queue:{STANDBY:{waitTime:0}},lastUpdated:now },
     { id:'tp-tiki', name:'Walt Disney\'s Enchanted Tiki Room',status:'OPERATING',queue:{STANDBY:{waitTime:0}},lastUpdated:now }
   ] };
   const queue = { lands:[{ name:'New Orleans Square', rides:[

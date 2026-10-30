@@ -14,6 +14,7 @@ async function evaluate(beforeWait, currentWait) {
   const context = vm.createContext({
     Date, Intl, Map, JSON, Number, console, LIVE_FRESHNESS_MS: 1200000,
     PARKS: new Map([[6, { name: 'Magic Kingdom' }]]),
+    parkTimezone: () => 'America/New_York', zoneParts: () => ({ hour: 14 }),
     ensureNotificationSchema: async () => {},
     readPriorRideState: async () => [{ ...ride, waitTime: beforeWait, updatedAt: Date.now() }],
     fetchCurrentRideSnapshot: async () => ({ rides: [ride] }),
@@ -45,6 +46,7 @@ test('queued transitions are recorded before the notification checkpoint', async
   const context = vm.createContext({
     Date, Intl, Map, JSON, Number, console, LIVE_FRESHNESS_MS: 1200000,
     PARKS: new Map([[6, { name: 'Magic Kingdom' }]]),
+    parkTimezone: () => 'America/New_York', zoneParts: () => ({ hour: 14 }),
     ensureNotificationSchema: async () => {},
     readPriorRideState: async () => [{ ...ride, waitTime: 55, updatedAt: Date.now() }],
     fetchCurrentRideSnapshot: async () => ({ rides: [ride] }),
@@ -67,6 +69,7 @@ test('failed queue insertion never advances ride checkpoint', async () => {
   const context = vm.createContext({
     Date, Intl, Map, JSON, Number, console, LIVE_FRESHNESS_MS: 1200000,
     PARKS: new Map([[6, { name: 'Magic Kingdom' }]]),
+    parkTimezone: () => 'America/New_York', zoneParts: () => ({ hour: 14 }),
     ensureNotificationSchema: async () => {},
     readPriorRideState: async () => [{ ...ride, waitTime: 55, updatedAt: Date.now() }],
     fetchCurrentRideSnapshot: async () => ({ rides: [ride] }),

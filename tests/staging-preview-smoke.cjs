@@ -47,7 +47,7 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.equal(await page.locator('#view-explore [data-park="16"]').getAttribute('aria-pressed'),'true');
     await page.locator('#view-explore [data-park="17"]').click();
     await page.waitForSelector('[data-ride-id="dca:guardians"]',{timeout:10000});
-    await page.locator('[data-ride-id="dca:guardians"] [data-open-ride]').click();
+    await page.locator('[data-ride-id="dca:guardians"] [data-open-ride]').first().click();
     assert.match(await page.locator('#sheetTitle').textContent(),/Guardians/);
     assert(apiParks.includes(16)&&apiParks.includes(17));
     assert(apiHosts.every(host=>host==='parkpulse-api-staging.jamesp5297.workers.dev'));

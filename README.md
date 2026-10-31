@@ -8,13 +8,11 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · 2.0.0 release preparation (not deployed; production remains 1.9.5)**
-
-**Release status:** This is an unpublished final-preparation branch. The Disneyland resort and parks are enabled in this review source, but production stays unchanged until explicit signoff. See [ParkPulse 2.0 release gates](docs/parkpulse-2-release-plan.md).
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 2.0.0**
 
 ## What ParkPulse does
 
-- **Live waits and ride status** for four Walt Disney World parks, plus Disneyland Park and Disney California Adventure in the upcoming 2.0 release.
+- **Live waits and ride status** for four Walt Disney World parks, plus Disneyland Park and Disney California Adventure.
 - **Best Now** compares the current wait with what is normally expected for that ride around the same time of day.
 - **Wait comparisons** quickly show when something is running better or worse than typical.
 - **Wait trends** add a subtle up/down arrow when the live wait moves by at least 5 minutes in about 15 minutes.

@@ -190,6 +190,8 @@ test('startup binds navigation and renders before pending diagnostics or registr
     refreshPushState: () => new Promise(() => {}), $$: () => [nav], $: () => ({}),
     window: { addEventListener() {} }, document: { addEventListener() {} }, handleDialogKeydown() {},
     checkForAppUpdate() {},
+    URL, location: { href: 'https://app.useparkpulse.com/' },
+    parkIdForRideKey: () => null, refreshRelevantParks: () => new Promise(() => {}),
     rideData: { addEventListener() {}, refresh: () => new Promise(() => {}) },
     store: { addEventListener() {}, snapshot: { activeView: 'explore' } }, views: { explore: {} },
     selectView() { rendered = true; }

@@ -1355,3 +1355,15 @@ test('Every frontend shared-catalog import is re-exported through data.js', () =
   }
   assert(forwarded.has('parkIdForRideKey'));
 });
+
+
+test('Settings tab uses a complete, symmetric gear SVG rather than the distorted legacy path', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const settings = html.match(/<button id="nav-settings"[\s\S]*?<\/button>/)?.[0];
+  assert(settings, 'Settings tab exists');
+  assert.match(settings, /<svg viewBox="0 0 24 24" aria-hidden="true">/);
+  assert.match(settings, /<circle cx="12" cy="12" r="3"\/>/);
+  assert.match(settings, /M9\.671 4\.136a2\.34/);
+  assert.doesNotMatch(settings, /M12 15\.5A3\.5 3\.5/);
+  assert.match(settings, /<span>Settings<\/span>/);
+});

@@ -113,6 +113,11 @@ if (previewUrl) {
       if (entry.name === "app.js") {
         contents = contents.replace('new URL("https://app.useparkpulse.com/")', 'new URL("' + origin + '/")');
       }
+      if (entry.name === "push.js") {
+        const supportCheck = 'export function pushSupported(){return Boolean(';
+        if (!contents.includes(supportCheck)) fail("Staging push support guard missing.");
+        contents = contents.replace(supportCheck, 'export function pushSupported(){return Boolean(false && ');
+      }
       if (entry.name === "index.html") {
         contents = contents
           .replace("<title>ParkPulse</title>", '<title>ParkPulse 2.0 — Staging Preview</title>')

@@ -61,3 +61,7 @@ The generated configuration intentionally permits only GET/read endpoints and pr
 Cloudflare documentation: `wrangler d1 create` returns the database binding ID, and `wrangler d1 execute ... --remote --file` applies SQL remotely. Deploying from `.parkpulse-staging/worker` must include `--config ./wrangler.toml` on every command; do not run the regular production deploy command for staging.
 
 **Do not paste credentials or subscription endpoints into ChatGPT or GitHub.** For first live testing, send back only the staging Worker URL and redacted `/health` output.
+
+## Controlled history-only staging mode
+
+The staging generator can optionally use `--enable-history-cron` after manual CPU checks. This adds only one five-minute trigger on the generated staging Worker and activates its history-only guard. Notifications, alert checkpoints and historical backfill remain disabled. The default generator still produces no cron. See `worker/README.md` for enable/disable commands and metric checks.

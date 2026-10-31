@@ -132,3 +132,30 @@ The deployment prints the staging URL, typically `https://parkpulse-api-staging.
 Only once API testing passes should we enable manual data writes, staging test notifications, hourly history backfill, or scheduled sampling. Those require a separate explicit step and Cloudflare CPU/D1 measurements. The current staging `APP_URL` points at the reserved invalid domain on purpose so no push link can send users to production.
 
 See `docs/parkpulse-2-staging-readiness.md` for the validation gates and expected D1 usage.
+
+## Optional history-only staging cron (after inspecting staging CPU)
+
+From the repository root, regenerate the staging copy with a history-only schedule:
+
+```bash
+git pull --ff-only
+node worker/scripts/build-staging.mjs --database-id YOUR_STAGING_UUID --enable-history-cron
+cd .parkpulse-staging/worker
+npx wrangler deploy --config ./wrangler.toml --dry-run
+npx wrangler deploy --config ./wrangler.toml
+```
+
+The `--enable-history-cron` switch changes the staging Worker only when redeployed: it attaches one five-minute cron. It records live state/history, **never** evaluates notification rules, sends push, advances alert checkpoints or initiates historical baseline backfill. The live production Worker and its cron behavior remain unchanged.
+
+Verify `/health` includes `stagingHistoryOnly: true` and review scheduled invocations, CPU, errors and D1 usage. The scheduler continues after Codespaces is closed.
+
+To disable recurring collection, regenerate without the switch and deploy the staging copy:
+
+```bash
+cd /workspaces/park-pulse-web
+node worker/scripts/build-staging.mjs --database-id YOUR_STAGING_UUID
+cd .parkpulse-staging/worker
+npx wrangler deploy --config ./wrangler.toml
+```
+
+Existing staging D1 history is retained. Do not use the production deploy command.

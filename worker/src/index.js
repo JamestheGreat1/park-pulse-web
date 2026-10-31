@@ -120,6 +120,7 @@ export default {
           version: VERSION,
           staging: env.STAGING_MODE === "true",
           pushRegistrationEnabled: env.STAGING_MODE !== "true" || env.STAGING_ALLOW_PUSH === "true",
+          stagingHistoryOnly: env.STAGING_MODE === "true" && env.STAGING_ENABLE_CRON === "true" && env.STAGING_HISTORY_ONLY === "true",
           primaryDataSource: "ThemeParks.wiki",
           fallbackDataSource: "Queue-Times",
           themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),
@@ -325,11 +326,18 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
-    // Defense-in-depth even if a cron is accidentally attached in Cloudflare.
-    if (env.STAGING_MODE === "true" && env.STAGING_ENABLE_CRON !== "true") {
-      console.log("Staging cron disabled — no writes or push deliveries");
+    if (env.STAGING_MODE === "true") {
+      // Hard stop on the alert pipeline, even if a Cloudflare trigger is added.
+      if (env.STAGING_ENABLE_CRON !== "true" ||
+          env.STAGING_HISTORY_ONLY !== "true" ||
+          controller.cron !== "*/5 * * * *") {
+        console.log("Staging alert engine disabled; no scheduled work");
+        return;
+      }
+      ctx.waitUntil(runStagingHistoryOnly(env));
       return;
     }
+    // Production behavior is unchanged.
     // Separate invocations: maintenance cannot consume the alert job's CPU budget.
     if (controller.cron === "17 * * * *") ctx.waitUntil(runScheduledMaintenance(env));
     else ctx.waitUntil(runRideWatch(env));
@@ -1224,6 +1232,19 @@ async function fetchCurrentRideSnapshot(env) {
     }
   }
   return { rides, primaryParks, fallbackParks };
+}
+
+// Staging-only: sample state/history without notification evaluation,
+// checkpoints, historical backfill or hourly maintenance.
+async function runStagingHistoryOnly(env) {
+  if (env.STAGING_MODE !== "true" ||
+      env.STAGING_ENABLE_CRON !== "true" ||
+      env.STAGING_HISTORY_ONLY !== "true") {
+    throw new Error("Staging history collection is not explicitly enabled");
+  }
+  const { rides } = await fetchCurrentRideSnapshot(env);
+  await writeCurrentRideSnapshot(env, rides);
+  console.log("Staging history-only sample complete", rides.length);
 }
 
 async function runManualRefresh(env) {

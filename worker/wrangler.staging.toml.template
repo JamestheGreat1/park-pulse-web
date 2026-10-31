@@ -12,6 +12,7 @@ VAPID_SUBJECT = "https://parkpulse-staging.invalid/"
 STAGING_MODE = "true"
 STAGING_ALLOW_PUSH = "false"
 STAGING_ENABLE_CRON = "false"
+STAGING_HISTORY_ONLY = "false"
 
 [[d1_databases]]
 binding = "DB"

@@ -1,7 +1,7 @@
 import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=2.0.0-rc.1";
 import { store } from "./store.js?v=2.0.0-rc.1";
 import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=2.0.0-rc.1";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe } from "./push.js?v=2.0.0-rc.1";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe, armStagingLiveProbe, stagingLiveProbeStatus } from "./push.js?v=2.0.0-rc.1";
 import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=2.0.0-rc.1";
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -1027,6 +1027,17 @@ function renderSettings() {
               data-ride-id="${escapeHtml(scheduledProbeWatch.rideId)}">Arm test</button>`
           : `<button type="button" class="setting-action" data-view-jump="explore">Find ride</button>`}</div>`
     : "";
+  const liveProbe = backendState?.stagingLiveProbeAvailable === true && pushOn
+    ? `<div class="setting-row"><div><strong>Real ride-change verification</strong>
+        <small>One device only. Observe live source updates every five minutes for up to 12 hours; no pretend wait times. Sends at most one labeled alert if a real change matches your watch.</small></div>
+        <span class="health-pill good">Staging only</span></div>
+      ${waitWatch ? `<div class="setting-row"><div><strong>Real wait-drop test</strong><small>Watch ${escapeHtml(waitWatch.rideName)} cross your saved target.</small></div>
+        <button type="button" class="setting-action" data-arm-live-probe data-kind="wait" data-ride-id="${escapeHtml(waitWatch.rideId)}">Observe</button></div>` : ""}
+      ${reopenWatch ? `<div class="setting-row"><div><strong>Real reopening test</strong><small>Watch ${escapeHtml(reopenWatch.rideName)} reopen naturally.</small></div>
+        <button type="button" class="setting-action" data-arm-live-probe data-kind="reopen" data-ride-id="${escapeHtml(reopenWatch.rideId)}">Observe</button></div>` : ""}
+      <div class="setting-row"><div><strong>Observation status</strong><small>Check the saved progress and delivery result for this device.</small></div>
+        <button type="button" class="setting-action" data-check-live-probe>Check</button></div>`
+    : "";
   const installRow = install.visible
     ? `<div class="setting-row install-status-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>`
     : "";
@@ -1117,6 +1128,7 @@ function renderSettings() {
       ${pushOn ? `<div class="setting-row"><div><strong>Test notification</strong><small>Make sure push is actually working on this device.</small></div><button type="button" data-test-push class="setting-action">Send test</button></div>` : ""}
       ${stagingAlertTests}
       ${scheduledProbe}
+      ${liveProbe}
       ${installRow}
     </section>
     <div class="settings-section-title">Customization</div>
@@ -1252,8 +1264,11 @@ function bindDynamic() {
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
   $$('[data-simulate-alert]').forEach((button) => button.onclick = () =>
     testStagingRideAlert(button.dataset.simulateAlert, button.dataset.rideId));
-  $$('[data-arm-cron-probe]').forEach((button) => button.onclick = () =>
+  $('[data-arm-cron-probe]').forEach((button) => button.onclick = () =>
     armScheduledStagingTest(button.dataset.kind, button.dataset.rideId));
+  $('[data-arm-live-probe]').forEach((button) => button.onclick = () =>
+    armRealStagingObservation(button.dataset.kind, button.dataset.rideId));
+  $('[data-check-live-probe]').forEach((button) => button.onclick = checkRealStagingObservation);
   document.querySelectorAll('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const diagnosticsDetails = $(".diagnostics-details");
   if (diagnosticsDetails) diagnosticsDetails.ontoggle = () => { diagnosticsExpanded = diagnosticsDetails.open; };
@@ -1705,6 +1720,35 @@ async function armScheduledStagingTest(kind, rideId) {
     if (result.armed) toast("Scheduled test armed! It will run on the next 5-minute check.");
   } catch (error) {
     toast(error.message || "Couldn't arm the scheduled staging test.");
+  }
+}
+async function armRealStagingObservation(kind, rideId) {
+  if (backendState?.stagingLiveProbeAvailable !== true) return;
+  try {
+    const result = await armStagingLiveProbe(kind, rideId);
+    if (result.armed) toast("Watching real changes · one alert maximum · up to 12 hours.");
+  } catch (error) {
+    toast(error.message || "Couldn't arm real-data verification.");
+  }
+}
+async function checkRealStagingObservation() {
+  if (backendState?.stagingLiveProbeAvailable !== true) return;
+  try {
+    const result = await stagingLiveProbeStatus();
+    const labels = {
+      idle: "No live observation armed on this device.",
+      armed: "Armed · waiting for first source sample.",
+      monitoring: "Observing real waits · no qualifying change yet.",
+      retry: "A real change was queued · delivery is retrying.",
+      delivered: "Real observed change delivered to this device!",
+      "not-delivered": "A real change occurred, but the alert wasn't delivered.",
+      expired: "No qualifying real change within the 12-hour window.",
+      "cancelled-watch-changed": "Observation stopped because the watch changed."
+    };
+    toast((labels[result.status] || "Live observation: " + result.status) +
+      (result.observations ? ` (${result.observations} samples)` : ""));
+  } catch (error) {
+    toast(error.message || "Couldn't check real-data verification.");
   }
 }
 async function copyDiagnostics() {

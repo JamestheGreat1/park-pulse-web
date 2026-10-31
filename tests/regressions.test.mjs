@@ -1460,6 +1460,15 @@ test('Frosted and Liquid Glass snap their backdrop tint on tab changes', () => {
   }
 });
 
+test('Both glass styles disable the page-level fade that repaints WebKit blur layers', () => {
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  // The base fade animates opacity/transform over 200ms. That puts frosted
+  // backdrop-filter descendants in a temporary compositing group.
+  assert.match(css,/\.view-panel\{display:none;animation:fade \.2s ease\}/);
+  assert.match(css,/:root:is\(\[data-preview-surface="liquid"\],\[data-preview-surface="neutral"\]\) \.view-panel\.active\{\s*animation:none!important;\s*\}/);
+  assert.match(css,/:root:is\(\[data-preview-surface="liquid"\],\[data-preview-surface="neutral"\]\) \.view-panel\{\s*transform:none;\s*\}/);
+});
+
 test('2.0 mobile header clears translucent iOS safe area without changing desktop layout', () => {
   const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
   assert.equal((css.match(/padding-top:calc\(env\(safe-area-inset-top,0px\) \+ 30px\)/g)||[]).length,2);

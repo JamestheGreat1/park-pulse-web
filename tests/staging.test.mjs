@@ -161,7 +161,10 @@ test("staging preview hosts enabled DLR PWA assets from same Worker origin", () 
   assert.match(push,/export function pushSupported\(\)\{return Boolean\(false && /);
   assert.match(version.version,/^2\.0\.0-preview\.\d+$/);
   assert(sw.includes(version.version));
-  assert(!sw.includes('CACHE_NAME = "parkpulse-1.9.5"'));
+  const releaseVersion = JSON.parse(read("version.json")).version;
+  assert(!sw.includes('CACHE_NAME = "parkpulse-' + releaseVersion + '"'));
+  assert(!app.includes('?v=' + releaseVersion));
+  assert(index.includes(version.version));
   assert.equal(read("assets/js/catalog.js"), before);
 });
 

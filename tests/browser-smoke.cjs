@@ -20,10 +20,22 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.waitForSelector('[data-dismiss-first-run]', { timeout: 5000 });
     await page.locator('[data-dismiss-first-run]').click();
     await page.waitForFunction(() => !document.querySelector('[data-dismiss-first-run]'));
-    for (const name of ['watching', 'settings', 'explore']) {
+    for (const name of ['watching', 'resorts', 'settings', 'explore']) {
       await page.locator(`#nav-${name}`).click();
       assert.equal(await page.locator(`#nav-${name}`).getAttribute('aria-current'), 'page');
     }
+    await page.locator('#nav-resorts').click();
+    assert.equal(await page.locator('[data-resort="wdw"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('[data-resort="dlr"]').isDisabled(), true);
+    assert.match(await page.locator('[data-resort="dlr"]').innerText(), /Coming soon/);
+    await page.locator('[data-resort="wdw"]').click();
+    assert.equal(await page.locator('#nav-explore').getAttribute('aria-current'), 'page');
+    await page.locator('#view-explore [data-park="5"]').click();
+    assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.evaluate(() => {
+      const state = JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1'));
+      return state.selectedResortId === 'wdw' && state.selectedParkId === 5 && state.lastParkByResort.wdw === 5;
+    }), true);
     await page.locator('[data-view-jump="watching"]').click();
     await page.locator('[data-view-jump="explore"]').click();
     await page.locator('#view-explore [data-open-ride]').first().click();
@@ -52,6 +64,8 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#view-explore [data-open-ride]', { timeout: 5000 });
     assert.equal(await page.locator('[data-dismiss-first-run]').count(), 0);
+    assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('#nav-resorts').count(), 1);
     assert.match(await page.locator('#networkBanner').textContent(), /offline/i);
     assert.deepEqual(errors, []);
     console.log('PASS: startup with hanging health, onboarding, navigation, view jumps, keyboard dialog, expiration preservation, complete cache, offline relaunch');

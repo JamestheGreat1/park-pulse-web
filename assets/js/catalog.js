@@ -1,8 +1,8 @@
 // Shared, declarative resort and park metadata.
 // Disabled parks are registered for future rollout but MUST NOT be polled or shown.
 export const RESORTS = Object.freeze([
-  Object.freeze({ id: "wdw", name: "Walt Disney World", short: "WDW", timezone: "America/New_York", enabled: true, parkIds: Object.freeze([6, 5, 7, 8]) }),
-  Object.freeze({ id: "dlr", name: "Disneyland Resort", short: "DLR", timezone: "America/Los_Angeles", enabled: false, parkIds: Object.freeze([16, 17]) })
+  Object.freeze({ id: "wdw", name: "Walt Disney World", short: "WDW", location: "Orlando, Florida", timezone: "America/New_York", enabled: true, parkIds: Object.freeze([6, 5, 7, 8]) }),
+  Object.freeze({ id: "dlr", name: "Disneyland Resort", short: "DLR", location: "Anaheim, California", timezone: "America/Los_Angeles", enabled: false, parkIds: Object.freeze([16, 17]) })
 ]);
 
 export const ALL_PARKS = Object.freeze([

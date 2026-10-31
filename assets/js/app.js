@@ -1,4 +1,4 @@
-import { PARKS, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
+import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
 import { store } from "./store.js?v=1.9.5";
 import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.5";
 import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.5";
@@ -6,7 +6,7 @@ import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, 
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
+const views = { explore: $("#view-explore"), watching: $("#view-watching"), resorts: $("#view-resorts"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const installHelpSheet = $("#installHelpSheet");
@@ -892,14 +892,15 @@ function renderExplore() {
   const parkStatus = parkOperatingState(parkSchedule);
   const ticketedEvents = formatTicketedEvents(parkSchedule, state.useLocalTime);
   const crowd = rideData.crowdForPark(state.selectedParkId);
+  const activeResort = RESORT_BY_ID.get(state.selectedResortId) || RESORTS[0];
   views.explore.innerHTML = `
     <section class="hero-card liquid-glass">
-      <div><span class="eyebrow">Walt Disney World</span><h2>Stop refreshing wait times.</h2><p>Pick a wait you’d actually take. ParkPulse will keep an eye on it and buzz you when it gets there.</p></div>
+      <div><button class="resort-switch" type="button" data-view-jump="resorts" aria-label="Switch resort; current destination: ${escapeHtml(activeResort.name)}"><span class="eyebrow">${escapeHtml(activeResort.name)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button><h2>Stop refreshing wait times.</h2><p>Pick a wait you’d actually take. ParkPulse will keep an eye on it and buzz you when it gets there.</p></div>
       <button class="hero-watch" type="button" data-view-jump="watching" aria-label="View ${activeCount} active ${activeCount === 1 ? "watch" : "watches"}"><strong>${activeCount}</strong><span>${activeCount === 1 ? "active watch" : "active watches"}</span></button>
     </section>
     ${firstRunVisible() ? `<section class="first-run-card liquid-glass" aria-label="ParkPulse quick start"><div class="first-run-mark" aria-hidden="true">✦</div><div class="first-run-copy"><span class="eyebrow">Quick start</span><h3>Best Now does the useful part for you.</h3><p>It compares each ride with what’s normal right now. Tap a ride to watch it, then let ParkPulse keep checking. That’s basically it.</p></div><button type="button" class="first-run-dismiss" data-dismiss-first-run>Got it</button></section>` : ""}
     <div class="park-strip" aria-label="Choose a park">
-      ${PARKS.map((p) => {
+      ${parksForResort(state.selectedResortId).map((p) => {
         const chipStatus = parkOperatingState(rideData.hoursForPark(p.id));
         const statusLabel = chipStatus.key === "unknown" ? "" : `, ${chipStatus.label.toLowerCase()}`;
         return `<button type="button" class="park-chip ${p.id === state.selectedParkId ? "active" : ""}" data-park="${p.id}" aria-pressed="${p.id === state.selectedParkId}" aria-label="${escapeHtml(p.name + statusLabel)}"><span class="park-chip-icon" aria-hidden="true">${p.emoji}</span>${p.short}<span class="park-chip-status ${parkChipStatusClass(chipStatus)}" aria-hidden="true"></span></button>`;
@@ -914,6 +915,27 @@ function renderExplore() {
     <div class="park-feature-slot" data-park-state="${parkStatus.key}">${parkFeatureMarkup(state, parkSchedule, parkStatus)}</div>
     <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><div class="park-title-row"><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-status-slot">${parkStatusPillMarkup(parkStatus)}</span></div><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
     <div class="ride-list">${rideListMarkup(state)}</div>`;
+}
+function renderResorts() {
+  const state = store.snapshot;
+  views.resorts.innerHTML = `
+    <div class="page-heading"><span class="eyebrow">Your destination</span><h2>Resorts</h2><p>Pick your resort. Your parks, waits and recommendations follow along.</p></div>
+    <div class="resort-list" aria-label="Available and upcoming resorts">
+      ${RESORTS.map((resort) => {
+        const parks = parksForResort(resort.id);
+        const enabled = resort.enabled && parks.length > 0;
+        const selected = enabled && resort.id === state.selectedResortId;
+        const count = resort.parkIds.length;
+        const symbol = resort.id === "wdw" ? "🏰" : resort.id === "dlr" ? "🎡" : "🎢";
+        const caption = `${count} theme ${count === 1 ? "park" : "parks"}`;
+        return `<button type="button" class="resort-card liquid-glass ${selected ? "selected" : ""} ${enabled ? "" : "unavailable"}" data-resort="${escapeHtml(resort.id)}" aria-pressed="${selected}" ${enabled ? "" : 'disabled aria-disabled="true"'}>
+          <span class="resort-card-mark" aria-hidden="true">${symbol}</span>
+          <span class="resort-card-copy"><strong>${escapeHtml(resort.name)}</strong><span>${escapeHtml(resort.location || "")}</span><small>${escapeHtml(caption)}</small></span>
+          <span class="resort-card-status ${selected ? "selected" : ""}">${selected ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>Selected</span>' : enabled ? '<span>Choose</span>' : '<span>Coming soon</span>'}</span>
+        </button>`;
+      }).join("")}
+    </div>
+    <p class="resort-helper">Your choice is saved on this device. Favorites and ride alerts stay with you across resorts.</p>`;
 }
 function renderWatching() {
   const rules = store.snapshot.rules;
@@ -1100,7 +1122,7 @@ function renderParkHours() {
   const statusSlot = $(".park-status-slot", views.explore);
   if (statusSlot) statusSlot.innerHTML = parkStatusPillMarkup(status);
 
-  PARKS.forEach((park) => {
+  parksForResort(store.snapshot.selectedResortId).forEach((park) => {
     const button = $(`[data-park="${park.id}"]`, views.explore);
     if (!button) return;
     const chipStatus = parkOperatingState(rideData.hoursForPark(park.id));
@@ -1143,12 +1165,24 @@ function renderRideDataUpdate() {
 }
 function render() {
   store.pruneExpired(false);
-  renderExplore(); renderWatching(); renderSettings();
+  renderExplore(); renderWatching(); renderResorts(); renderSettings();
   updateWatchBadge();
   setTheme(); bindDynamic();
 }
 function bindDynamic() {
-  document.querySelectorAll('[data-park]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
+  document.querySelectorAll('[data-park]').forEach((b) => b.onclick = () => {
+    const parkId = Number(b.dataset.park);
+    if (!store.selectPark(parkId)) return;
+    nextUpOffset = 0;
+    if (!rideData.ridesForPark(parkId).length) rideData.refresh({ parkId });
+  });
+  document.querySelectorAll('[data-resort]').forEach((b) => b.onclick = () => {
+    if (!store.selectResort(b.dataset.resort)) return;
+    nextUpOffset = 0;
+    selectView("explore");
+    const parkId = store.snapshot.selectedParkId;
+    if (!rideData.ridesForPark(parkId).length) rideData.refresh({ parkId });
+  });
   document.querySelectorAll('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
   bindRideCards(views.explore);
   document.querySelectorAll('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);

@@ -1051,3 +1051,104 @@ test('California provider normalization respects stable IDs, excludes shows, and
   assert.equal(fallback[0].waitTime,30);
   assert.equal(primary.some(ride=>ride.id==='dl:tianas'),false);
 });
+
+
+test('Resorts view is the fourth accessible tab and preserves glass navigation layout', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const app = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  const nav = [...html.matchAll(/data-view-target="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(nav, ['explore', 'watching', 'resorts', 'settings']);
+  assert.match(html, /id="view-resorts" class="view-panel"/);
+  assert.match(css, /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(css, /grid-template-columns:repeat\(4,auto\)/);
+  assert.match(css, /\.resort-card\.selected/);
+  assert.match(css, /\.resort-card\.unavailable/);
+  assert.match(css, /\.resort-card:focus-visible/);
+  assert.match(css, /prefers-reduced-motion:reduce/);
+  assert.match(app, /function renderResorts\(\)/);
+  assert.match(app, /data-resort=/);
+  assert.match(app, /disabled aria-disabled/);
+  assert.match(app, /parksForResort\(state.selectedResortId\)\.map/);
+  assert.match(app, /activeResort.name/);
+});
+
+test('Stored resort state migrates old WDW settings and rejects disabled destinations', () => {
+  const script = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8')
+    .replace(/^import .*;\n/, '')
+    .replace(/export class Store/, 'class Store')
+    .replace(/export const store = new Store\(\);/, '');
+  const catalog = { wdw:{id:'wdw',enabled:true}, dlr:{id:'dlr',enabled:false} };
+  const resorts = [catalog.wdw,catalog.dlr];
+  const parks = [{id:6,resortId:'wdw'},{id:5,resortId:'wdw'},{id:16,resortId:'dlr'}];
+  const enabledParks = parks.filter(p=>catalog[p.resortId].enabled);
+  const parkList = id => enabledParks.filter(p=>p.resortId===id);
+  const storage = new Map();
+  storage.set('parkpulse.rideWatcher.v1', JSON.stringify({
+    selectedParkId:5,
+    rules:[{rideId:'epcot:figment',parkId:5,rideName:'Figment'}],
+    favorites:['epcot:figment'],accent:'violet',useLocalTime:false
+  }));
+  const context=vm.createContext({
+    Number,String,Date,Array,Set,JSON,EventTarget,structuredClone,
+    CustomEvent:class extends Event{constructor(name,opts){super(name);this.detail=opts.detail;}},
+    RESORTS:resorts,PARKS:enabledParks,parksForResort:parkList,
+    resortForPark:id=>resorts.find(r=>r.id===parks.find(p=>p.id===Number(id))?.resortId),
+    window:{PARKPULSE_CONFIG:{DEFAULT_PARK_ID:6}},
+    localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)}
+  });
+  const StoreType=vm.runInContext(script+'\nStore',context);
+  const instance=new StoreType();
+  assert.equal(instance.snapshot.selectedResortId,'wdw');
+  assert.equal(instance.snapshot.selectedParkId,5);
+  assert.equal(instance.snapshot.lastParkByResort.wdw,5);
+  assert.deepEqual(Array.from(instance.snapshot.favorites),['epcot:figment']);
+  assert.equal(instance.snapshot.rules[0].rideId,'epcot:figment');
+  assert.equal(instance.snapshot.accent,'violet');
+  assert.equal(instance.snapshot.useLocalTime,false);
+  assert.equal(instance.selectResort('dlr'),false);
+  assert.equal(instance.selectPark(16),false);
+  assert.equal(instance.snapshot.selectedParkId,5);
+  assert.equal(instance.selectPark(6),true);
+  assert.equal(instance.snapshot.lastParkByResort.wdw,6);
+  assert.equal(instance.selectResort('wdw'),true);
+  assert.equal(instance.snapshot.activeView,'explore');
+  assert.equal(instance.snapshot.selectedParkId,6);
+  const reloaded=new StoreType();
+  assert.equal(reloaded.snapshot.selectedParkId,6);
+  assert.equal(reloaded.snapshot.selectedResortId,'wdw');
+  assert.equal(reloaded.snapshot.rules[0].rideId,'epcot:figment');
+});
+
+test('When Disneyland is enabled later, selection remembers each resort last park', () => {
+  const script=fs.readFileSync(new URL('../assets/js/store.js',import.meta.url),'utf8')
+    .replace(/^import .*;\n/,'').replace(/export class Store/,'class Store')
+    .replace(/export const store = new Store\(\);/,'');
+  const resorts=[{id:'wdw',enabled:true},{id:'dlr',enabled:true}];
+  const parks=[{id:6,resortId:'wdw'},{id:5,resortId:'wdw'},{id:16,resortId:'dlr'},{id:17,resortId:'dlr'}];
+  const storage=new Map();
+  const context=vm.createContext({
+    Number,String,Date,Array,Set,JSON,EventTarget,structuredClone,
+    CustomEvent:class extends Event{constructor(name,opts){super(name);this.detail=opts.detail;}},
+    RESORTS:resorts,PARKS:parks,
+    parksForResort:id=>parks.filter(p=>p.resortId===id),
+    resortForPark:id=>resorts.find(r=>r.id===parks.find(p=>p.id===Number(id))?.resortId),
+    window:{PARKPULSE_CONFIG:{DEFAULT_PARK_ID:6}},
+    localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)}
+  });
+  const StoreType=vm.runInContext(script+'\nStore',context);
+  const instance=new StoreType();
+  assert.equal(instance.selectPark(5),true);
+  assert.equal(instance.selectResort('dlr'),true);
+  assert.equal(instance.snapshot.selectedParkId,16);
+  assert.equal(instance.selectPark(17),true);
+  assert.equal(instance.selectResort('wdw'),true);
+  assert.equal(instance.snapshot.selectedParkId,5);
+  assert.equal(instance.selectResort('dlr'),true);
+  assert.equal(instance.snapshot.selectedParkId,17);
+  const next=new StoreType();
+  assert.equal(next.snapshot.selectedResortId,'dlr');
+  assert.equal(next.snapshot.selectedParkId,17);
+  assert.equal(next.selectResort('wdw'),true);
+  assert.equal(next.snapshot.selectedParkId,5);
+});

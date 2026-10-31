@@ -617,7 +617,7 @@ test("staging cron probe arm API requires a registered subscribed watch and expl
           if(!sql.includes("INSERT INTO worker_state"))throw Error("unknown write");
           payload=bound[2];return {meta:{changes:1}};
         }
-      }};}
+      }}};
     }}
   };
   const ctx=vm.createContext({

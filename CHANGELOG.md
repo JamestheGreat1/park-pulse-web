@@ -1,8 +1,11 @@
-## 2.0.0 — 2026-10-31 (final release preparation; not deployed)
+## 2.0.0 — 2026-10-31
 
-- Prepared the public six-park catalog with Disneyland and Disney California Adventure enabled in an isolated release branch, leaving production on 1.9.5.
-- Synchronized stable 2.0.0 versions, cache keys and module imports; kept the staging generator isolated and compatible with an already-enabled Disneyland source catalog.
-- No merge, production Worker deployment, D1 mutation or public PWA publish has occurred. Release gates and final signoff are still required.
+- ParkPulse expands from four Walt Disney World parks to **six parks across Walt Disney World and Disneyland Resort**, covering 101 curated attractions.
+- New Resorts view, remembered park/resort selection, cross-resort favorites and ride watches, shared links, and park-local time display.
+- Refreshes the destination resort automatically when switching, even with cached wait data, and keeps fresh park API responses out of the offline service-worker cache.
+- Improved Frosted Glass page transitions and polished status indicators and compact settings layouts for iPhone.
+- Preserved existing WDW ride history, notification subscriptions, interface preferences and glass styles; California history and comparison baselines warm up separately after launch.
+- Includes pre-release notification delivery tests, a guarded staging environment, and 2.0 regression and browser/offline smoke tests.
 
 ## 2.0.0-rc.1 — 2026-10-31 (release candidate, not deployed)
 

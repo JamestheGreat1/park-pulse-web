@@ -98,3 +98,5 @@ jobs:
           node-version: '24'
       - name: Probe current Disneyland & DCA provider payloads (no secrets)
         run: node worker/scripts/audit-disneyland-sources.mjs
+      - name: Diagnose Disneyland staging hours and freshness (read-only, no secrets)
+        run: node worker/scripts/audit-disneyland-health.mjs

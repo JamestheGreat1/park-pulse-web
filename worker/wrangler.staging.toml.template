@@ -19,5 +19,6 @@ binding = "DB"
 database_name = "parkpulse-staging"
 database_id = "__STAGING_D1_ID__"
 
-# No cron triggers. Scheduled processing is explicitly disabled in the Worker
-# as a defense in depth, even if triggers are attached inadvertently.
+# Explicitly clear any prior staging schedules when disabling collection.
+[triggers]
+crons = []

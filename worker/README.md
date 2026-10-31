@@ -159,3 +159,5 @@ npx wrangler deploy --config ./wrangler.toml
 ```
 
 Existing staging D1 history is retained. Do not use the production deploy command.
+
+**Rollback safety:** the staging default explicitly declares `[triggers] crons = []`, so redeploying the default staging build clears any previously attached staging cron rather than merely relying on a missing triggers section.

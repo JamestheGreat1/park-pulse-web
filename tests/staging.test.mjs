@@ -17,7 +17,9 @@ test("staging template has different Worker/database identities and no cron or p
   assert.match(template, /^name = "parkpulse-api-staging"/m);
   assert.match(template, /^database_name = "parkpulse-staging"/m);
   assert.match(template, /^database_id = "__STAGING_D1_ID__"/m);
-  assert.doesNotMatch(template, /\[triggers\]|^crons\s*=/m);
+  assert.match(template, /^\[triggers\]$/m);
+  assert.match(template, /^crons = \[\]$/m);
+  assert.doesNotMatch(template, /^crons = \["/m);
   assert.doesNotMatch(template, /app\.useparkpulse\.com|jamesp5297|database_name = "parkpulse"/);
   assert.match(template, /^STAGING_MODE = "true"/m);
   assert.match(template, /^STAGING_ALLOW_PUSH = "false"/m);
@@ -56,7 +58,8 @@ test("stage source generator only mutates a copied catalog and not original flag
   assert.match(before, /id: "dlr"[^\n]*enabled: false/);
   assert.equal(read("assets/js/catalog.js"), before);
   assert(existsSync(new URL("../.parkpulse-staging/worker/src/index.js", import.meta.url)));
-  assert.doesNotMatch(output, /\[triggers\]|^crons\s*=/m);
+  assert.match(output, /^\[triggers\]$/m);
+  assert.match(output, /^crons = \[\]$/m);
 });
 
 

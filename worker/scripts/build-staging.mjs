@@ -23,7 +23,10 @@ if (!/^database_name\s*=\s*"parkpulse-staging"/m.test(template)) fail("Database 
 if (!/^STAGING_MODE\s*=\s*"true"/m.test(template)) fail("Staging safety flag missing.");
 if (!/^STAGING_ALLOW_PUSH\s*=\s*"false"/m.test(template)) fail("Push gate must be disabled.");
 if (!/^STAGING_ENABLE_CRON\s*=\s*"false"/m.test(template)) fail("Cron gate must be disabled.");
-if (/^\s*\[triggers\]/m.test(template) || /^\s*crons\s*=/m.test(template)) fail("Staging must not schedule cron jobs.");
+if ((template.match(/^\[triggers\]$/gm) || []).length !== 1 ||
+    (template.match(/^crons = \[\]$/gm) || []).length !== 1) {
+  fail("Staging must have an explicit empty trigger list by default.");
+}
 if (!template.includes("__STAGING_D1_ID__")) fail("Staging D1 placeholder not found.");
 if (enableHistoryCron && !template.includes('STAGING_HISTORY_ONLY = "false"')) {
   fail("History-only guard missing from template.");
@@ -61,8 +64,10 @@ if (enableHistoryCron) {
   if (!stagingConfig.includes('STAGING_HISTORY_ONLY = "true"')) {
     fail("History-only guard was not activated.");
   }
-  stagingConfig += String.fromCharCode(10) + '[triggers]' + String.fromCharCode(10)
-    + 'crons = ["*/5 * * * *"]' + String.fromCharCode(10);
+  stagingConfig = stagingConfig.replace('crons = []', 'crons = ["*/5 * * * *"]');
+  if (!stagingConfig.includes('crons = ["*/5 * * * *"]')) {
+    fail("History-only schedule was not activated.");
+  }
 }
 if (stagingConfig.includes(productionUUID)) fail("Generated config references production D1.");
 writeFileSync(join(workerRoot, "wrangler.toml"), stagingConfig);

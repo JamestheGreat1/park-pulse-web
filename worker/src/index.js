@@ -1581,7 +1581,12 @@ async function runStagingHistoryOnly(env) {
   // An explicit, one-shot staging-only request may now exercise the real
   // durable queue and checkpoint. Ordinary history collection does not.
   if (stagingPushTestReady(env)) await runArmedStagingCronProbe(env);
-  if (stagingLiveProbeReady(env)) await runArmedStagingLiveProbe(env, rides);
+  try {
+    if (stagingLiveProbeReady(env)) await runArmedStagingLiveProbe(env, rides);
+  } catch (error) {
+    // One-device validation must never interrupt ordinary staging history.
+    console.warn("Staging live observation deferred", error?.code || error?.message || "unknown");
+  }
 }
 
 // Opt-in staging verification of REAL provider snapshots. Ordinary staging

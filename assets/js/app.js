@@ -1,7 +1,7 @@
 import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
 import { store } from "./store.js?v=1.9.5";
 import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.5";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.5";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert } from "./push.js?v=1.9.5";
 import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.5";
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -995,6 +995,25 @@ function renderSettings() {
       : pushBlocked
         ? `<span class="health-pill bad">Blocked</span>`
         : `<button type="button" data-toggle-push class="setting-action">Enable</button>`;
+  const stagedPush = backendState?.stagingPushTestOnly === true;
+  const waitWatch = state.rules.find((rule) => rule.threshold != null);
+  const reopenWatch = state.rules.find((rule) => rule.reopen === true);
+  const stagingAlertTests = stagedPush && pushOn
+    ? `<div class="setting-row"><div><strong>Simulated ride alerts</strong>
+          <small>Test the real alert rules with pretend transitions. Live ride data won't change.</small>
+        </div><span class="health-pill good">Staging only</span></div>
+        ${waitWatch ? `<div class="setting-row"><div><strong>Wait target test</strong>
+          <small>Simulate a drop below your target for ${escapeHtml(waitWatch.rideName)}.</small></div>
+          <button type="button" data-simulate-alert="wait" data-ride-id="${escapeHtml(waitWatch.rideId)}"
+            class="setting-action">Send test</button></div>` : ""}
+        ${reopenWatch ? `<div class="setting-row"><div><strong>Reopening test</strong>
+          <small>Simulate ${escapeHtml(reopenWatch.rideName)} reopening.</small></div>
+          <button type="button" data-simulate-alert="reopen" data-ride-id="${escapeHtml(reopenWatch.rideId)}"
+            class="setting-action">Send test</button></div>` : ""}
+        ${!waitWatch || !reopenWatch ? `<div class="setting-row"><div><strong>More test options</strong>
+          <small>Add a ride watch with ${!waitWatch && !reopenWatch ? "a wait target and reopening alerts" : !waitWatch ? "a wait target" : "reopening alerts"} enabled to unlock both tests.</small></div>
+          <button type="button" data-view-jump="explore" class="setting-action">Find ride</button></div>` : ""}`
+    : "";
   const installRow = install.visible
     ? `<div class="setting-row install-status-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>`
     : "";
@@ -1083,6 +1102,7 @@ function renderSettings() {
     <section class="settings-group liquid-glass">
       <div class="setting-row"><div><strong>Push notifications</strong><small>${escapeHtml(pushCopy)}</small></div>${pushAction}</div>
       ${pushOn ? `<div class="setting-row"><div><strong>Test notification</strong><small>Make sure push is actually working on this device.</small></div><button type="button" data-test-push class="setting-action">Send test</button></div>` : ""}
+      ${stagingAlertTests}
       ${installRow}
     </section>
     <div class="settings-section-title">Customization</div>
@@ -1216,7 +1236,9 @@ function bindDynamic() {
   $$('[data-enable-push]').forEach((b) => b.onclick = activatePush);
   $$('[data-toggle-push]').forEach((b) => b.onclick = pushOn ? deactivatePush : activatePush);
   $$('[data-install]').forEach((b) => b.onclick = installApp);
-  $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
+  $('[data-test-push]').forEach((b) => b.onclick = testNotification);
+  $('[data-simulate-alert]').forEach((button) => button.onclick = () =>
+    testStagingRideAlert(button.dataset.simulateAlert, button.dataset.rideId));
   document.querySelectorAll('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const diagnosticsDetails = $(".diagnostics-details");
   if (diagnosticsDetails) diagnosticsDetails.ontoggle = () => { diagnosticsExpanded = diagnosticsDetails.open; };
@@ -1651,6 +1673,15 @@ async function deactivatePush() {
 async function testNotification() {
   try { await sendTestPush(); toast("Test sent — you should get it in a second."); }
   catch (error) { toast(error.message || "Couldn't send test notification."); }
+}
+async function testStagingRideAlert(kind, rideId) {
+  if (backendState?.stagingPushTestOnly !== true) return;
+  try {
+    const result = await simulateStagingRideAlert(kind, rideId);
+    if (result.delivered) toast("Simulated " + (kind === "wait" ? "wait target" : "reopening") + " alert sent!");
+  } catch (error) {
+    toast(error.message || "Couldn't send simulated ride alert.");
+  }
 }
 async function copyDiagnostics() {
   const lines = [

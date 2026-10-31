@@ -144,8 +144,41 @@ export async function sendTestPush(){
       const reason=result.pushReason? ` · ${result.pushReason}` : "";
       throw new Error(`Push service rejected the request${result.pushStatus?` (${result.pushStatus})`:""}${reason}.`);
     }
+    if(response.status===429||result.code==="TEST_COOLDOWN") {
+      throw new Error("Test already sent! Try again in a minute.");
+    }
     throw new Error(`Push test failed${response.status?` (${response.status})`:""}.`);
   }
 
+  return result;
+}
+
+
+// Staging only: simulate the same wait/reopening transition evaluator used by
+// the live alert engine. No live attraction status is modified.
+export async function simulateStagingRideAlert(kind, rideId) {
+  if (!["wait", "reopen"].includes(kind) || !rideId) {
+    throw new Error("Choose a watched attraction to test.");
+  }
+  const sub = await currentSubscription();
+  if (!sub) throw new Error("Enable notifications on this device first.");
+  const response = await request(`${workerBase}/subscriptions/test-alert`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ subscription: sub.toJSON(), kind, rideId })
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    if (response.status === 429 || result.code === "TEST_COOLDOWN") {
+      throw new Error("Test already sent! Try again in a minute.");
+    }
+    if (result.code === "TEST_WATCH_REQUIRED") {
+      throw new Error("Add a matching watch with this alert type enabled first.");
+    }
+    if (result.code === "NOT_REGISTERED") {
+      throw new Error("Your watches aren't synced yet. Reopen Settings and try again.");
+    }
+    throw new Error(`Simulated alert failed (${response.status}).`);
+  }
   return result;
 }

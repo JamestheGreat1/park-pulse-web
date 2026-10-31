@@ -91,6 +91,7 @@ test('ThemeParks attraction waits stay live when the parent park is closed', asy
     VERSION: 'test',
     Number, String, Map,
     findCatalogRide: () => catalogRide,
+    isSingleRiderName: () => false,
     fetch: async () => ({
       ok: true,
       json: async () => ({

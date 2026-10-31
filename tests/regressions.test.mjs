@@ -597,6 +597,14 @@ test('condensed Status keeps four summary rows and expandable diagnostics', () =
 });
 
 
+test('Staging-only verification labels use no-wrap layout without changing standard statuses', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  assert.equal((app.match(/class="health-pill good staging-test-label">Staging only<\/span>/g)||[]).length,2);
+  assert.match(css,/\.settings-group \.setting-row \.health-pill\.staging-test-label\s*\{[^}]*white-space:nowrap;[^}]*overflow-wrap:normal;/s);
+  assert.match(css,/\.health-pill,\.setting-value\{[^}]*max-width:52%/);
+});
+
 test('Settings customization bindings survive diagnostics wiring', () => {
   const block = app.slice(app.indexOf('function bindDynamic('), app.indexOf('async function copyText('));
   assert.match(block, /querySelectorAll\('\[data-copy-diagnostics\]'\)/);

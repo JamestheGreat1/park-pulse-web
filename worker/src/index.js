@@ -1194,18 +1194,22 @@ function ruleMatchesRide(rule, ride) {
   return normalizeName(rule.rideName) === normalizeName(ride.name);
 }
 
+// Limit upstream concurrency while preserving the deterministic ride order.
 async function fetchCurrentRideSnapshot(env) {
   const rides = [];
   let primaryParks = 0;
   let fallbackParks = 0;
-
-  for (const [parkId, park] of PARKS) {
-    const snapshot = await fetchFreshParkRides(parkId, park, env);
-    rides.push(...snapshot.rides);
-    if (snapshot.primaryAvailable) primaryParks++;
-    if (snapshot.fallbackUsed) fallbackParks++;
+  const parks = [...PARKS.entries()];
+  for (let start = 0; start < parks.length; start += 2) {
+    const snapshots = await Promise.all(parks.slice(start, start + 2).map(async ([parkId, park]) =>
+      fetchFreshParkRides(parkId, park, env)
+    ));
+    for (const snapshot of snapshots) {
+      rides.push(...snapshot.rides);
+      if (snapshot.primaryAvailable) primaryParks++;
+      if (snapshot.fallbackUsed) fallbackParks++;
+    }
   }
-
   return { rides, primaryParks, fallbackParks };
 }
 
@@ -1257,12 +1261,28 @@ async function runRideWatch(env) {
   ).all()).results || [];
 
   const parsedSubs = [];
+  // Most watches have stable keys, so avoid checking every subscriber
+  // against every ride. Legacy name/ID rules keep their park fallback.
+  const watchersByRideKey = new Map();
+  const legacyWatchersByPark = new Map();
   for (const row of subscriptions) {
     let raw = [];
     try { raw = JSON.parse(row.watch_ids || "[]"); } catch {}
 
     const rules = normalizeRules(raw);
-    parsedSubs.push({ ...row, rules });
+    const subscriber = { ...row, rules };
+    parsedSubs.push(subscriber);
+    for (const rule of rules) {
+      const key = String(rule.rideId);
+      if (!watchersByRideKey.has(key)) watchersByRideKey.set(key, []);
+      watchersByRideKey.get(key).push(subscriber);
+      const parkId = Number(rule.parkId);
+      const park = PARKS.get(parkId);
+      if (park && !(park.rides || []).some((ride) => ride.key === key)) {
+        if (!legacyWatchersByPark.has(parkId)) legacyWatchersByPark.set(parkId, []);
+        legacyWatchersByPark.get(parkId).push(subscriber);
+      }
+    }
 
     if (JSON.stringify(rules) !== JSON.stringify(raw)) {
       await env.DB.prepare(
@@ -1296,7 +1316,11 @@ async function runRideWatch(env) {
         operationalNow &&
         !openingRamp;
 
-      const watchers = parsedSubs.filter((sub) =>
+      const candidates = [
+        ...(watchersByRideKey.get(String(ride.id)) || []),
+        ...(legacyWatchersByPark.get(Number(ride.parkId)) || [])
+      ];
+      const watchers = [...new Set(candidates)].filter((sub) =>
         sub.rules.some((rule) => ruleMatchesRide(rule, ride))
       );
 

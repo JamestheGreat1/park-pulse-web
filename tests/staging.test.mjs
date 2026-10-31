@@ -472,6 +472,7 @@ test("production baseline backfill uses saved ThemeParks UUID without directory 
   const ctx=vm.createContext({
     Date,Number,String,Map,JSON,console,
     BASELINE_REFRESH_MS:86400000,BASELINE_RETRY_MS:1800000,BASELINE_BATCH_SIZE:8,
+    parkTimezone:()=> "America/Los_Angeles",
     themeParksRideIds:async()=>{directoryCalls++;throw Error("Unnecessary");},
     fetchThemeParksHistory:async(_,ride)=>{assert.equal(ride.sourceId,uuid);historyCalls++;return{};},
     buildTimeBaselines:()=>[{slotMinute:900,medianWait:20,sampleMinutes:160,sampleDays:7}],
@@ -715,7 +716,7 @@ test("simulated alert buttons are visible only with staged push and saved watch 
 test("scheduled staging queue probe is one-shot and checkpoints only after queue commit", async () => {
   const src=read("worker/src/index.js");
   const start=src.indexOf("async function runArmedStagingCronProbe(env) {");
-  const end=src.indexOf("// Resolve ThemeParks IDs from the park's stable entity catalog",start);
+  const end=src.indexOf("// Resolve official ThemeParks UUIDs independently",start);
   assert(start!==-1 && end>start);
   const vm=await import("node:vm");
   const now=Date.now(),rideId="dl:indiana-jones",endpoint="https://push.example/staging-only";

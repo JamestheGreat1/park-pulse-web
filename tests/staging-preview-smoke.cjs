@@ -59,6 +59,7 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.waitForSelector('[data-ride-id="dca:guardians"]',{timeout:10000});
     await page.locator('[data-ride-id="dca:guardians"] [data-open-ride]').first().click();
     assert.match(await page.locator('#sheetTitle').textContent(),/Guardians/);
+    await page.locator('[data-close-sheet]').click();
     // Prevent small-screen gear distortion on both glass surfaces.
     await page.setViewportSize({width:320,height:720});
     for(const surface of ['liquid','neutral']){

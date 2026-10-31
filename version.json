@@ -1,5 +1,5 @@
 {
-  "version": "1.9.5",
-  "released": "2026-10-18",
-  "channel": "stable"
+  "version": "2.0.0-rc.1",
+  "released": "2026-10-31",
+  "channel": "release-candidate"
 }

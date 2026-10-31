@@ -90,7 +90,7 @@ export class Store extends EventTarget {
       state.selectedResortId = resort.id;
       state.selectedParkId = selectedPark.id;
       state.lastParkByResort[resort.id] = selectedPark.id;
-      state.activeView = "explore";
+      // Keep the current tab (especially Resorts) while updating its selection.
       state.query = "";
     }, "resort");
     return true;

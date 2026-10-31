@@ -4065,7 +4065,7 @@ body{
     width:auto!important;
     height:52px!important;
     min-height:52px!important;
-    grid-template-columns:repeat(3,auto)!important;
+    grid-template-columns:repeat(4,auto)!important;
     padding:5px!important;
     border-radius:19px!important;
   }
@@ -4079,9 +4079,17 @@ body{
     width:min(460px,calc(100% - 20px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)))!important;
     height:var(--nav-h)!important;
     min-height:var(--nav-h)!important;
-    grid-template-columns:repeat(3,1fr)!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
     padding:7px!important;
     border-radius:25px!important;
+  }
+  /* Every tab keeps exactly one-quarter of the Liquid dock. */
+  :root[data-preview-surface="liquid"] .bottom-nav .nav-item{
+    width:100%;
+    min-width:0;
+    min-height:0;
+    box-sizing:border-box;
+    padding-inline:2px;
   }
 }
 
@@ -5282,6 +5290,33 @@ body{
 .resort-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .resort-card{width:100%;min-width:0;min-height:138px;padding:22px;display:flex;align-items:center;gap:17px;border-radius:24px;text-align:left;color:var(--text);position:relative;cursor:pointer;transition:background-color .16s ease,border-color .16s ease,transform .12s ease}
 .resort-card.selected{border-color:rgba(var(--blue-rgb),.60);background:linear-gradient(135deg,rgba(var(--blue-rgb),.13),rgba(var(--blue2-rgb),.035)),var(--glass)}
+/* Clear resort selection without turning either glass surface into an opaque card. */
+.resort-card.selected{
+  border-color:rgba(var(--blue-rgb),.78)!important;
+  box-shadow:inset 0 0 0 1px rgba(var(--blue-rgb),.32),0 12px 36px rgba(var(--blue2-rgb),.12)!important;
+}
+.resort-card.selected::after{
+  content:"";
+  position:absolute;
+  left:0;
+  top:20px;
+  bottom:20px;
+  width:4px;
+  border-radius:0 6px 6px 0;
+  background:var(--blue);
+  box-shadow:0 0 14px rgba(var(--blue-rgb),.38);
+  pointer-events:none;
+}
+.resort-card.selected .resort-card-mark{
+  background:rgba(var(--blue-rgb),.21);
+  box-shadow:inset 0 0 0 1px rgba(var(--blue-rgb),.24);
+}
+:root[data-preview-surface="liquid"] .resort-card.selected{
+  background:linear-gradient(135deg,rgba(var(--blue-rgb),.19),rgba(var(--blue2-rgb),.055) 65%),var(--glass)!important;
+}
+:root[data-preview-surface="neutral"] .resort-card.selected{
+  background:linear-gradient(135deg,rgba(var(--blue-rgb),.16),rgba(var(--blue2-rgb),.035) 65%),var(--glass)!important;
+}
 .resort-card.unavailable{opacity:.66;cursor:not-allowed}
 .resort-card:not(:disabled):hover{background-color:rgba(var(--blue-rgb),.12)}
 .resort-card-mark{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:18px;background:rgba(var(--blue-rgb),.12);font-size:1.75rem}
@@ -5290,7 +5325,14 @@ body{
 .resort-card-copy>span{font-size:.83rem;color:var(--muted)}
 .resort-card-copy small{font-size:.74rem;color:var(--muted)}
 .resort-card-status{display:flex;align-items:center;gap:5px;flex:0 0 auto;font-weight:800;font-size:.73rem;color:var(--muted);white-space:nowrap}
-.resort-card-status.selected{color:var(--blue)}
+.resort-card-status.selected{
+  color:var(--blue);
+  background:rgba(var(--blue-rgb),.13);
+  border:1px solid rgba(var(--blue-rgb),.36);
+  padding:7px 9px;
+  border-radius:999px;
+  box-shadow:inset 0 1px rgba(255,255,255,.09);
+}
 .resort-card-status svg{width:17px;height:17px;stroke-width:2.7}
 .resort-helper{color:var(--muted);font-size:.79rem;line-height:1.5;padding:18px 5px}
 @media(max-width:760px){.resort-list{grid-template-columns:1fr;gap:10px}.resort-card{padding:16px;min-height:110px;gap:12px}.resort-card-mark{width:52px;height:52px;flex-basis:52px;border-radius:15px}}

@@ -1188,9 +1188,14 @@ function bindDynamic() {
     if (!rideData.ridesForPark(parkId).length) rideData.refresh({ parkId });
   });
   document.querySelectorAll('[data-resort]').forEach((b) => b.onclick = () => {
-    if (!store.selectResort(b.dataset.resort)) return;
+    const resortId = b.dataset.resort;
+    if (!store.selectResort(resortId)) return;
     nextUpOffset = 0;
-    selectView("explore");
+    // The Resort tab is a selector, not a redirect. Keep it visible so the
+    // selection indicator updates in place; Explore is one explicit tap away.
+    const newCard = [...document.querySelectorAll('[data-resort]')]
+      .find((card) => card.dataset.resort === resortId);
+    if (newCard) newCard.focus({ preventScroll: true });
     const parkId = store.snapshot.selectedParkId;
     if (!rideData.ridesForPark(parkId).length) rideData.refresh({ parkId });
   });

@@ -75,6 +75,11 @@ jobs:
         run: node worker/scripts/build-staging.mjs --database-id 11111111-1111-4111-8111-111111111111 --enable-history-cron --preview-url https://parkpulse-api-staging.jamesp5297.workers.dev
       - name: Check staged historical backfill identity (no token or network)
         run: node worker/scripts/backfill-staging.mjs --check
+      - name: Verify staging-only push test config and key setup guard (no secrets)
+        run: |
+          node worker/scripts/build-staging.mjs --database-id 11111111-1111-4111-8111-111111111111 --enable-history-cron --preview-url https://parkpulse-api-staging.jamesp5297.workers.dev --enable-test-push
+          node worker/scripts/setup-staging-push.mjs --check
+          node worker/scripts/build-staging.mjs --database-id 11111111-1111-4111-8111-111111111111 --enable-history-cron --preview-url https://parkpulse-api-staging.jamesp5297.workers.dev
       - name: Install staging Worker dependencies
         working-directory: .parkpulse-staging/worker
         run: npm install --no-save --package-lock=false

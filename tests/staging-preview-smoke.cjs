@@ -116,6 +116,14 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.equal(selectedStyle.selectedMark,'4px');
     assert.notEqual(selectedStyle.selectedBadge,'rgba(0, 0, 0, 0)');
     assert(apiParks.includes(16)&&apiParks.includes(17));
+    // Default preview must keep its push controls intentionally disabled.
+    const previewPush = await page.evaluate(async()=>{
+      const mod=await import('/assets/js/push.js?v='+
+        document.querySelector('script[type="module"]')?.src?.split('?v=')[1]?.split('&')[0]);
+      return mod.pushSupported();
+    }).catch(()=>null);
+    assert.notEqual(previewPush,true);
+
     assert(apiHosts.every(host=>host==='parkpulse-api-staging.jamesp5297.workers.dev'));
     assert.deepEqual(errors,[]);
     console.log('PASS: generated staging preview loads, uses staging API, selects DLR and DCA, and opens ride sheets');

@@ -310,3 +310,70 @@ test("staging Queue-Times rides use resolved ThemeParks UUIDs, never numeric fal
   assert.equal(result.mappedRides,1);
   assert.equal(result.unmappedRides,1);
 });
+
+
+test("staging opt-in test push generates enabled PWA without enabling live alerts", () => {
+  const cmd=new URL("../worker/scripts/build-staging.mjs",import.meta.url);
+  const url="https://parkpulse-api-staging.jamesp5297.workers.dev";
+  const args=["--database-id","11111111-1111-4111-8111-111111111111",
+    "--enable-history-cron","--preview-url",url,"--enable-test-push"];
+  const built=spawnSync(process.execPath,[cmd.pathname,...args],{encoding:"utf8"});
+  assert.equal(built.status,0,built.stderr);
+  const cfg=read(".parkpulse-staging/worker/wrangler.toml");
+  assert.match(cfg,/^STAGING_MODE = "true"$/m);
+  assert.match(cfg,/^STAGING_ALLOW_PUSH = "true"$/m);
+  assert.match(cfg,/^STAGING_PUSH_TEST_ONLY = "true"$/m);
+  assert.match(cfg,/^STAGING_HISTORY_ONLY = "true"$/m);
+  assert.match(cfg,/^crons = \["\*\/5 \* \* \* \*"\]$/m);
+  assert.match(cfg,/^APP_ORIGIN = "https:\/\/parkpulse-api-staging\.jamesp5297\.workers\.dev"$/m);
+  const push=read(".parkpulse-staging/site/assets/js/push.js");
+  assert.match(push,/export function pushSupported\(\)\{return Boolean\(workerBase/);
+  assert.doesNotMatch(push,/Boolean\(false && workerBase/);
+  const index=read(".parkpulse-staging/site/index.html");
+  assert.match(index,/Staging · Push test only/);
+  assert.doesNotMatch(index,/2\.0 Staging Preview · Alerts disabled/);
+  assert.match(read("assets/js/push.js"),/Boolean\(workerBase/);
+  const check=new URL("../worker/scripts/setup-staging-push.mjs",import.meta.url);
+  const verified=spawnSync(process.execPath,[check.pathname,"--check"],{encoding:"utf8"});
+  assert.equal(verified.status,0,verified.stderr);
+  assert.match(verified.stdout,/STAGING PUSH CONFIG OK/);
+  assert(!verified.stdout.includes("privateKey"));
+});
+
+test("staging test-push generation requires a staging host and collector schedule", () => {
+  const cmd=new URL("../worker/scripts/build-staging.mjs",import.meta.url);
+  const base=["--database-id","11111111-1111-4111-8111-111111111111"];
+  const origin="https://parkpulse-api-staging.jamesp5297.workers.dev";
+  for(const args of [
+    [...base,"--enable-test-push"],
+    [...base,"--enable-test-push","--preview-url",origin],
+    [...base,"--enable-test-push","--enable-history-cron"]
+  ]){
+    const r=spawnSync(process.execPath,[cmd.pathname,...args],{encoding:"utf8"});
+    assert.notEqual(r.status,0);
+    assert.match(r.stderr,/STAGING BUILD BLOCKED/);
+  }
+});
+
+test("staging notification routes require isolated VAPID keys and registered test subscribers", async () => {
+  const source=read("worker/src/index.js");
+  const start=source.indexOf("function stagingPushTestReady(env) {");
+  const end=source.indexOf("const PARKS = new Map([",start);
+  assert(start!==-1 && end>start);
+  const vm=await import("node:vm");
+  const fn=vm.runInNewContext(source.slice(start,end)+"\nstagingPushTestReady", {Boolean});
+  const env={STAGING_MODE:"true",STAGING_ALLOW_PUSH:"true",STAGING_PUSH_TEST_ONLY:"true",
+    VAPID_SUBJECT:"https://parkpulse-api-staging.example/",VAPID_SERVER_PUBLIC_KEY:"fixture",VAPID_SERVER_PRIVATE_KEY:"fixture"};
+  assert.equal(fn(env),true);
+  for(const change of [
+    {STAGING_MODE:"false"},{STAGING_ALLOW_PUSH:"false"},{STAGING_PUSH_TEST_ONLY:"false"},
+    {VAPID_SERVER_PRIVATE_KEY:null},{VAPID_SERVER_PUBLIC_KEY:null}
+  ]) assert.equal(fn({...env,...change}),false);
+  assert.match(source,/SELECT endpoint,p256dh,auth FROM subscriptions WHERE endpoint=\?/);
+  assert.match(source,/SELECT last_sent FROM notification_log_v2 WHERE endpoint=\? AND ride_key=\? AND kind=\?/);
+  assert.match(source,/STAGING_PUSH_DISABLED/);
+  const staging=source.slice(source.indexOf('async scheduled(controller, env, ctx) {'),source.indexOf('\n};',source.indexOf('async scheduled(controller, env, ctx) {')));
+  assert.doesNotMatch(staging,/STAGING_ALLOW_PUSH|STAGING_PUSH_TEST_ONLY/);
+  assert.match(staging,/ctx\.waitUntil\(runStagingHistoryOnly\(env\)\)/);
+  assert.doesNotMatch(staging,/ctx\.waitUntil\(runRideWatch\(env\)\)/);
+});

@@ -217,3 +217,25 @@ Even if the runner finishes, readiness may require checking enough valid histori
 The staging-only baseline endpoint now resolves ThemeParks attraction UUIDs from the official park `/children` directory rather than the chosen live source. The curated catalog matches names to identifiers, and a 24-hour D1 `worker_state` cache avoids repeated directory lookups. This never changes the Queue-Times live fallback, changes no production configuration, and rejects constructing history requests from Queue-Times IDs. The protected endpoint reports `mappedRides` and `unmappedRides` for diagnosis.
 
 After redeploying the staging Worker with `--enable-history-cron` and `--preview-url`, run one manual baseline batch and inspect the mapping counts and zero failures before restarting the paced backfill runner.
+
+### Staging-only push delivery (manual device tests, no live ride notifications)
+
+The ordinary staging build keeps push disabled. For an opt-in, isolated iOS/desktop Web Push smoke test, add `--enable-test-push` to the **staging generator**, alongside the existing `--enable-history-cron --preview-url` flags. It only changes the ignored `.parkpulse-staging` copy: `STAGING_ALLOW_PUSH = "true"`, `STAGING_PUSH_TEST_ONLY = "true"`. It leaves automatic alert jobs disabled. Production remains unchanged.
+
+From Codespaces, on `feature/multi-resort-dlr`:
+
+```bash
+cd /workspaces/park-pulse-web && git pull --ff-only
+node worker/scripts/build-staging.mjs --database-id 937420cb-3ce0-49e5-9cca-5d7529f191b8 --enable-history-cron --preview-url https://parkpulse-api-staging.jamesp5297.workers.dev --enable-test-push
+node worker/scripts/setup-staging-push.mjs --check
+node worker/scripts/setup-staging-push.mjs
+cd .parkpulse-staging/worker && npx wrangler deploy --config ./wrangler.toml
+```
+
+The setup utility creates a **new P-256 VAPID keypair** in gitignored `.parkpulse-staging/push-vapid.json` (private permissions) and uploads two staging Worker secrets through Wrangler. **No key is printed.** Re-running setup reuses the same local keys, which is important to keep existing staging push subscriptions. It refuses to run unless Worker name, isolated staging D1, staging app origin and both staging push/cron flags are correct. Keep `.parkpulse-staging` out of Git and never copy the production VAPID values.
+
+Verify `GET /health` reports `staging: true`, `pushRegistrationEnabled: true`, `stagingPushTestOnly: true`, `vapidConfigured: true` and `stagingHistoryOnly: true`.
+
+**iPhone:** open the staging URL in Safari, Share → Add to Home Screen, then launch the new staging Home Screen icon (this is separate from production). Under Settings, enable notifications. Once the watch syncs, tap **Send test**. If allowed by iOS, the phone should receive a `ParkPulse test` notification. The Worker only sends a test to a **registered staging D1 subscriber** and allows at most one test per minute. Do not send test notifications to third-party subscriptions.
+
+**Important:** This phase only verifies permission, VAPID, isolated subscription registration and push delivery. The staging schedule continues sampling history only, and **does not automatically send live wait/reopening alerts**. Validate the real alert pipeline separately before production rollout. The staging Worker URL is not a private authentication boundary.

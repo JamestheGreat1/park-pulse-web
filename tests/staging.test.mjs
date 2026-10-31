@@ -430,7 +430,7 @@ test("backend-only 2.0.1 patch leaves public PWA version unchanged", () => {
   const pkg=JSON.parse(read("worker/package.json"));
   const app=JSON.parse(read("version.json"));
   assert.equal(pkg.version,"2.0.1");
-  assert.match(worker,/const VERSION = "2\\.0\\.1";/);
+  assert(worker.includes('const VERSION = "2.0.1";'));
   assert.equal(app.version,"2.0.0");
 });
 

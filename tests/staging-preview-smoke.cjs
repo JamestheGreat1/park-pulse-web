@@ -49,6 +49,26 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.waitForSelector('[data-ride-id="dca:guardians"]',{timeout:10000});
     await page.locator('[data-ride-id="dca:guardians"] [data-open-ride]').first().click();
     assert.match(await page.locator('#sheetTitle').textContent(),/Guardians/);
+    // Prevent small-screen gear distortion on both glass surfaces.
+    await page.setViewportSize({width:320,height:720});
+    for(const surface of ['liquid','neutral']){
+      const iconCheck=await page.evaluate(surface=>{
+        document.documentElement.setAttribute('data-preview-surface',surface);
+        const svg=document.querySelector('#nav-settings svg');
+        const path=svg.querySelector('path');
+        const b=path.getBBox();
+        const iconStyle=getComputedStyle(svg);
+        const box=svg.getBoundingClientRect();
+        return {viewBox:svg.getAttribute('viewBox'),closed:path.getAttribute('d').endsWith('Z'),
+          centered:Math.abs(b.x+b.width/2-12)<0.1&&Math.abs(b.y+b.height/2-12)<0.1,
+          inBounds:b.x>1&&b.y>1&&b.x+b.width<23&&b.y+b.height<23,
+          fill:iconStyle.fill,size:box.width};
+      },surface);
+      assert.equal(iconCheck.viewBox,'0 0 24 24');
+      assert(iconCheck.closed&&iconCheck.centered&&iconCheck.inBounds,JSON.stringify(iconCheck));
+      assert.equal(iconCheck.fill,'none');
+      assert(iconCheck.size>=17&&iconCheck.size<=22);
+    }
     assert(apiParks.includes(16)&&apiParks.includes(17));
     assert(apiHosts.every(host=>host==='parkpulse-api-staging.jamesp5297.workers.dev'));
     assert.deepEqual(errors,[]);

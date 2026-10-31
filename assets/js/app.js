@@ -1029,7 +1029,7 @@ function renderSettings() {
     : "";
   const liveProbe = backendState?.stagingLiveProbeAvailable === true && pushOn
     ? `<div class="setting-row"><div><strong>Real ride-change verification</strong>
-        <small>One device only. Observe live source updates every five minutes for up to 12 hours; no pretend wait times. Sends at most one labeled alert if a real change matches your watch.</small></div>
+        <small>One device only. Observe live source updates every five minutes for up to 12 hours; no pretend wait times. Stops after the first qualifying real change; provider retries may occur.</small></div>
         <span class="health-pill good">Staging only</span></div>
       ${waitWatch ? `<div class="setting-row"><div><strong>Real wait-drop test</strong><small>Watch ${escapeHtml(waitWatch.rideName)} cross your saved target.</small></div>
         <button type="button" class="setting-action" data-arm-live-probe data-kind="wait" data-ride-id="${escapeHtml(waitWatch.rideId)}">Observe</button></div>` : ""}

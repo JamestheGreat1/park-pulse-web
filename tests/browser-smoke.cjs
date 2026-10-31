@@ -46,7 +46,8 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.equal(desktopNav.length, 4);
     assert(desktopNav.every(width => width >= 108));
     await page.locator('[data-resort="wdw"]').click();
-    assert.equal(await page.locator('#nav-explore').getAttribute('aria-current'), 'page');
+    assert.equal(await page.locator('#nav-resorts').getAttribute('aria-current'), 'page');
+    await page.locator('#nav-explore').click();
     await page.locator('#view-explore [data-park="5"]').click();
     assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await page.evaluate(() => {
@@ -141,6 +142,8 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await stagedPage.locator('#nav-resorts').click();
     assert.equal(await stagedPage.locator('[data-resort="dlr"]').isDisabled(),false);
     await stagedPage.locator('[data-resort="dlr"]').click();
+    assert.equal(await stagedPage.locator('#nav-resorts').getAttribute('aria-current'), 'page');
+    await stagedPage.locator('#nav-explore').click();
     await stagedPage.waitForSelector('[data-ride-id="dl:space-mountain"]',{timeout:10000});
     assert.equal(await stagedPage.locator('#view-explore [data-park]').count(),2);
     await stagedPage.locator('#view-explore [data-park="17"]').click();

@@ -5313,9 +5313,13 @@ body{
 }
 :root[data-preview-surface="liquid"] .resort-card.selected{
   background:linear-gradient(135deg,rgba(var(--blue-rgb),.19),rgba(var(--blue2-rgb),.055) 65%),var(--glass)!important;
+  border-color:rgba(var(--blue-rgb),.78)!important;
+  box-shadow:inset 0 0 0 1px rgba(var(--blue-rgb),.32),0 12px 36px rgba(var(--blue2-rgb),.12)!important;
 }
 :root[data-preview-surface="neutral"] .resort-card.selected{
   background:linear-gradient(135deg,rgba(var(--blue-rgb),.16),rgba(var(--blue2-rgb),.035) 65%),var(--glass)!important;
+  border-color:rgba(var(--blue-rgb),.78)!important;
+  box-shadow:inset 0 0 0 1px rgba(var(--blue-rgb),.32),0 12px 36px rgba(var(--blue2-rgb),.12)!important;
 }
 .resort-card.unavailable{opacity:.66;cursor:not-allowed}
 .resort-card:not(:disabled):hover{background-color:rgba(var(--blue-rgb),.12)}

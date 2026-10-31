@@ -1123,8 +1123,9 @@ test('Stored resort state migrates old WDW settings and rejects disabled destina
   assert.equal(instance.snapshot.selectedParkId,5);
   assert.equal(instance.selectPark(6),true);
   assert.equal(instance.snapshot.lastParkByResort.wdw,6);
+  instance.update(state=>{state.activeView='resorts'},'view');
   assert.equal(instance.selectResort('wdw'),true);
-  assert.equal(instance.snapshot.activeView,'explore');
+  assert.equal(instance.snapshot.activeView,'resorts');
   assert.equal(instance.snapshot.selectedParkId,6);
   const reloaded=new StoreType();
   assert.equal(reloaded.snapshot.selectedParkId,6);
@@ -1373,4 +1374,21 @@ test('Settings tab uses a fully closed, symmetric outline gear across glass mode
   assert.match(settings, /<circle cx="12" cy="12" r="2.85"\/>/);
   assert.doesNotMatch(settings, /M12 15\.5A3\.5 3\.5|M9\.671 4\.136/);
   assert.match(settings, /<span>Settings<\/span>/);
+});
+
+
+test('Liquid dock uses four equal phone slots and four desktop slots', () => {
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  const oldThreeCols=/grid-template-columns:repeat\(3,(?:auto|1fr)\)!important/;
+  assert.doesNotMatch(css,oldThreeCols);
+  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)!important/);
+  assert.match(css,/grid-template-columns:repeat\(4,auto\)!important/);
+  assert.match(css,/\.resort-card\.selected::after/);
+  assert.match(css,/\.resort-card-status\.selected/);
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const clickHandler=app.slice(app.indexOf("document.querySelectorAll('[data-resort]').forEach"),app.indexOf("document.querySelectorAll('[data-next-up-another]')"));
+  assert.doesNotMatch(clickHandler,/selectView\("explore"\)/);
+  const store=fs.readFileSync(new URL('../assets/js/store.js',import.meta.url),'utf8');
+  const selection=store.slice(store.indexOf("selectResort(resortId)"),store.indexOf("selectPark(parkId)"));
+  assert.doesNotMatch(selection,/activeView\s*=\s*"explore"/);
 });

@@ -42,6 +42,16 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.locator('#nav-resorts').click();
     assert.equal(await page.locator('[data-resort="dlr"]').isDisabled(),false);
     await page.locator('[data-resort="dlr"]').click();
+    assert.equal(await page.locator('#nav-resorts').getAttribute('aria-current'),'page');
+    assert.equal(await page.locator('#view-resorts').isVisible(),true);
+    assert.equal(await page.locator('#view-explore').isVisible(),false);
+    assert.equal(await page.locator('[data-resort="dlr"]').getAttribute('aria-pressed'),'true');
+    assert.equal(await page.locator('[data-resort="wdw"]').getAttribute('aria-pressed'),'false');
+    assert.match(await page.locator('[data-resort="dlr"]').innerText(),/Selected/);
+    await page.reload({waitUntil:'domcontentloaded'});
+    assert.equal(await page.locator('#nav-resorts').getAttribute('aria-current'),'page');
+    assert.equal(await page.locator('[data-resort="dlr"]').getAttribute('aria-pressed'),'true');
+    await page.locator('#nav-explore').click();
     await page.waitForSelector('#view-explore [data-open-ride]',{timeout:10000});
     assert.equal(await page.locator('#view-explore [data-park]').count(),2);
     assert.equal(await page.locator('#view-explore [data-park="16"]').getAttribute('aria-pressed'),'true');
@@ -69,6 +79,41 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
       assert.equal(iconCheck.fill,'none');
       assert(iconCheck.size>=17&&iconCheck.size<=22);
     }
+    // Every Liquid tab must fit INSIDE the same dock, in one row, including
+    // the active fourth tab at small phone width and the desktop layout.
+    for(const width of [320,390,768,1280]){
+      await page.setViewportSize({width,height:800});
+      await page.locator('#nav-settings').click();
+      const rects = await page.evaluate(()=>{
+        document.documentElement.setAttribute('data-preview-surface','liquid');
+        const nav=document.querySelector('.bottom-nav').getBoundingClientRect();
+        const items=[...document.querySelectorAll('.bottom-nav .nav-item')]
+          .map(el=>{const r=el.getBoundingClientRect();return {x:r.x,right:r.right,y:r.y,bottom:r.bottom,width:r.width,height:r.height}});
+        return {nav:{x:nav.x,right:nav.right,y:nav.y,bottom:nav.bottom},items,
+          grid:getComputedStyle(document.querySelector('.bottom-nav')).gridTemplateColumns};
+      });
+      assert.equal(rects.items.length,4);
+      assert(rects.items.every(r=>r.width>=40&&r.x>=rects.nav.x-1&&r.right<=rects.nav.right+1),
+        'All four tab slots must fit inside Liquid dock at '+width+': '+JSON.stringify(rects));
+      assert(rects.items.every(r=>r.y>=rects.nav.y-1&&r.bottom<=rects.nav.bottom+1),
+        'No Liquid tab can wrap outside dock at '+width+': '+JSON.stringify(rects));
+      assert(rects.items.every((r,i)=>i===0||
+        (Math.abs(r.y-rects.items[0].y)<2&&rects.items[i-1].right<=r.x+1)),
+        'Liquid dock items must share one row at '+width+': '+JSON.stringify(rects));
+    }
+    await page.setViewportSize({width:390,height:844});
+    await page.locator('#nav-resorts').click();
+    const selectedStyle = await page.evaluate(()=>{
+      const selected=document.querySelector('[data-resort="dlr"]');
+      const other=document.querySelector('[data-resort="wdw"]');
+      return {selectedBorder:getComputedStyle(selected).borderTopColor,
+        otherBorder:getComputedStyle(other).borderTopColor,
+        selectedMark:getComputedStyle(selected,'::after').width,
+        selectedBadge:getComputedStyle(selected.querySelector('.resort-card-status')).backgroundColor};
+    });
+    assert.notEqual(selectedStyle.selectedBorder,selectedStyle.otherBorder);
+    assert.equal(selectedStyle.selectedMark,'4px');
+    assert.notEqual(selectedStyle.selectedBadge,'rgba(0, 0, 0, 0)');
     assert(apiParks.includes(16)&&apiParks.includes(17));
     assert(apiHosts.every(host=>host==='parkpulse-api-staging.jamesp5297.workers.dev'));
     assert.deepEqual(errors,[]);

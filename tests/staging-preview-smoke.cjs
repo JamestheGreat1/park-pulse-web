@@ -60,6 +60,24 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.locator('[data-ride-id="dca:guardians"] [data-open-ride]').first().click();
     assert.match(await page.locator('#sheetTitle').textContent(),/Guardians/);
     await page.locator('[data-close-sheet]').click();
+    // Actual computed styles: both glass modes must show the new page without
+    // the inherited 200ms fade/transform on its backdrop-filter descendants.
+    for(const surface of ['neutral','liquid']){
+      await page.evaluate(surface=>{
+        document.documentElement.dataset.previewSurface=surface;
+      },surface);
+      await page.locator('#nav-resorts').click();
+      await page.locator('#nav-explore').click();
+      const paint=await page.evaluate(()=>{
+        const view=document.querySelector('#view-explore');
+        const computed=getComputedStyle(view);
+        return {animationName:computed.animationName,transform:computed.transform,
+          active:view.classList.contains('active')};
+      });
+      assert(paint.active,surface+' Explore panel did not activate');
+      assert.equal(paint.animationName,'none',surface+' page fade forces glass recoloring to lag');
+      assert.equal(paint.transform,'none',surface+' page transform forces extra glass compositing');
+    }
     // iOS translucent status-bar glass can soften content at the very top.
     // Keep the whole header (wordmark + refresh) below the safe-area margin,
     // without changing desktop spacing or overflowing on narrow devices.

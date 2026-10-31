@@ -161,3 +161,33 @@ npx wrangler deploy --config ./wrangler.toml
 Existing staging D1 history is retained. Do not use the production deploy command.
 
 **Rollback safety:** the staging default explicitly declares `[triggers] crons = []`, so redeploying the default staging build clears any previously attached staging cron rather than merely relying on a missing triggers section.
+
+## ParkPulse 2.0 — Staging frontend preview and safer baseline batches
+
+After the historical sampler is running and its D1 database is confirmed, generate the **staging app and Worker together**, without editing any production files:
+
+```bash
+cd /workspaces/park-pulse-web
+git pull --ff-only
+node worker/scripts/build-staging.mjs --database-id 937420cb-3ce0-49e5-9cca-5d7529f191b8 --enable-history-cron --preview-url https://parkpulse-api-staging.jamesp5297.workers.dev
+cd .parkpulse-staging/worker
+npx wrangler deploy --config ./wrangler.toml --dry-run
+npx wrangler deploy --config ./wrangler.toml
+```
+
+This serves the staging PWA at `https://parkpulse-api-staging.jamesp5297.workers.dev/`, sharing an origin with the staging API. The entire frontend is copied and **DLR is enabled only in the ignored staging copy**. A unique preview version avoids service-worker cache collisions; the preview banner says alerts are disabled. The production PWA and Worker remain unchanged.
+
+Do not use this public preview for sensitive information: the workers.dev URL is accessible to people with the link. Do not assume it requires authentication.
+
+### Staging-only baseline backfill (no live polling)
+
+The protected `POST /api/admin/baselines` route processes **up to four historical baselines per invocation** from the staging database's saved ride/source records. It avoids repeatedly fetching six parks, and it never evaluates notifications or advances alert checkpoints. It is unavailable on the production Worker. Only source records written in the last 20 minutes are eligible; if collection is unhealthy, fix the sampler first.
+
+Use the existing staging token; keep it out of logs and messages. From `.parkpulse-staging/worker`:
+
+```bash
+curl -fsS --max-time 90 -X POST -H "Authorization: Bearer $(cat ../refresh-token)" https://parkpulse-api-staging.jamesp5297.workers.dev/api/admin/baselines | jq '{ok,eligibleRides,baseline,analytics}'
+```
+
+If `failed` is nonzero or the service returns HTTP 429/5xx, stop and inspect before retrying. Repeated calls are optional and should be rate-limited; 4 per call is a deliberate safety limit. Baselines can be incomplete for rides lacking enough 30-day history, so never force a "ready" status.
+

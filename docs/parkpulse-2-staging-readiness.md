@@ -65,3 +65,9 @@ Cloudflare documentation: `wrangler d1 create` returns the database binding ID, 
 ## Controlled history-only staging mode
 
 The staging generator can optionally use `--enable-history-cron` after manual CPU checks. This adds only one five-minute trigger on the generated staging Worker and activates its history-only guard. Notifications, alert checkpoints and historical backfill remain disabled. The default generator still produces no cron. See `worker/README.md` for enable/disable commands and metric checks.
+
+## Same-origin staging preview and baseline endpoint
+
+Generate the UI preview on the *existing staging Worker* with `--preview-url https://parkpulse-api-staging.jamesp5297.workers.dev`, preserving the history-only schedule with `--enable-history-cron`. Wrangler static assets then serve `index.html` and all PWA dependencies from the staging Worker hostname, so no cross-origin setup or second Pages project is required. The preview uses a separate cache version and explicit staging API host. It is publicly reachable (unlisted, not authenticated). Production remains disabled.
+
+Use protected `POST /api/admin/baselines` in staging to process up to four pending baseline rides using fresh saved source IDs. It does not re-poll six parks or evaluate notifications. Stop on errors, check Cloudflare resource use, and keep the token private. Details in `worker/README.md`.

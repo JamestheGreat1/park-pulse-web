@@ -78,6 +78,43 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
       assert.equal(paint.animationName,'none',surface+' page fade forces glass recoloring to lag');
       assert.equal(paint.transform,'none',surface+' page transform forces extra glass compositing');
     }
+    // Staging-only labels must remain on one line on small iPhones, even
+    // alongside longer explanations in the push settings row.
+    await page.locator('#nav-settings').click();
+    await page.evaluate(()=>{
+      const group=document.querySelector('#view-settings .settings-group');
+      const row=document.createElement('div');
+      row.className='setting-row';
+      row.id='staging-pill-fixture';
+      row.innerHTML='<div><strong>Real ride-change verification</strong><small>One device only. Observe live source updates every five minutes for up to 12 hours; no pretend wait times.</small></div><span class="health-pill good staging-test-label">Staging only</span>';
+      group.append(row);
+    });
+    for(const width of [320,360,390,430]){
+      await page.setViewportSize({width,height:800});
+      for(const surface of ['neutral','liquid']){
+        const status=await page.evaluate(surface=>{
+          document.documentElement.dataset.previewSurface=surface;
+          const row=document.querySelector('#staging-pill-fixture');
+          const badge=row.querySelector('.staging-test-label');
+          const label=badge.getBoundingClientRect();
+          const shell=row.getBoundingClientRect();
+          const style=getComputedStyle(badge);
+          return {whiteSpace:style.whiteSpace,wrap:style.overflowWrap,
+            badgeLeft:label.left,badgeRight:label.right,badgeWidth:label.width,
+            rowRight:shell.right,scrollWidth:badge.scrollWidth,clientWidth:badge.clientWidth,
+            labelHeight:label.height,lineHeight:parseFloat(style.lineHeight)||15};
+        },surface);
+        assert.equal(status.whiteSpace,'nowrap',surface+' stage label wraps at '+width);
+        assert(status.scrollWidth<=status.clientWidth+1,
+          surface+' staged label text is clipped at '+width+': '+JSON.stringify(status));
+        assert(status.badgeRight<=status.rowRight+1,
+          surface+' staged label overflows settings panel at '+width+': '+JSON.stringify(status));
+        assert(status.labelHeight<=status.lineHeight*1.5,
+          surface+' staged label spans multiple lines at '+width+': '+JSON.stringify(status));
+      }
+    }
+    await page.evaluate(()=>document.querySelector('#staging-pill-fixture')?.remove());
+    await page.locator('#nav-explore').click();
     // iOS translucent status-bar glass can soften content at the very top.
     // Keep the whole header (wordmark + refresh) below the safe-area margin,
     // without changing desktop spacing or overflowing on narrow devices.

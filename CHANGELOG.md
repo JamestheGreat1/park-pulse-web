@@ -4,6 +4,7 @@
 - Included a Resorts tab, remembered per-resort park selection, local/Pacific timezone support, cross-resort favorites/watches and shared ride links.
 - Retained existing history, Best Now, crowd context and quiet glass styling; no new planner or UI clutter.
 - Resort changes now trigger a fresh fetch of every destination park even when previous waits are cached; cross-resort watches remain included and in-flight requests queue safely.
+- Fixed stale Disneyland data and missing park-status dots in the same-origin staging PWA: service worker now bypasses the offline cache for live `/api/*`, health, VAPID and subscriptions endpoints. Static PWA assets still work offline. Added a regression that injects an old cached response and verifies fresh JSON wins.
 - Aligned Frosted and Liquid page transitions: both now skip the 200ms whole-page fade/transform that can make backdrop-filter tint settle late in iOS WebKit. The one-frame repaint remains; glass styling and layout are unchanged. Added computed-style browser coverage for both materials.
 - Kept both short `Staging only` labels on one line on compact iPhones without changing long diagnostic statuses; added mobile Frosted/Liquid layout checks.
 - Prepared read-only production D1 audit and private backup runbook; source schema/config compare equal to main (remote verification pending).

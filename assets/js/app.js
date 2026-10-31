@@ -1,8 +1,8 @@
-import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
-import { store } from "./store.js?v=1.9.5";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.5";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe } from "./push.js?v=1.9.5";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.5";
+import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=2.0.0-rc.1";
+import { store } from "./store.js?v=2.0.0-rc.1";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=2.0.0-rc.1";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe } from "./push.js?v=2.0.0-rc.1";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=2.0.0-rc.1";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.5";
+const APP_VERSION = "2.0.0-rc.1";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;

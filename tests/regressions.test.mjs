@@ -1298,6 +1298,7 @@ test('Cross-resort alerts keep WDW and Disneyland Space Mountains separate', asy
     notificationRideName:ride=>ride.name,
     safeTag:id=>String(id).replace(':','-'),
     enqueueRideAlerts:async(_,alerts)=>{queued.push(...alerts);return alerts.length;},
+    sendPush:async()=>true,
     processPendingRideAlerts:async()=>({delivered:2,pending:0,retried:0,failed:0,discarded:0}),
     writeCurrentRideSnapshot:async()=>{}
   });

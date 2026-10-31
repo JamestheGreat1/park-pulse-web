@@ -239,3 +239,15 @@ Verify `GET /health` reports `staging: true`, `pushRegistrationEnabled: true`, `
 **iPhone:** open the staging URL in Safari, Share → Add to Home Screen, then launch the new staging Home Screen icon (this is separate from production). Under Settings, enable notifications. Once the watch syncs, tap **Send test**. If allowed by iOS, the phone should receive a `ParkPulse test` notification. The Worker only sends a test to a **registered staging D1 subscriber** and allows at most one test per minute. Do not send test notifications to third-party subscriptions.
 
 **Important:** This phase only verifies permission, VAPID, isolated subscription registration and push delivery. The staging schedule continues sampling history only, and **does not automatically send live wait/reopening alerts**. Validate the real alert pipeline separately before production rollout. The staging Worker URL is not a private authentication boundary.
+
+### Simulated wait-target and reopening push tests (staging only)
+
+After device push is working, deploy the latest feature branch with the existing
+`--enable-history-cron --preview-url https://parkpulse-api-staging.jamesp5297.workers.dev --enable-test-push`
+flags. No new VAPID keys or database migration are required; the private staging VAPID pair is reused.
+
+In the **installed staging PWA**, watch an attraction and enable its wait target and reopening alert. On **Settings**, the staging-only **Simulated ride alerts** section appears after the regular device test. Tap **Wait target test** or **Reopening test**. Each sends a clearly labeled `TEST · ...` push for a **real watched ride**, and the notification opens that ride in the staging app.
+
+The protected simulation uses the **same transition evaluator** as production alert detection, but synthetic before/after values are confined to Worker request memory. It never changes `ride_history`, `ride_state_v2`, `notification_ride_state`, or production alert schedule. Only the subscription registered with matching `endpoint`, `p256dh` and `auth` in **staging D1** may receive the test. One simulated notification per minute per subscription. It records only a staging test cooldown entry in `notification_log_v2`.
+
+This explicitly **does not exercise the five-minute live alert cron** (which remains disabled in staging) or its durable queue. Unit tests cover the shared transition conditions and queue retry behavior separately. Before production release, run a controlled live-alert/checkpoint integration test, verify CPU costs, and check cross-resort watch persistence.

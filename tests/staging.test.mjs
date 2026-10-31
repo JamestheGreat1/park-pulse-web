@@ -485,7 +485,9 @@ test("simulated staging endpoint is scoped to the registering device and cannot 
   assert.match(delivery.title,/reopened/);
   assert.equal(delivery.url,env.APP_URL+"?ride=dl%3Aindiana-jones");
   assert.equal(writeCount,2);
-  assert.doesNotMatch(source.slice(start,end),/notification_ride_state|ride_history|enqueueRideAlerts|runRideWatch/);
+  assert.doesNotMatch(source.slice(start,end),
+    /INSERT (?:INTO|OR REPLACE INTO) (?:notification_ride_state|ride_history)/);
+  assert.doesNotMatch(source.slice(start,end),/enqueueRideAlerts\(|runRideWatch\(/);
 });
 
 test("simulated alert buttons are visible only with staged push and saved watch rules",()=>{

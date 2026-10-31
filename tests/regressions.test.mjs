@@ -1392,3 +1392,12 @@ test('Liquid dock uses four equal phone slots and four desktop slots', () => {
   const selection=store.slice(store.indexOf("selectResort(resortId)"),store.indexOf("selectPark(parkId)"));
   assert.doesNotMatch(selection,/activeView\s*=\s*"explore"/);
 });
+
+
+test('2.0 mobile header clears translucent iOS safe area without changing desktop layout', () => {
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  assert.equal((css.match(/padding-top:calc\(env\(safe-area-inset-top,0px\) \+ 30px\)/g)||[]).length,2);
+  assert.doesNotMatch(css,/\.topbar\{[^}]*padding-top:calc\(env\(safe-area-inset-top,0px\) \+ 14px\)/);
+  assert.match(css,/@media \(min-width:1024px\) \{[\s\S]*?\.topbar\{\s*min-height:84px;\s*padding-top:16px;/);
+  assert.match(css,/ParkPulse 2\.0: Keep the mobile wordmark/);
+});

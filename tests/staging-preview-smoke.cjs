@@ -60,6 +60,31 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.locator('[data-ride-id="dca:guardians"] [data-open-ride]').first().click();
     assert.match(await page.locator('#sheetTitle').textContent(),/Guardians/);
     await page.locator('[data-close-sheet]').click();
+    // iOS translucent status-bar glass can soften content at the very top.
+    // Keep the whole header (wordmark + refresh) below the safe-area margin,
+    // without changing desktop spacing or overflowing on narrow devices.
+    for (const width of [320,390,768,1280]) {
+      await page.setViewportSize({width,height:800});
+      const header = await page.evaluate(()=>{
+        const bar = document.querySelector('.topbar');
+        const logo = document.querySelector('.brand-lockup');
+        const refresh = document.querySelector('#refreshButton');
+        const bb = bar.getBoundingClientRect();
+        const lb = logo.getBoundingClientRect();
+        const rb = refresh.getBoundingClientRect();
+        return { paddingTop: parseFloat(getComputedStyle(bar).paddingTop),
+          barTop:bb.top, barBottom:bb.bottom, logoTop:lb.top,
+          refreshTop:rb.top, refreshBottom:rb.bottom };
+      });
+      assert.equal(header.paddingTop, width<1024 ? 30 : 16,
+        'Top-header padding changed unexpectedly at '+width+': '+JSON.stringify(header));
+      assert(header.logoTop >= header.barTop+header.paddingTop-1,
+        'Header branding overlaps the status-bar clearance at '+width);
+      assert(header.refreshTop >= header.barTop+header.paddingTop-1,
+        'Refresh action overlaps the status-bar clearance at '+width);
+      assert(header.refreshBottom <= header.barBottom+1,
+        'Refresh action extends outside the top header at '+width);
+    }
     // Prevent small-screen gear distortion on both glass surfaces.
     await page.setViewportSize({width:320,height:720});
     for(const surface of ['liquid','neutral']){

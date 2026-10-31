@@ -378,3 +378,125 @@ test("staging notification routes require isolated VAPID keys and registered tes
   assert.doesNotMatch(staging.slice(0,staging.indexOf("// Production behavior is unchanged.")),
     /runRideWatch|runScheduledMaintenance/);
 });
+
+
+test("wait target and reopening simulations use the exact production evaluator", async () => {
+  const source=read("worker/src/index.js");
+  const from=source.indexOf("function evaluateRideTransitionAlert(");
+  const to=source.indexOf("async function runRideWatch(env) {",from);
+  assert(from!==-1 && to>from);
+  const vm=await import("node:vm");
+  const now=Date.now();
+  const ctx={Number,Date,encodeURIComponent,
+    LIVE_FRESHNESS_MS:15*60000,
+    PARKS:new Map([[16,{name:"Disneyland Park"}]]),
+    notificationRideName:r=>r.name,safeTag:t=>t.replace(/[^a-z0-9_-]/gi,"-")};
+  const evaluateAlert=vm.runInNewContext(source.slice(from,to)+"\nevaluateRideTransitionAlert",ctx);
+  const ride={id:"dl:indiana-jones",parkId:16,name:"Indiana Jones Adventure",
+    isOpen:true,waitTime:35,sourceStale:false,sourceMissing:false};
+  const rule={rideId:ride.id,threshold:35,reopen:true};
+  const full={operationalBefore:true,operationalNow:true,openingRamp:false};
+  const appUrl="https://parkpulse-api-staging.jamesp5297.workers.dev/";
+  const wait=evaluateAlert(ride,{isOpen:true,waitTime:50,updatedAt:now-60000},
+    rule,full,now,appUrl);
+  assert.equal(wait.kind,"wait");
+  assert.equal(wait.threshold,35);
+  assert.match(wait.payload.title,/Indiana Jones Adventure.*35 min/);
+  assert.equal(wait.payload.url,appUrl+"?ride=dl%3Aindiana-jones");
+  const reopen=evaluateAlert(ride,{isOpen:false,waitTime:null,updatedAt:now-60000},
+    rule,full,now,appUrl);
+  assert.equal(reopen.kind,"reopen");
+  assert.match(reopen.payload.title,/reopened/);
+  assert.equal(reopen.payload.url,wait.payload.url);
+  assert.equal(evaluateAlert({...ride,sourceStale:true},{isOpen:false,updatedAt:now-60000},
+    rule,full,now,appUrl),null);
+  assert.equal(evaluateAlert(ride,{isOpen:false,updatedAt:now-60000},rule,
+    {...full,openingRamp:true},now,appUrl),null);
+  assert.equal(evaluateAlert(ride,{isOpen:true,waitTime:35,updatedAt:now-60000},
+    rule,full,now,appUrl),null);
+  assert.equal(evaluateAlert(ride,{isOpen:true,waitTime:50,updatedAt:now-16*60000},
+    rule,full,now,appUrl),null);
+  assert.equal(evaluateAlert(ride,{isOpen:true,waitTime:50,updatedAt:now-60000},
+    {...rule,threshold:null},full,now,appUrl),null);
+  const production=source.slice(source.indexOf("async function runRideWatch(env) {"),
+    source.indexOf("async function getAnalyticsStatus(env) {"));
+  assert.match(production,/evaluateRideTransitionAlert\(/);
+});
+
+test("simulated staging endpoint is scoped to the registering device and cannot write live checkpoints",async()=>{
+  const source=read("worker/src/index.js");
+  const start=source.indexOf('if (request.method === "POST" && url.pathname === "/subscriptions/test-alert")');
+  const end=source.indexOf('if (request.method === "POST" && url.pathname === "/subscriptions/test")',start);
+  assert(start!==-1&&end>start);
+  const vm=await import("node:vm");
+  const now=Date.now();
+  const rule={rideId:"dl:indiana-jones",parkId:16,rideName:"Indiana Jones Adventure",threshold:35,reopen:true};
+  const registered={endpoint:"https://push.example/abc",p256dh:"device-p256dh",auth:"device-auth",
+    watch_ids:JSON.stringify([rule])};
+  const sub={endpoint:registered.endpoint,keys:{p256dh:registered.p256dh,auth:registered.auth}};
+  let delivery=null,lastSent=null,writeCount=0;
+  const env={STAGING_MODE:"true",APP_URL:"https://parkpulse-api-staging.jamesp5297.workers.dev/",DB:{
+    prepare(sql){
+      if(sql.includes("FROM subscriptions"))return{bind:()=>({first:async()=>registered})};
+      if(sql.includes("SELECT last_sent"))return{bind:()=>({first:async()=>lastSent==null?null:{last_sent:lastSent}})};
+      if(sql.includes("INSERT INTO notification_log_v2"))return{bind:()=>({run:async()=>{writeCount++;lastSent=Date.now();return{}}})};
+      throw Error("Unexpected staging DB operation: "+sql);
+    }
+  }};
+  const sharedStart=source.indexOf("function evaluateRideTransitionAlert(");
+  const sharedEnd=source.indexOf("async function runRideWatch(env) {",sharedStart);
+  const ctx=vm.createContext({Date,Number,String,Boolean,Array,JSON,URL,encodeURIComponent,
+    LIVE_FRESHNESS_MS:900000,
+    PARKS:new Map([[16,{name:"Disneyland Park"}]]),
+    notificationRideName:r=>r.name,safeTag:id=>id.replace(/[^a-z0-9_-]+/gi,"-"),
+    stagingPushTestReady:env=>env.STAGING_MODE==="true",
+    validateSubscription:sub=>sub?.endpoint&&sub?.keys?.p256dh&&sub?.keys?.auth
+      ? {endpoint:sub.endpoint,p256dh:sub.keys.p256dh,auth:sub.keys.auth}:null,
+    normalizeRules:raw=>raw,
+    catalogRideByKey:key=>key===rule.rideId?{name:"Indiana Jones Adventure",parkId:16}:null,
+    sendPush:async(_,payload)=>{delivery=payload;return true;},
+    json:(value,status)=>({status,value}),
+    console
+  });
+  vm.runInContext(source.slice(sharedStart,sharedEnd),ctx);
+  const handler=vm.runInContext(
+    "(async(request,env)=>{const url=new URL(request.url);const cors={};"+
+      source.slice(start,end)+"return {status:404};})",ctx);
+  const req=(kind,subscription=sub,rideId=rule.rideId)=>({
+    method:"POST",url:"https://parkpulse-api-staging.jamesp5297.workers.dev/subscriptions/test-alert",
+    json:async()=>({kind,subscription,rideId})
+  });
+  assert.equal((await handler(req("wait"),{...env,STAGING_MODE:"false"})).status,404);
+  assert.equal((await handler(req("fake"),env)).status,400);
+  assert.equal((await handler(req("wait",{...sub,keys:{...sub.keys,auth:"wrong"}}),env)).status,403);
+  assert.equal(writeCount,0);
+  const wait=await handler(req("wait"),env);
+  assert.equal(wait.status,200);
+  assert.equal(wait.value.simulated,true);
+  assert.equal(wait.value.kind,"wait");
+  assert.equal(writeCount,1);
+  assert.match(delivery.title,/^TEST · Indiana Jones Adventure/);
+  assert.match(delivery.body,/^Simulation only · /);
+  assert.equal(delivery.url,env.APP_URL+"?ride=dl%3Aindiana-jones");
+  assert.equal((await handler(req("reopen"),env)).status,429);
+  lastSent=null;
+  const reopen=await handler(req("reopen"),env);
+  assert.equal(reopen.status,200);
+  assert.match(delivery.title,/reopened/);
+  assert.equal(delivery.url,env.APP_URL+"?ride=dl%3Aindiana-jones");
+  assert.equal(writeCount,2);
+  assert.doesNotMatch(source.slice(start,end),/notification_ride_state|ride_history|enqueueRideAlerts|runRideWatch/);
+});
+
+test("simulated alert buttons are visible only with staged push and saved watch rules",()=>{
+  const app=read("assets/js/app.js"),push=read("assets/js/push.js");
+  assert.match(app,/backendState\?\.stagingPushTestOnly === true/);
+  assert.match(app,/state\.rules\.find\(\(rule\) => rule\.threshold != null\)/);
+  assert.match(app,/state\.rules\.find\(\(rule\) => rule\.reopen === true\)/);
+  assert.match(app,/data-simulate-alert="wait"/);
+  assert.match(app,/data-simulate-alert="reopen"/);
+  assert.match(app,/async function testStagingRideAlert/);
+  assert.match(push,/export async function simulateStagingRideAlert/);
+  assert.match(push,/subscriptions\/test-alert/);
+  assert.match(push,/Test already sent! Try again in a minute/);
+});

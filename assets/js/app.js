@@ -1236,8 +1236,8 @@ function bindDynamic() {
   $$('[data-enable-push]').forEach((b) => b.onclick = activatePush);
   $$('[data-toggle-push]').forEach((b) => b.onclick = pushOn ? deactivatePush : activatePush);
   $$('[data-install]').forEach((b) => b.onclick = installApp);
-  $('[data-test-push]').forEach((b) => b.onclick = testNotification);
-  $('[data-simulate-alert]').forEach((button) => button.onclick = () =>
+  $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
+  $$('[data-simulate-alert]').forEach((button) => button.onclick = () =>
     testStagingRideAlert(button.dataset.simulateAlert, button.dataset.rideId));
   document.querySelectorAll('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const diagnosticsDetails = $(".diagnostics-details");

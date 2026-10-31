@@ -28,6 +28,23 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.equal(await page.locator('[data-resort="wdw"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await page.locator('[data-resort="dlr"]').isDisabled(), true);
     assert.match(await page.locator('[data-resort="dlr"]').innerText(), /Coming soon/);
+    // The fourth nav item must remain reachable without clipping on a small phone.
+    await page.setViewportSize({ width: 320, height: 640 });
+    const mobileNav = await page.locator('.bottom-nav .nav-item').evaluateAll(items =>
+      items.map(item => {
+        const box = item.getBoundingClientRect();
+        return { left: box.left, right: box.right, width: box.width };
+      }));
+    assert.equal(mobileNav.length, 4);
+    assert(mobileNav.every(item => item.width >= 44 && item.left >= 0 && item.right <= 320));
+    assert(mobileNav.every((item, index) => index === 0 || mobileNav[index - 1].right <= item.left + 1));
+    const resortCard = await page.locator('[data-resort="dlr"]').boundingBox();
+    assert(resortCard && resortCard.x >= 0 && resortCard.x + resortCard.width <= 320);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const desktopNav = await page.locator('.bottom-nav .nav-item').evaluateAll(items =>
+      items.map(item => item.getBoundingClientRect().width));
+    assert.equal(desktopNav.length, 4);
+    assert(desktopNav.every(width => width >= 108));
     await page.locator('[data-resort="wdw"]').click();
     assert.equal(await page.locator('#nav-explore').getAttribute('aria-current'), 'page');
     await page.locator('#view-explore [data-park="5"]').click();

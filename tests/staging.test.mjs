@@ -214,3 +214,28 @@ test("protected staging baseline route reads fresh saved rides; no extra park po
   assert.match(backendRoute,/REFRESH_ADMIN_TOKEN/);
   assert.match(backendRoute,/runStagingBaselineBatch\(env\)/);
 });
+
+
+test("paced baseline automation checks staging safety without a token or network", () => {
+  const source = read("worker/scripts/backfill-staging.mjs");
+  assert.match(source, /STAGING_MODE\\s\*=\\s\*"true"/); // Source verifies STAGING_MODE.
+  assert.match(source, /parkpulse-api-staging\.jamesp5297\.workers\.dev/);
+  assert.match(source, /maxBatches = 26/);
+  assert.match(source, /delayBetweenBatchesMs = 40_000/);
+  assert.match(source, /stopController|SIGINT/);
+  assert.match(source, /failed > 0 \|\| errorRides > 0/);
+  assert.match(source, /historyCollecting/);
+  assert.doesNotMatch(source, /https:\/\/parkpulse-api\.jamesp5297\.workers\.dev/);
+  const script = new URL("../worker/scripts/backfill-staging.mjs", import.meta.url);
+  const generator = new URL("../worker/scripts/build-staging.mjs", import.meta.url);
+  const built = spawnSync(process.execPath, [generator.pathname, "--database-id",
+    "11111111-1111-4111-8111-111111111111", "--enable-history-cron",
+    "--preview-url", "https://parkpulse-api-staging.jamesp5297.workers.dev"], {encoding:"utf8"});
+  assert.equal(built.status,0,built.stderr);
+  const verified = spawnSync(process.execPath, [script.pathname, "--check"], {encoding:"utf8"});
+  assert.equal(verified.status,0,verified.stderr);
+  assert.match(verified.stdout,/STAGING BACKFILL CONFIG OK/);
+  const invalid = spawnSync(process.execPath, [script.pathname, "--production"], {encoding:"utf8"});
+  assert.notEqual(invalid.status,0);
+  assert.match(invalid.stderr,/STAGING BACKFILL STOPPED/);
+});

@@ -191,3 +191,23 @@ curl -fsS --max-time 90 -X POST -H "Authorization: Bearer $(cat ../refresh-token
 
 If `failed` is nonzero or the service returns HTTP 429/5xx, stop and inspect before retrying. Repeated calls are optional and should be rate-limited; 4 per call is a deliberate safety limit. Baselines can be incomplete for rides lacking enough 30-day history, so never force a "ready" status.
 
+
+### Finish staging historical baselines with one command
+
+Once a four-ride manual batch has worked (zero failures), there is a **manually started** backfill runner. It only calls the existing protected staging endpoint, never deploys or changes production, and never prints the private token. From any Codespaces terminal:
+
+```bash
+cd /workspaces/park-pulse-web && git pull --ff-only && node worker/scripts/backfill-staging.mjs
+```
+
+The runner checks staging Worker identity, separate D1 database, the currently enabled history-only cron and an active history collector. It processes **at most 26 batches**, each of **up to four attractions**, with a **40-second cooldown** between batches. It prints saved baseline progress, and stops on errors, history rate limits, missing source records, stalled progress or invalid responses. Press **Ctrl+C** to stop; successful batches remain saved in D1. Re-run later only after resolving any reported issue.
+
+This is an interactive Codespaces process; keep the terminal session open until it finishes. It does **not** schedule or run unattended in Cloudflare.
+
+To validate the local staging config without reading the token or making network requests:
+
+```bash
+node worker/scripts/backfill-staging.mjs --check
+```
+
+Even if the runner finishes, readiness may require checking enough valid historical days per attraction; review `/api/analytics/status` and real ride analytics before launch.

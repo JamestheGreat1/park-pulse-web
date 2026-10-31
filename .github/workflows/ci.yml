@@ -73,6 +73,8 @@ jobs:
         run: npx wrangler deploy --dry-run --outdir ./dry-run
       - name: Generate isolated staging Worker build (fake test UUID; no Cloudflare access)
         run: node worker/scripts/build-staging.mjs --database-id 11111111-1111-4111-8111-111111111111 --enable-history-cron --preview-url https://parkpulse-api-staging.jamesp5297.workers.dev
+      - name: Check staged historical backfill identity (no token or network)
+        run: node worker/scripts/backfill-staging.mjs --check
       - name: Install staging Worker dependencies
         working-directory: .parkpulse-staging/worker
         run: npm install --no-save --package-lock=false

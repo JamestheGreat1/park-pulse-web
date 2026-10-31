@@ -3,8 +3,8 @@
 **Status: HOLD / release candidate only.** This file does not authorize production deployment.
 
 - Candidate branch: `release/2.0.0-rc1` (based on `feature/multi-resort-dlr`).
-- Candidate version: `2.0.0-rc.1`; live production remains on its existing version.
-- The committed `assets/js/catalog.js` deliberately keeps the Disneyland Resort, Disneyland Park, and Disney California Adventure **disabled**. A staging-only generator enables them in a gitignored copy; never reuse that generated config or its D1/secrets for production.
+- Candidate version: `2.0.0-rc.1`; separate unpublished final-prep branch: `release/2.0.0-final-prep` with stable `2.0.0`. Live production remains unchanged.
+- The RC branch keeps DLR **disabled** in committed source; the separate final-prep branch enables DLR only for prelaunch review. Staging generates an isolated copy and never reuses its D1/secrets for production.
 - Production Worker (`parkpulse-api`), database (`parkpulse`), and `app.useparkpulse.com` must not be changed just to review this candidate.
 
 ## Evidence already collected
@@ -24,7 +24,7 @@
 - [x] Checked-in production schema/Worker configuration match `main`; remote tables, key columns and the Time Travel bookmark were confirmed. A private production SQL export completed successfully on 2026-10-31 (64 MB, restrictive file permissions); secure a copy outside Codespaces and refresh the recovery point on release day. See [production D1 audit](parkpulse-2-production-d1-audit.md).
 - [ ] Recheck monthly account-wide D1, Worker and subrequest headroom with both staging and production running; staging numbers alone do not include full live-alert costs. Decide when to reduce/stop staging after launch.
 - [ ] Run acceptance on iPhone standalone PWA and desktop: both resorts, all six park selectors, remembered resorts, history, local vs. park time/DST, shared links, favorites/watches, offline cache, light/dark and Liquid/Frosted Glass.
-- [ ] Produce final release commit (not this RC): switch exactly three catalog `enabled: false` flags for DLR/DL/DCA to `true`, change candidate version/cache to `2.0.0`, update the staging generator/tests to accept a now-public DLR catalog safely, and prepare a stable changelog/README. Validate that zero staging Worker names, test origins, private VAPID settings, or staging D1 IDs reach the production config.
+- [ ] Final-prep branch `release/2.0.0-final-prep` now enables the three Disneyland flags and uses stable 2.0.0 asset/Worker versions; staging generator/tests and release notes adapted. **CI review and production/staging isolation checks must pass before this release gate is satisfied.** No merge or deploy.
 - [ ] Obtain explicit signoff before merge and production rollout.
 
 ## Future release sequence — only AFTER all gates pass

@@ -262,6 +262,39 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
+test('service worker bypasses cached same-origin park JSON and health endpoints', async () => {
+  const source=fs.readFileSync(new URL('../service-worker.js',import.meta.url),'utf8');
+  const handlers={}, cacheHits=[], writes=[], network=[];
+  const context=vm.createContext({
+    URL,Response,Request,
+    location:{origin:'https://parkpulse-api-staging.example'},
+    self:{addEventListener:(type,listener)=>{handlers[type]=listener}},
+    caches:{open:async()=>({
+      match:async request=>{cacheHits.push(request.url);return new Response('OLD STALE JSON')},
+      put:async(...args)=>writes.push(args)
+    })},
+    fetch:async(request,options)=>{network.push({url:request.url,cache:options?.cache});
+      return new Response(JSON.stringify({fresh:true}),{status:200,headers:{'Content-Type':'application/json'}});}
+  });
+  vm.runInContext(source,context);
+  for(const path of ['/api/park/16','/api/park/17','/api/analytics/status','/health','/vapid-key']){
+    let outcome;
+    const request={method:'GET',url:'https://parkpulse-api-staging.example'+path};
+    handlers.fetch({request,respondWith:promise=>{outcome=promise}});
+    assert(outcome,'SW should explicitly handle the same-origin API '+path);
+    assert.equal((await (await outcome).json()).fresh,true,
+      'Must get live network JSON instead of previously cached '+path);
+  }
+  assert.equal(network.length,5);
+  assert(network.every(item=>item.cache==='no-store'));
+  assert.deepEqual(cacheHits,[],'Dynamic requests must not even inspect stale shell cache');
+  assert.equal(writes.length,0,'Dynamic JSON must never go into offline cache');
+  let staticResult;
+  handlers.fetch({request:{method:'GET',url:'https://parkpulse-api-staging.example/assets/js/data.js?v=2.0.0-rc.1'},
+    respondWith:p=>{staticResult=p}});
+  assert.equal((await (await staticResult).text()),'OLD STALE JSON',
+    'Static shell assets must retain offline cache behavior');
+});
 test('editing a watch keeps its exact expiration unless a new duration is selected', async () => {
   for (const duration of ['keep', '3h']) {
     const existing = { rideId: 'mk:test', parkId: 6, expiresAt: 1234567890, createdAt: 42, reopen: true };

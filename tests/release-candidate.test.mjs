@@ -8,7 +8,7 @@ const version = release.version;
 
 test("candidate version and cache references stay synchronized", () => {
   assert.equal(version, "2.0.0");
-  assert.equal(release.channel, "release-prep");
+  assert.equal(release.channel, "stable");
   const index = source("index.html");
   const app = source("assets/js/app.js");
   const sw = source("service-worker.js");
@@ -33,7 +33,7 @@ test("stable release prepares all six parks without changing production deployme
   const catalog = source("assets/js/catalog.js");
   for (const identity of ['id: "dlr"', "id: 16,", "id: 17,"]) {
     const line = catalog.split("\n").find((row) => row.includes(identity));
-    assert(line && line.includes("enabled: true"), identity + " must be enabled only in final prep branch");
+    assert(line && line.includes("enabled: true"), identity + " must be enabled in stable build");
   }
   const config = source("worker/wrangler.toml");
   assert.match(config, /^name = "parkpulse-api"$/m);

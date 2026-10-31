@@ -1336,3 +1336,21 @@ test('Ride history returns its own park timezone and park-day bounds', async () 
   assert.equal(starts[0][0],'dl:space-mountain');
   assert.equal(starts[0][1],Date.parse('2026-07-04T10:00:00Z'));
 });
+
+
+test('Every frontend shared-catalog import is re-exported through data.js', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const api=fs.readFileSync(new URL('../assets/js/api.js',import.meta.url),'utf8');
+  const data=fs.readFileSync(new URL('../assets/js/data.js',import.meta.url),'utf8');
+  const catalog=fs.readFileSync(new URL('../assets/js/catalog.js',import.meta.url),'utf8');
+  const declared=new Set([...catalog.matchAll(/export (?:const|function) ([A-Za-z0-9_]+)/g)].map(match=>match[1]));
+  const exported=data.match(/export \{ ([^}]+) \} from "\.\/catalog\.js/)?.[1] || '';
+  const forwarded=new Set(exported.split(',').map(s=>s.trim()));
+  for(const file of [app,api]) {
+    const imports=[...file.matchAll(/import \{ ([^}]+) \} from "\.\/data\.js/g)];
+    for(const [,keys] of imports) for(const key of keys.split(',').map(s=>s.trim())) {
+      if(declared.has(key))assert(forwarded.has(key),'data.js forgot to re-export '+key);
+    }
+  }
+  assert(forwarded.has('parkIdForRideKey'));
+});

@@ -425,6 +425,70 @@ test("staging ThemeParks history UUID directory lookup is cached and ignores non
   assert.equal(fetches,1,"directory fetched once; subsequent batch uses stored mapping");
 });
 
+test("production baseline backfill resolves ThemeParks UUID for fresh Queue-Times rides", async () => {
+  const source=read("worker/src/index.js");
+  const start=source.indexOf("async function refreshRideBaselines(env,");
+  const end=source.indexOf("async function getAnalyticsStatus(env)",start);
+  assert(start>=0&&end>start);
+  const vm=await import("node:vm");
+  const mapped="a8a5b7e4-1234-5678-abcd-ef0123456789";
+  const candidate={id:"dl:space-mountain",parkId:16,name:"Space Mountain",
+    source:"queue-times",sourceId:"371",sourceStale:false};
+  const missing={id:"dca:unmapped",parkId:17,name:"Unmapped",
+    source:"queue-times",sourceId:"372",sourceStale:false};
+  const used=[];
+  const ctx=vm.createContext({
+    Date,Number,String,Map,JSON,console,
+    BASELINE_REFRESH_MS:86400000,BASELINE_RETRY_MS:1800000,BASELINE_BATCH_SIZE:8,
+    parkTimezone:()=> "America/Los_Angeles",
+    themeParksRideIds:async(env)=>{assert.notEqual(env.STAGING_MODE,"true");return new Map([[candidate.id,mapped]]);},
+    fetchThemeParksHistory:async(_,ride)=>{used.push({source:ride.source,id:ride.sourceId});
+      assert.equal(ride.sourceId,mapped,"Only official ThemeParks UUIDs reach historical API");return{};},
+    buildTimeBaselines:()=>[{slotMinute:600,medianWait:25,sampleMinutes:180,sampleDays:7}],
+    saveRideBaseline:async()=>{},markBaselineError:async()=>{throw Error("Unexpected error")}
+  });
+  vm.runInContext(source.slice(start,end),ctx);
+  const run=vm.runInContext("refreshRideBaselines",ctx);
+  const env={THEMEPARKS_API_KEY:"test",DB:{prepare:(sql)=>{
+    assert.match(sql,/FROM ride_baseline_meta/);return{all:async()=>({results:[]})};
+  }}};
+  const outcome=await run(env,[candidate,missing],4);
+  assert.equal(outcome.processed,1);
+  assert.equal(outcome.refreshed,1);
+  assert.equal(outcome.failed,0);
+  assert.equal(used.length,1);
+  assert.equal(used[0].id,mapped);
+  assert.equal(candidate.source,"queue-times","The live wait source must not be mutated");
+  assert.equal(candidate.sourceId,"371","Queue-Times sourceId must stay unchanged in live data");
+});
+
+test("production baseline backfill uses saved ThemeParks UUID without directory fetching", async () => {
+  const source=read("worker/src/index.js");
+  const start=source.indexOf("async function refreshRideBaselines(env,");
+  const end=source.indexOf("async function getAnalyticsStatus(env)",start);
+  const vm=await import("node:vm");
+  const uuid="a8a5b7e4-1234-5678-abcd-ef0123456789";
+  let directoryCalls=0,historyCalls=0;
+  const ctx=vm.createContext({
+    Date,Number,String,Map,JSON,console,
+    BASELINE_REFRESH_MS:86400000,BASELINE_RETRY_MS:1800000,BASELINE_BATCH_SIZE:8,
+    themeParksRideIds:async()=>{directoryCalls++;throw Error("Unnecessary");},
+    fetchThemeParksHistory:async(_,ride)=>{assert.equal(ride.sourceId,uuid);historyCalls++;return{};},
+    buildTimeBaselines:()=>[{slotMinute:900,medianWait:20,sampleMinutes:160,sampleDays:7}],
+    saveRideBaseline:async()=>{},markBaselineError:async()=>{}
+  });
+  vm.runInContext(source.slice(start,end),ctx);
+  const run=vm.runInContext("refreshRideBaselines",ctx);
+  const env={THEMEPARKS_API_KEY:"test",DB:{prepare:()=>({all:async()=>({results:[{
+    ride_key:"dl:space-mountain",source_id:uuid,status:"ok",slot_count:10,
+    refreshed_at:Date.now()-90000000,last_error:null
+  }]})})}};
+  const result=await run(env,[{id:"dl:space-mountain",source:"queue-times",sourceId:"371",sourceStale:false}],2);
+  assert.equal(directoryCalls,0);
+  assert.equal(historyCalls,1);
+  assert.equal(result.refreshed,1);
+});
+
 test("staging Queue-Times rides use resolved ThemeParks UUIDs, never numeric fallback IDs", async () => {
   const source=read("worker/src/index.js");
   const start=source.indexOf("async function runStagingBaselineBatch(env) {");

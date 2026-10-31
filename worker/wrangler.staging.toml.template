@@ -5,6 +5,16 @@ main = "src/index.js"
 compatibility_date = "2026-09-01"
 preview_urls = false
 
+# Retain staging cron invocation logs and console output in Workers Observability.
+# This affects the staging Worker only; production logging remains unchanged.
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 1
+
 [vars]
 APP_URL = "https://parkpulse-staging.invalid/"
 APP_ORIGIN = "https://parkpulse-staging.invalid"

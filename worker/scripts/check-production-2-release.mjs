@@ -25,10 +25,6 @@ if (health.version !== "2.0.0" || health.ok !== true || health.staging !== false
     health.notificationEngine?.ready !== true || health.notificationEngine?.status !== "running") {
   throw new Error("Production Worker health is not yet ready for public 2.0");
 }
-if (Number(health.notificationEngine.checkpointRides) !== 101) {
-  throw new Error("Expected 101 ride checkpoints after first production 2.0 cron tick; currently " +
-    health.notificationEngine.checkpointRides);
-}
 if (Number(health.notificationEngine?.delivery?.pending || 0) > 0 ||
     Number(health.notificationEngine?.delivery?.failed || 0) > 0) {
   throw new Error("Last notification cycle has pending/failed deliveries; investigate before publishing");
@@ -46,4 +42,9 @@ for (const [parkId, expected] of parks) {
     throw new Error("Invalid park payload for park " + parkId);
   }
 }
+if (Number(health.notificationEngine.checkpointRides) !== 101) {
+  throw new Error("Expected 101 ride checkpoints after first production 2.0 cron tick; currently " +
+    health.notificationEngine.checkpointRides);
+}
+
 console.log("PASS: 2.0 production Worker, 101 alert checkpoints, six live park APIs.");

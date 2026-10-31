@@ -1,3 +1,9 @@
+## 2.0.0 — 2026-10-31 (final release preparation; not deployed)
+
+- Prepared the public six-park catalog with Disneyland and Disney California Adventure enabled in an isolated release branch, leaving production on 1.9.5.
+- Synchronized stable 2.0.0 versions, cache keys and module imports; kept the staging generator isolated and compatible with an already-enabled Disneyland source catalog.
+- No merge, production Worker deployment, D1 mutation or public PWA publish has occurred. Release gates and final signoff are still required.
+
 ## 2.0.0-rc.1 — 2026-10-31 (release candidate, not deployed)
 
 - Prepared the multi-resort ParkPulse candidate: Walt Disney World plus Disneyland Resort, with stable ride keys for six parks and 101 curated attractions.

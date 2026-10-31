@@ -214,3 +214,34 @@ export async function armStagingCronProbe(kind, rideId) {
   }
   return result;
 }
+
+
+// Staging-only real feed validation. No simulated wait/closed states are sent.
+// The Worker observes one ride for this device during normal history cron.
+export async function armStagingLiveProbe(kind, rideId) {
+  if (!["wait", "reopen"].includes(kind) || !rideId)
+    throw new Error("Choose a watched attraction and one alert type.");
+  const subscription = await currentSubscription();
+  if (!subscription) throw new Error("Enable staging notifications first.");
+  const response = await request(`${workerBase}/subscriptions/live-probe`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subscription: subscription.toJSON(), kind, rideId, confirm: true
+    })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || `Live observation failed (${response.status}).`);
+  return result;
+}
+
+export async function stagingLiveProbeStatus() {
+  const subscription = await currentSubscription();
+  if (!subscription) throw new Error("Enable staging notifications first.");
+  const response = await request(`${workerBase}/subscriptions/live-probe/status`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subscription: subscription.toJSON() })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || `Couldn't check live observation (${response.status}).`);
+  return result;
+}

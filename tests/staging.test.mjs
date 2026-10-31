@@ -375,5 +375,6 @@ test("staging notification routes require isolated VAPID keys and registered tes
   const staging=source.slice(source.indexOf('async scheduled(controller, env, ctx) {'),source.indexOf('\n};',source.indexOf('async scheduled(controller, env, ctx) {')));
   assert.doesNotMatch(staging,/STAGING_ALLOW_PUSH|STAGING_PUSH_TEST_ONLY/);
   assert.match(staging,/ctx\.waitUntil\(runStagingHistoryOnly\(env\)\)/);
-  assert.doesNotMatch(staging,/ctx\.waitUntil\(runRideWatch\(env\)\)/);
+  assert.doesNotMatch(staging.slice(0,staging.indexOf("// Production behavior is unchanged.")),
+    /runRideWatch|runScheduledMaintenance/);
 });

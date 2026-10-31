@@ -104,7 +104,7 @@ test("staging scheduled handler never falls through to production alerts", async
 
 test("history-only sampler writes samples without alerts, checkpoints or historical backfill", async () => {
   const source = read("worker/src/index.js");
-  const sample = source.slice(source.indexOf("async function runStagingHistoryOnly(env) {"),source.indexOf("async function runStagingBaselineBatch(env) {"));
+  const sample = source.slice(source.indexOf("async function runStagingHistoryOnly(env) {"),source.indexOf("// One-shot staging scheduled integration drill."));
   assert.match(sample,/await fetchCurrentRideSnapshot\(env\)/);
   assert.match(sample,/await writeCurrentRideSnapshot\(env, rides\)/);
   assert.doesNotMatch(sample,/runRideWatch|sendPush|enqueueRideAlerts|refreshRideBaselines/);
@@ -113,7 +113,8 @@ test("history-only sampler writes samples without alerts, checkpoints or histori
   const ctx = vm.createContext({
     console,
     fetchCurrentRideSnapshot: async () => {fetched++;return {rides:[{id:"dl:test"}]};},
-    writeCurrentRideSnapshot: async (_, rows) => {written++;assert.equal(rows.length,1);}
+    writeCurrentRideSnapshot: async (_, rows) => {written++;assert.equal(rows.length,1);},
+    stagingPushTestReady: () => false,
   });
   vm.runInContext(sample,ctx);
   const run = vm.runInContext("runStagingHistoryOnly",ctx);
@@ -501,4 +502,156 @@ test("simulated alert buttons are visible only with staged push and saved watch 
   assert.match(push,/export async function simulateStagingRideAlert/);
   assert.match(push,/subscriptions\/test-alert/);
   assert.match(push,/Test already sent! Try again in a minute/);
+});
+
+
+test("scheduled staging queue probe is one-shot and checkpoints only after queue commit", async () => {
+  const src=read("worker/src/index.js");
+  const start=src.indexOf("async function runArmedStagingCronProbe(env) {");
+  const end=src.indexOf("// Resolve ThemeParks IDs from the park's stable entity catalog",start);
+  assert(start!==-1 && end>start);
+  const vm=await import("node:vm");
+  const now=Date.now(),rideId="dl:indiana-jones",endpoint="https://push.example/staging-only";
+  let value=JSON.stringify({status:"armed",endpoint,rideId,kind:"wait",armedAt:now,expiresAt:now+20*60000});
+  const order=[],records=[];
+  const env={
+    STAGING_MODE:"true",STAGING_ENABLE_CRON:"true",STAGING_HISTORY_ONLY:"true",
+    STAGING_ALLOW_PUSH:"true",STAGING_PUSH_TEST_ONLY:"true",
+    APP_URL:"https://parkpulse-api-staging.jamesp5297.workers.dev/",
+    DB:{prepare(sql){
+      const fields=[];
+      return {bind(...args){
+        fields.push(...args);
+        return {
+          first:async()=>{
+            if(sql.includes("FROM worker_state"))return {payload:value};
+            if(sql.includes("FROM subscriptions"))return {
+              endpoint,p256dh:"device-key",auth:"auth-key",watch_ids:JSON.stringify([
+                {rideId,parkId:16,rideName:"Indiana Jones Adventure",reopen:true,threshold:35}
+              ])};
+            throw Error("unexpected SELECT "+sql);
+          },
+          run:async()=>{
+            if(!sql.includes("UPDATE worker_state"))throw Error("unexpected UPDATE "+sql);
+            const next=fields[1],expected=fields[3];
+            if(value!==expected)return {meta:{changes:0}};
+            value=next;
+            order.push("state:"+JSON.parse(next).status);
+            return {meta:{changes:1}};
+          }
+        };
+      }};
+    }}
+  };
+  const ctx=vm.createContext({
+    Date,Number,String,Map,Object,JSON,console,
+    stagingPushTestReady:()=>true,
+    ensureNotificationSchema:async()=>{order.push("schema");},
+    catalogRideByKey:()=>({parkId:16,name:"Indiana Jones Adventure"}),
+    normalizeRules:rules=>rules,
+    PARKS:new Map([[16,{name:"Disneyland Park"}]]),
+    notificationRideName:r=>r.name,
+    safeTag:x=>x.replace(/[^a-z0-9_-]+/gi,"-"),
+    LIVE_FRESHNESS_MS:15*60000,
+    encodeURIComponent,
+    evaluateRideTransitionAlert:()=>({
+      kind:"wait",threshold:35,payload:{title:"Indiana Jones Adventure • 35 min",
+        body:"Target ≤35 • Disneyland Park",url:env.APP_URL+"?ride=dl%3Aindiana-jones",tag:"ride-test"}
+    }),
+    ruleMatchesRide:(rule,ride)=>rule.rideId===ride.id,
+    enqueueRideAlerts:async(_env,alerts)=>{
+      order.push("enqueue");records.push(alerts[0]);
+      assert.match(alerts[0].payload.title,/^STAGING CRON TEST/);
+      assert.match(alerts[0].payload.body,/^Simulation only/);
+      return 1;
+    },
+    writeCurrentRideSnapshot:async(_env,rides,checkpoint)=>{
+      assert.equal(checkpoint,true);
+      assert.equal(rides.length,1);
+      order.push("checkpoint");
+    },
+    processPendingRideAlerts:async(_env,config)=>{
+      assert.equal(config.rides[0].id,rideId);
+      assert.equal(config.subscriptions[0].endpoint,endpoint);
+      assert.equal(typeof config.send,"function");
+      order.push("delivery");
+      return {delivered:1,retried:0,failed:0,discarded:0,pending:0};
+    },
+    cooldownActive:async()=>false,sendPush:async()=>true
+  });
+  vm.runInContext(src.slice(start,end),ctx);
+  const run=vm.runInContext("runArmedStagingCronProbe",ctx);
+  await run({...env,STAGING_MODE:"false"});
+  assert.deepEqual(order,[]);
+  await run(env);
+  assert.deepEqual(order.slice(0,5),["state:running","schema","enqueue","checkpoint","delivery"]);
+  assert.equal(JSON.parse(value).status,"delivered");
+  assert.equal(records.length,1);
+  await run(env);
+  assert.equal(records.length,1,"later cron never repeats the delivered push");
+});
+
+test("staging cron probe arm API requires a registered subscribed watch and explicit confirmation",async()=>{
+  const src=read("worker/src/index.js");
+  const start=src.indexOf('if (request.method === "POST" && url.pathname === "/subscriptions/cron-probe")');
+  const end=src.indexOf("// Simulated watch transitions use the SAME evaluator",start);
+  assert(start!==-1 && end>start);
+  const vm=await import("node:vm"),now=Date.now();
+  const rideId="dl:indiana-jones",endpoint="https://push.example/staging";
+  const sub={endpoint,keys:{p256dh:"p256dh",auth:"auth"}};
+  let payload=null;
+  const env={
+    STAGING_MODE:"true",STAGING_ENABLE_CRON:"true",STAGING_HISTORY_ONLY:"true",
+    DB:{prepare(sql){
+      const bound=[];
+      return{bind(...args){bound.push(...args);return{
+        first:async()=>{
+          if(sql.includes("FROM subscriptions"))return {
+            endpoint,p256dh:"p256dh",auth:"auth",
+            watch_ids:JSON.stringify([{rideId,threshold:35,parkId:16,reopen:true}])
+          };
+          if(sql.includes("FROM worker_state"))return payload?{payload,updated_at:now}:null;
+          throw Error("unknown read "+sql);
+        },
+        run:async()=>{
+          if(!sql.includes("INSERT INTO worker_state"))throw Error("unknown write");
+          payload=bound[2];return {meta:{changes:1}};
+        }
+      }};}
+    }}
+  };
+  const ctx=vm.createContext({
+    JSON,Date,Number,String,URL,
+    stagingPushTestReady:()=>true,
+    validateSubscription:s=>s?.keys?{endpoint:s.endpoint,p256dh:s.keys.p256dh,auth:s.keys.auth}:null,
+    normalizeRules:raw=>raw,
+    catalogRideByKey:id=>id===rideId?{name:"Indiana Jones Adventure",parkId:16}:null,
+    json:(body,status)=>({body,status})
+  });
+  const fn=vm.runInContext("(async(request,env)=>{const url=new URL(request.url);const cors={};"+
+    src.slice(start,end)+"return {status:404};})",ctx);
+  function req(extra={}){return{method:"POST",url:"https://parkpulse-api-staging.jamesp5297.workers.dev/subscriptions/cron-probe",
+    json:async()=>({subscription:sub,kind:"wait",rideId,confirm:true,...extra})};}
+  assert.equal((await fn(req(),{...env,STAGING_MODE:"false"})).status,404);
+  assert.equal((await fn(req({confirm:false}),env)).status,400);
+  assert.equal((await fn(req({subscription:{...sub,keys:{...sub.keys,auth:"bad"}}}),env)).status,403);
+  assert.equal(payload,null);
+  const armed=await fn(req(),env);
+  assert.equal(armed.status,200);
+  assert.equal(armed.body.armed,true);
+  assert.equal(JSON.parse(payload).status,"armed");
+  assert.equal((await fn(req(),env)).status,409,"cannot overwrite pending test");
+});
+
+test("staging schedule probe never enables the regular live alert job",()=>{
+  const source=read("worker/src/index.js");
+  const scheduled=source.slice(source.indexOf("  async scheduled(controller, env, ctx) {"),
+    source.indexOf("\n};",source.indexOf("  async scheduled(controller, env, ctx) {")));
+  assert.match(scheduled,/runStagingHistoryOnly\(env\)/);
+  assert.doesNotMatch(scheduled.slice(0,scheduled.indexOf("// Production behavior is unchanged.")),
+    /runRideWatch\(|runScheduledMaintenance\(/);
+  const frontend=read("assets/js/app.js");
+  assert.match(frontend,/stagingCronProbeAvailable === true/);
+  assert.match(frontend,/data-arm-cron-probe/);
+  assert.match(read("assets/js/push.js"),/export async function armStagingCronProbe/);
 });

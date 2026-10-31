@@ -128,6 +128,8 @@ export default {
           staging: env.STAGING_MODE === "true",
           pushRegistrationEnabled: env.STAGING_MODE !== "true" || stagingPushTestReady(env),
           stagingPushTestOnly: stagingPushTestReady(env),
+          stagingCronProbeAvailable: stagingPushTestReady(env) &&
+            env.STAGING_ENABLE_CRON === "true" && env.STAGING_HISTORY_ONLY === "true",
           stagingHistoryOnly: env.STAGING_MODE === "true" && env.STAGING_ENABLE_CRON === "true" && env.STAGING_HISTORY_ONLY === "true",
           stagingFrontendPreview: env.STAGING_MODE === "true" && Boolean(env.ASSETS),
           primaryDataSource: "ThemeParks.wiki",
@@ -273,6 +275,83 @@ export default {
         ).run();
 
         return json({ ok: true, watched: rules.length }, 200, cors);
+      }
+
+      // Explicit opt-in for ONE queued, scheduled staging alert test.
+      // A registered subscription + matching watch are both required.
+      if (request.method === "POST" && url.pathname === "/subscriptions/cron-probe") {
+        if (env.STAGING_MODE !== "true") return json({ error: "Not found" }, 404, cors);
+        if (!stagingPushTestReady(env) || env.STAGING_ENABLE_CRON !== "true" ||
+            env.STAGING_HISTORY_ONLY !== "true") {
+          return json({ error: "Staging scheduled tests are disabled", code: "STAGING_PROBE_DISABLED" },
+            403, cors);
+        }
+        const body = await request.json().catch(() => ({}));
+        const subscription = validateSubscription(body?.subscription);
+        const kind = body?.kind;
+        const rideId = String(body?.rideId || "");
+        if (!subscription || !["wait", "reopen"].includes(kind) ||
+            !/^[a-z0-9-]+:[a-z0-9-]+$/i.test(rideId) ||
+            body?.confirm !== true) {
+          return json({ error: "Choose a watched attraction and confirm this test",
+            code: "INVALID_PROBE" }, 400, cors);
+        }
+        const stored = await env.DB.prepare(
+          "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+        ).bind(subscription.endpoint).first();
+        if (!stored || stored.p256dh !== subscription.p256dh || stored.auth !== subscription.auth) {
+          return json({ error: "Your staging subscription is not registered",
+            code: "NOT_REGISTERED" }, 403, cors);
+        }
+        let watchList = [];
+        try { watchList = JSON.parse(stored.watch_ids || "[]"); } catch {}
+        const rule = normalizeRules(watchList).find((item) => item.rideId === rideId);
+        const catalog = catalogRideByKey(rideId);
+        if (!rule || !catalog || (kind === "wait" && rule.threshold == null) ||
+            (kind === "reopen" && !rule.reopen)) {
+          return json({ error: "First save a matching watch with this alert enabled",
+            code: "TEST_WATCH_REQUIRED" }, 400, cors);
+        }
+        const key = "staging-cron-probe";
+        const now = Date.now();
+        const previous = await env.DB.prepare(
+          "SELECT updated_at,payload FROM worker_state WHERE state_key=?"
+        ).bind(key).first();
+        let prior = {};
+        try { prior = JSON.parse(previous?.payload || "{}"); } catch {}
+        // One global active test protects every staging subscriber, and a
+        // short cooldown prevents repeated requests from the public preview.
+        if (["armed","running","retry"].includes(prior.status) &&
+            Number(prior.expiresAt) > now) {
+          return json({ error: "A scheduled test is already active",
+            code: "PROBE_ACTIVE" }, 409, cors);
+        }
+        if (Number(previous?.updated_at || 0) > now - 120000) {
+          return json({ error: "Try another scheduled test in two minutes",
+            code: "TEST_COOLDOWN" }, 429, cors);
+        }
+        const armed = {
+          status: "armed", endpoint: subscription.endpoint, rideId, kind,
+          armedAt: now, expiresAt: now + 20 * 60000
+        };
+        const payload = JSON.stringify(armed);
+        // Conditional insert/update ensures simultaneous arm requests cannot
+        // overwrite each other or bypass the global active-test guard.
+        const claimed = await env.DB.prepare(
+          `INSERT INTO worker_state(state_key,updated_at,payload)
+           VALUES(?,?,?)
+           ON CONFLICT(state_key) DO UPDATE SET
+             updated_at=excluded.updated_at,payload=excluded.payload
+           WHERE worker_state.payload=?`
+        ).bind(key, now, payload, previous?.payload || "").run();
+        if (Number(claimed?.meta?.changes || 0) !== 1) {
+          return json({ error: "Another scheduled test is already active",
+            code: "PROBE_ACTIVE" }, 409, cors);
+        }
+        return json({ ok: true, armed: true, kind, rideId,
+          message: "One staging test is armed for the next five-minute collection",
+          expiresAt: new Date(armed.expiresAt).toISOString()
+        }, 200, { ...cors, "Cache-Control": "no-store" });
       }
 
       // Simulated watch transitions use the SAME evaluator and push sender as
@@ -1395,6 +1474,112 @@ async function runStagingHistoryOnly(env) {
   const { rides } = await fetchCurrentRideSnapshot(env);
   await writeCurrentRideSnapshot(env, rides);
   console.log("Staging history-only sample complete", rides.length);
+  // An explicit, one-shot staging-only request may now exercise the real
+  // durable queue and checkpoint. Ordinary history collection does not.
+  if (stagingPushTestReady(env)) await runArmedStagingCronProbe(env);
+}
+
+// One-shot staging scheduled integration drill. All synthetic states are
+// confined to this function and a staging-only notification checkpoint; the
+// live wait feed, history rows, and production alert scheduler are unchanged.
+async function runArmedStagingCronProbe(env) {
+  if (env.STAGING_MODE !== "true" || env.STAGING_ENABLE_CRON !== "true" ||
+      env.STAGING_HISTORY_ONLY !== "true" || !stagingPushTestReady(env)) return;
+  const key = "staging-cron-probe";
+  const record = await env.DB.prepare(
+    "SELECT payload FROM worker_state WHERE state_key=?"
+  ).bind(key).first();
+  if (!record) return;
+
+  let probe;
+  try { probe = JSON.parse(record.payload); } catch { return; }
+  const now = Date.now();
+  if (!["armed", "retry"].includes(probe.status)) return;
+  if (Number(probe.expiresAt || 0) <= now) {
+    await env.DB.prepare(
+      "UPDATE worker_state SET updated_at=?,payload=? WHERE state_key=? AND payload=?"
+    ).bind(now, JSON.stringify({ ...probe, status: "expired" }), key, record.payload).run();
+    return;
+  }
+  const state = { ...probe, status: "running", attemptedAt: now };
+  const lock = await env.DB.prepare(
+    "UPDATE worker_state SET updated_at=?,payload=? WHERE state_key=? AND payload=?"
+  ).bind(now, JSON.stringify(state), key, record.payload).run();
+  if (Number(lock?.meta?.changes || 0) !== 1) return;
+
+  let outcome = "failed";
+  let delivery = null;
+  try {
+    await ensureNotificationSchema(env);
+    const row = await env.DB.prepare(
+      "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+    ).bind(probe.endpoint).first();
+    const catalog = catalogRideByKey(probe.rideId);
+    let stored = [];
+    try { stored = JSON.parse(row?.watch_ids || "[]"); } catch {}
+    const rules = normalizeRules(stored);
+    const rule = rules.find((item) => item.rideId === probe.rideId);
+    if (!row || !catalog || !rule ||
+        (probe.kind === "wait" && rule.threshold == null) ||
+        (probe.kind === "reopen" && !rule.reopen)) {
+      outcome = "cancelled-watch-changed";
+    } else {
+      const ride = {
+        id: probe.rideId, parkId: catalog.parkId, name: catalog.name,
+        isOpen: true, waitTime: probe.kind === "wait" ? Number(rule.threshold) : 15,
+        source: "staging-cron-simulation", sourceStale: false, sourceMissing: false
+      };
+      const before = {
+        isOpen: probe.kind === "wait",
+        waitTime: probe.kind === "wait" ? Number(rule.threshold) + 15 : null,
+        updatedAt: now - 60000
+      };
+      const activity = { operationalNow: true, operationalBefore: true, openingRamp: false };
+      const alert = evaluateRideTransitionAlert(
+        ride, before, rule, activity, now, env.APP_URL
+      );
+      if (!alert || alert.kind !== probe.kind || !ruleMatchesRide(rule, ride)) {
+        throw new Error("Staging probe transition did not match the watch");
+      }
+      if (probe.status === "armed") {
+        await enqueueRideAlerts(env, [{
+          endpoint: row.endpoint, rideId: ride.id, kind: alert.kind,
+          threshold: alert.threshold,
+          payload: {
+            ...alert.payload,
+            title: `STAGING CRON TEST · ${alert.payload.title}`,
+            body: `Simulation only · ${alert.payload.body}`,
+            tag: `staging-cron-${safeTag(ride.id)}-${alert.kind}`
+          }
+        }], now);
+        // As in runRideWatch, the checkpoint advances only after queueing.
+        // The checkpoint is deliberately separate from ride history.
+        await writeCurrentRideSnapshot(env, [ride], true);
+      }
+      delivery = await processPendingRideAlerts(env, {
+        rides: [ride],
+        subscriptions: [{ ...row, rules }],
+        matchesRule: ruleMatchesRide,
+        isCoolingDown: (endpoint, rideId, kind) => cooldownActive(env, endpoint, rideId, kind),
+        send: sendPush,
+        now
+      });
+      outcome = delivery.delivered > 0 ? "delivered" :
+        delivery.pending > 0 ? "retry" : "not-delivered";
+    }
+  } catch (error) {
+    console.warn("Staging cron probe failed", error?.code || error?.message || "unknown");
+    outcome = "failed";
+  }
+
+  await env.DB.prepare(
+    "UPDATE worker_state SET updated_at=?,payload=? WHERE state_key=? AND payload=?"
+  ).bind(Date.now(), JSON.stringify({
+    ...state, status: outcome, completedAt: Date.now(),
+    delivery: delivery || null
+  }), key, JSON.stringify(state)).run();
+  console.log("Staging scheduled alert probe", outcome,
+    JSON.stringify(delivery || {}));
 }
 
 // Resolve ThemeParks IDs from the park's stable entity catalog, not from the

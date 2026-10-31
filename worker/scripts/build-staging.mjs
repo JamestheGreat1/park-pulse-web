@@ -22,6 +22,13 @@ const productionUUID = prodConfig.match(/^database_id\s*=\s*"([^"]+)"/m)?.[1];
 if (!productionUUID) fail("Production binding not found; cannot verify safe isolation.");
 if (uuid.toLowerCase() === productionUUID.toLowerCase()) fail("Staging database ID must differ from production.");
 if (!/^name\s*=\s*"parkpulse-api-staging"/m.test(template)) fail("Worker name is not staging.");
+if (!/^\[observability\]$/m.test(template) ||
+    !/^enabled\s*=\s*true$/m.test(template.split("[observability]")[1].split("[observability.logs]")[0]) ||
+    !/^\[observability.logs\]$/m.test(template) ||
+    !/^invocation_logs\s*=\s*true$/m.test(template) ||
+    !/^head_sampling_rate\s*=\s*1$/m.test(template)) {
+  fail("Staging Worker must persist all invocation and console logs.");
+}
 if (!/^database_name\s*=\s*"parkpulse-staging"/m.test(template)) fail("Database name is not staging.");
 if (!/^STAGING_MODE\s*=\s*"true"/m.test(template)) fail("Staging safety flag missing.");
 if (!/^STAGING_ALLOW_PUSH\s*=\s*"false"/m.test(template) ||

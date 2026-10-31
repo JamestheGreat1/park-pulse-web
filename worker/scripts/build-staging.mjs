@@ -66,17 +66,17 @@ if (previewUrl) {
   }
 }
 
-let generatedCatalog = catalog;
-let changes = 0;
+// With Disneyland public in the stable 2.0 source, staging must preserve
+// the same catalog rather than silently rewriting public flags. Check all
+// three enabled declarations, and fail closed if release flags drift.
+const generatedCatalog = catalog;
 for (const pattern of [
-  /(\{ id:\s*"dlr",[^\n]*\benabled:\s*)false/,
-  /(\{ id:\s*16,[^\n]*\benabled:\s*)false/,
-  /(\{ id:\s*17,[^\n]*\benabled:\s*)false/
+  /\{ id:\s*"dlr",[^\n]*\benabled:\s*true/,
+  /\{ id:\s*16,[^\n]*\benabled:\s*true/,
+  /\{ id:\s*17,[^\n]*\benabled:\s*true/
 ]) {
-  if (!pattern.test(generatedCatalog)) fail("DLR source flag not found exactly where expected.");
-  generatedCatalog = generatedCatalog.replace(pattern, (_m, prefix) => { changes++; return prefix + "true"; });
+  if (!pattern.test(generatedCatalog)) fail("Expected enabled DLR catalog flag in stable 2.0 source.");
 }
-if (changes !== 3) fail("Expected exactly three DLR feature flags.");
 
 const stageRoot = join(projectRoot, ".parkpulse-staging");
 const workerRoot = join(stageRoot, "worker");

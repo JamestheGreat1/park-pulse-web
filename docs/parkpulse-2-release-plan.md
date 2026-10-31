@@ -3,8 +3,8 @@
 **Status: HOLD / release candidate only.** This file does not authorize production deployment.
 
 - Candidate branch: `release/2.0.0-rc1` (based on `feature/multi-resort-dlr`).
-- Candidate version: `2.0.0-rc.1`; live production remains on its existing version.
-- The committed `assets/js/catalog.js` deliberately keeps the Disneyland Resort, Disneyland Park, and Disney California Adventure **disabled**. A staging-only generator enables them in a gitignored copy; never reuse that generated config or its D1/secrets for production.
+- Candidate version: `2.0.0-rc.1`; separate unpublished final-prep branch: `release/2.0.0-final-prep` with stable `2.0.0`. Live production remains unchanged.
+- The RC branch keeps DLR **disabled** in committed source; the separate final-prep branch enables DLR only for prelaunch review. Staging generates an isolated copy and never reuses its D1/secrets for production.
 - Production Worker (`parkpulse-api`), database (`parkpulse`), and `app.useparkpulse.com` must not be changed just to review this candidate.
 
 ## Evidence already collected
@@ -14,18 +14,47 @@
 - Cloudflare screenshot (2026-10-31, 24-hour range): staging Worker 230 invocations, zero Worker errors, roughly 9 ms CPU metric, about 165k D1 rows read and 64k written, 1.5 MB storage. These are aggregate dashboard figures, **not guaranteed upper bounds** on a scheduled invocation.
 - Billing screenshot: Workers Paid allowances (50 million D1 writes, 25 billion reads, 30 million CPU milliseconds included per month); current usage 312.85k writes, 315.12k reads and 11.17k Worker CPU milliseconds. Production and staging can share monthly account allowances.
 - Screenshot of staging `/health` has `stagingHistoryOnly: true`, `stagingPushTestOnly: true`, `stagingCronProbeAvailable: true`; `notificationEngine.ready: false` / `waiting` is expected in history-only mode.
-- These observations demonstrate staging readiness **only**; the production alert scheduler, production D1 migration state, and full sustained load have not been proven by them.
+- Production preflight screenshot (2026-10-31, 07:45:29 UTC lastCheck): existing Worker version `1.7.6` returned `ok:true`, `notificationEngine.ready:true`, `status:"running"`, 47 WDW checkpoints, `vapidConfigured:true`, `themeParksApiKeyConfigured:true`, and latest cycle `queued/delivered/retried/failed/discarded/pending = 0`. The older response emitted `staging:null` (absent field), **not** an explicit `false` — production identity is established independently from the production Worker config and endpoint. This verifies the current scheduled pipeline's health, **not** delivery of an as-yet-unobserved natural trigger.
+- Staging and production health/usage observations do not guarantee sustained six-park production CPU/D1 performance. Confirm again immediately before rollout and watch early cron ticks.
 
 ## Mandatory gates before final 2.0.0
 
 - [ ] GitHub Actions for the candidate's draft PR: regression, browser/offline, Worker bundle, staged-preview smoke all pass. Treat the read-only upstream source audit as advisory; manually resolve real source failures.
 - [ ] Confirm at least one **natural, real live wait-target transition** and one **natural reopening** through the scheduler/alert queue, with correct same-device delivery, no duplicates, and no cross-resort misrouting. The synthetic staging probe **does not** satisfy this gate. Design a controlled, isolated staging integration test; do not enable real alerts for arbitrary staging subscribers without review.
 - [ ] Verify a recent staging history-only run actually writes correct live samples at the six parks, and check scheduled CPU *distribution*, exceptions, source freshness, hourly work, D1 consumption, and a few 5-minute cycles after quiet periods.
-- [x] Checked-in production schema/Worker configuration match `main`; remote tables, key columns and the Time Travel bookmark were confirmed. A private production SQL export completed successfully on 2026-10-31 (64 MB, restrictive file permissions); secure a copy outside Codespaces and refresh the recovery point on release day. See [production D1 audit](parkpulse-2-production-d1-audit.md).
-- [ ] Recheck monthly account-wide D1, Worker and subrequest headroom with both staging and production running; staging numbers alone do not include full live-alert costs. Decide when to reduce/stop staging after launch.
+- [x] Checked-in production schema/Worker configuration match `main`; remote tables, key columns and the Time Travel bookmark were confirmed. A private production SQL export completed successfully on 2026-10-31 (64 MB, restrictive file permissions); user confirmed an encrypted copy stored outside Codespaces; decrypt/restore has not been tested. Refresh the recovery point on release day. See [production D1 audit](parkpulse-2-production-d1-audit.md).
+- [x] Current production notification engine preflight (2026-10-31): `ready:true`, `running`, 47 existing WDW checkpoints, push credentials present, zero current failed/pending queue counts. Recheck after Worker deployment and monitor real cross-resort alerts.\n- [ ] Recheck monthly account-wide D1, Worker and subrequest headroom with both staging and production running; staging numbers alone do not include full live-alert costs. Decide when to reduce/stop staging after launch.
 - [ ] Run acceptance on iPhone standalone PWA and desktop: both resorts, all six park selectors, remembered resorts, history, local vs. park time/DST, shared links, favorites/watches, offline cache, light/dark and Liquid/Frosted Glass.
-- [ ] Produce final release commit (not this RC): switch exactly three catalog `enabled: false` flags for DLR/DL/DCA to `true`, change candidate version/cache to `2.0.0`, update the staging generator/tests to accept a now-public DLR catalog safely, and prepare a stable changelog/README. Validate that zero staging Worker names, test origins, private VAPID settings, or staging D1 IDs reach the production config.
+- [x] Final-prep branch `release/2.0.0-final-prep` enables the three Disneyland flags, uses stable 2.0.0 asset/Worker versions, and keeps staging D1/Worker identity isolated. Final-prep CI **4/4 green** (run 41180627897). The branch is a **draft PR targeting the RC**, not `main`; no merge/deploy has occurred. Final iPhone/desktop acceptance and owner release signoff are separate, open gates.
 - [ ] Obtain explicit signoff before merge and production rollout.
+
+## Natural alert acceptance and monitored-rollout decision (2026-10-31)
+
+The scheduler's five-minute path, the shared wait/reopen evaluator, durable D1 queue/retry handling, cross-resort ride keys and device push delivery have dedicated automated checks or controlled scheduled staging evidence. The iPhone received the explicitly labeled scheduled simulation. **No captured natural source transition has yet produced a verified `STAGING LIVE` device delivery.** The opt-in observer showing `monitoring` is not a delivery pass, and the private device provider endpoints cannot be inspected from the repository.
+
+**Release decision path:** The owner may explicitly approve a monitored rollout with this remaining real-world uncertainty, provided the production health preflight below is green, staging data continues to update, a secure production D1 copy exists outside Codespaces, and first-launch monitoring/rollback ownership is arranged. Do not silently mark the original natural-alert checkbox as passed; it stays unverified until an actual event is observed. A `stale` or `unavailable` notification engine, failed cron, missing VAPID configuration, abnormal CPU/D1 metrics or stale live feed is a **no-go**, not an accepted risk.
+
+### Read-only production Worker notification preflight
+
+```bash
+curl -fsS https://parkpulse-api.jamesp5297.workers.dev/health | jq '{
+  ok, version, staging, vapidConfigured, themeParksApiKeyConfigured,
+  notificationEngine: {
+    ready: .notificationEngine.ready,
+    status: .notificationEngine.status,
+    lastCheck: .notificationEngine.lastCheck,
+    checkpointRides: .notificationEngine.checkpointRides,
+    cadenceMinutes: .notificationEngine.cadenceMinutes,
+    delivery: .notificationEngine.delivery
+  }
+}'
+```
+
+Expected **before rollout**: `ok: true`, `staging: false`, `vapidConfigured: true`, `notificationEngine.ready: true`, `status: "running"`, a recent `lastCheck`, and approximately **47** checkpoint rides for current WDW production. Any deviation must be investigated before launch. Health-only JSON contains no subscription endpoints or secrets. Also check the current production scheduled Worker log/Cloudflare dashboard for failures and confirm both WDW parks and DLR are receiving fresh data on staging.
+
+After deploying the **production Worker first** but before switching the public PWA: repeat this command and verify the checkpoint count rises to approximately **101** after a normal five-minute scheduled run, while old WDW rides/subscriptions stay intact. Do not promise immediate California baselines; 30-day analytics must accumulate honestly.
+
+First-live-traffic watch: record Worker cron outcomes/CPU, `notificationEngine.delivery` error/pending counts, cross-resort watched attraction links, D1 reads/writes and whether legitimate real transitions result in a push. If a real source transition is observed but delivery fails, pause the launch and investigate/rollback. **A successful send isn't proven solely by `ready`** — it proves cron/checkpoint health.
 
 ## Future release sequence — only AFTER all gates pass
 
@@ -40,7 +69,7 @@
 
 - Staging's 101 baselines do **not** automatically populate production D1. California's production comparisons may initially show honest insufficient-data states while history warms; do not manufacture historical trends.
 - Staging presently runs in history-only mode; its notification-engine `waiting` status is not the same as a broken production engine.
-- `worker/scripts/build-staging.mjs` currently requires the three committed DLR source flags to remain disabled. It must be adjusted deliberately at the final enablement step, together with tests.
+- The RC staging generator requires the committed DLR flags to be disabled; **final-prep** now validates the three already-enabled DLR flags without altering the source and keeps the isolated staging Worker/D1 safety gates. Do not generate a production Worker using the staging template.
 - This release adds **no** trip planner, user accounts, or new paid features. Keep the existing four-tab UI and the low-noise ParkPulse design.
 
 **Release rule:** no merge to `main`, production D1 write, production Worker deploy or public PWA publish until the above gates are explicitly accepted.

@@ -1,4 +1,4 @@
-import { PARKS, RESORTS, parksForResort, resortForPark } from "./catalog.js?v=2.0.0-rc.1";
+import { PARKS, RESORTS, parksForResort, resortForPark } from "./catalog.js?v=2.0.0";
 
 const KEY = "parkpulse.rideWatcher.v1";
 

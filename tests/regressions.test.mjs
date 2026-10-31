@@ -938,18 +938,18 @@ test('wait trend glyph stays compact and hides for stale cards', () => {
   assert.match(card, /rideTrendMarkup\(ride, status\)/);
 });
 
-test('shared catalog preserves WDW parks and gates Disneyland until Phase 2', async () => {
+test('stable catalog preserves WDW parks and includes both Disneyland parks', async () => {
   const source = fs.readFileSync(new URL('../assets/js/catalog.js', import.meta.url), 'utf8');
   const catalog = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(source));
-  assert.deepEqual(catalog.PARKS.map(p => p.id), [6, 5, 7, 8]);
+  assert.deepEqual(catalog.PARKS.map(p => p.id), [6, 5, 7, 8, 16, 17]);
   assert.deepEqual(catalog.parksForResort('wdw').map(p => p.id), [6,5,7,8]);
-  assert.deepEqual(catalog.parksForResort('dlr'), []);
+  assert.deepEqual(catalog.parksForResort('dlr').map(p => p.id), [16,17]);
   assert.deepEqual(catalog.parksForResort('dlr', { includeDisabled: true }).map(p => p.id), [16,17]);
   assert.equal(catalog.parkTimezone(6), 'America/New_York');
   assert.equal(catalog.parkTimezone(16), 'America/Los_Angeles');
   assert.equal(catalog.resortForPark(17).id, 'dlr');
   assert.equal(catalog.parkName(5), 'EPCOT');
-  assert.equal(catalog.PARKS.some(p => p.resortId === 'dlr'), false);
+  assert.equal(catalog.PARKS.some(p => p.resortId === 'dlr'), true);
   const worker = fs.readFileSync(new URL('../worker/src/index.js', import.meta.url), 'utf8');
   assert.match(worker, /import \{ PARKS as ENABLED_PARKS, parkTimezone \} from/);
 });
@@ -1004,7 +1004,7 @@ test('Worker uses per-park timezone for baselines, events, and history', () => {
 });
 
 
-test('Disneyland catalogs are curated, distinct and remain behind disabled resort gates', async () => {
+test('Disneyland catalogs are curated and enabled in stable public release', async () => {
   const file = fs.readFileSync(new URL('../worker/src/disneyland-rides.js', import.meta.url), 'utf8');
   const { DISNEYLAND_RIDES, disneylandRidesForPark } =
     await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(file));
@@ -1020,8 +1020,8 @@ test('Disneyland catalogs are curated, distinct and remain behind disabled resor
                   disneylandRidesForPark(17).find(ride => ride.key === 'dca:pal-a-round-non-swinging'));
   const catalog = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(
     fs.readFileSync(new URL('../assets/js/catalog.js', import.meta.url), 'utf8')));
-  assert.deepEqual(catalog.PARKS.map(p => p.id), [6, 5, 7, 8]);
-  assert.equal(catalog.parksForResort('dlr').length, 0);
+  assert.deepEqual(catalog.PARKS.map(p => p.id), [6, 5, 7, 8, 16, 17]);
+  assert.equal(catalog.parksForResort('dlr').length, 2);
   assert.match(worker, /ENABLED_PARKS\.filter\(\(item\) => item\.resortId === "dlr"\)/);
 });
 
@@ -1208,14 +1208,14 @@ test('When Disneyland is enabled later, selection remembers each resort last par
 });
 
 
-test('Shared ride keys resolve to the correct resort without permitting disabled parks', async () => {
+test('Shared ride keys resolve to the correct enabled resort', async () => {
   const source=fs.readFileSync(new URL('../assets/js/catalog.js',import.meta.url),'utf8');
   const catalog=await import('data:text/javascript;charset=utf-8,'+encodeURIComponent(source));
   for(const [key,park] of [['mk:space-mountain',6],['epcot:remy',5],['dhs:rise',7],['ak:everest',8]]) {
     assert.equal(catalog.parkIdForRideKey(key),park);
   }
-  assert.equal(catalog.parkIdForRideKey('dl:space-mountain'),null);
-  assert.equal(catalog.parkIdForRideKey('dca:guardians'),null);
+  assert.equal(catalog.parkIdForRideKey('dl:space-mountain'),16);
+  assert.equal(catalog.parkIdForRideKey('dca:guardians'),17);
   assert.equal(catalog.parkIdForRideKey('dl:space-mountain',{includeDisabled:true}),16);
   assert.equal(catalog.parkIdForRideKey('dca:guardians',{includeDisabled:true}),17);
   assert.equal(catalog.parkIdForRideKey('invalid'),null);

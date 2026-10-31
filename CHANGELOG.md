@@ -1,3 +1,12 @@
+## 2.0.0 — 2026-10-31
+
+- ParkPulse expands from four Walt Disney World parks to **six parks across Walt Disney World and Disneyland Resort**, covering 101 curated attractions.
+- New Resorts view, remembered park/resort selection, cross-resort favorites and ride watches, shared links, and park-local time display.
+- Refreshes the destination resort automatically when switching, even with cached wait data, and keeps fresh park API responses out of the offline service-worker cache.
+- Improved Frosted Glass page transitions and polished status indicators and compact settings layouts for iPhone.
+- Preserved existing WDW ride history, notification subscriptions, interface preferences and glass styles; California history and comparison baselines warm up separately after launch.
+- Includes pre-release notification delivery tests, a guarded staging environment, and 2.0 regression and browser/offline smoke tests.
+
 ## 2.0.0-rc.1 — 2026-10-31 (release candidate, not deployed)
 
 - Prepared the multi-resort ParkPulse candidate: Walt Disney World plus Disneyland Resort, with stable ride keys for six parks and 101 curated attractions.

@@ -26,8 +26,13 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     }
     await page.locator('#nav-resorts').click();
     assert.equal(await page.locator('[data-resort="wdw"]').getAttribute('aria-pressed'), 'true');
-    assert.equal(await page.locator('[data-resort="dlr"]').isDisabled(), true);
-    assert.match(await page.locator('[data-resort="dlr"]').innerText(), /Coming soon/);
+    // Stable 2.0 must actually expose both resort choices, not the old
+    // gated "Coming soon" card.
+    assert.equal(await page.locator('[data-resort="dlr"]').isDisabled(), false);
+    assert.doesNotMatch(await page.locator('[data-resort="dlr"]').innerText(), /Coming soon/);
+    await page.locator('[data-resort="dlr"]').click();
+    assert.equal(await page.locator('[data-resort="dlr"]').getAttribute('aria-pressed'), 'true');
+    await page.locator('[data-resort="wdw"]').click();
     // The fourth nav item must remain reachable without clipping on a small phone.
     await page.setViewportSize({ width: 320, height: 640 });
     const mobileNav = await page.locator('.bottom-nav .nav-item').evaluateAll(items =>
@@ -97,8 +102,8 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     console.log('PASS: startup with hanging health, onboarding, navigation, view jumps, keyboard dialog, expiration preservation, complete cache, offline relaunch');
     await context.close();
 
-    // Staged multi-resort integration test: enable DLR only in this browser's
-    // intercepted module response. The actual repo and deployed app stay gated.
+    // Staged multi-resort integration test: serve the public catalog in an
+    // isolated fixture, with the network responses fully mocked.
     const fs = require('node:fs');
     const path = require('node:path');
     const catalogSource = fs.readFileSync(path.join(__dirname, '../assets/js/catalog.js'), 'utf8')

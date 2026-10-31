@@ -87,6 +87,19 @@ jobs:
         working-directory: .parkpulse-staging/worker
         run: npx wrangler deploy --config ./wrangler.toml --dry-run --outdir ./dry-run
 
+  production-release-gate:
+    name: Production Worker 2.0 readiness (read-only)
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'release/2.0.0-final-prep'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify real production Worker, 101 checkpoints, and all six park APIs
+        run: node worker/scripts/check-production-2-release.mjs
+
   source-audit:
     name: Read-only Disneyland provider coverage audit
     runs-on: ubuntu-latest

@@ -140,6 +140,19 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.notEqual(selectedStyle.selectedBorder,selectedStyle.otherBorder);
     assert.equal(selectedStyle.selectedMark,'4px');
     assert.notEqual(selectedStyle.selectedBadge,'rgba(0, 0, 0, 0)');
+    // Both destinations already have cached rides. Switching resorts must
+    // still fetch EVERY park in the destination, not just its first park.
+    const verifyResortRefetch = async (resortId, parkIds) => {
+      const counts = new Map(parkIds.map(id => [id, apiParks.filter(parkId => parkId === id).length]));
+      await page.locator('[data-resort="' + resortId + '"]').click();
+      for(let attempt=0; attempt<75; attempt++){
+        if(parkIds.every(id=>apiParks.filter(parkId=>parkId===id).length>counts.get(id)))return;
+        await new Promise(resolve=>setTimeout(resolve,40));
+      }
+      assert.fail('Resort switch failed to refetch all parks in ' + resortId);
+    };
+    await verifyResortRefetch('wdw',[5,6,7,8]);
+    await verifyResortRefetch('dlr',[16,17]);
     assert(apiParks.includes(16)&&apiParks.includes(17));
     // Default preview must keep its push controls intentionally disabled.
     const previewPush = await page.evaluate(async()=>{

@@ -11,6 +11,7 @@ APP_ORIGIN = "https://parkpulse-staging.invalid"
 VAPID_SUBJECT = "https://parkpulse-staging.invalid/"
 STAGING_MODE = "true"
 STAGING_ALLOW_PUSH = "false"
+STAGING_PUSH_TEST_ONLY = "false"
 STAGING_ENABLE_CRON = "false"
 STAGING_HISTORY_ONLY = "false"
 

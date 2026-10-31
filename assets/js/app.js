@@ -1045,12 +1045,15 @@ function renderSettings() {
   const systemTone = backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : "";
   const systemCopy = `Ride data ${refreshCopy} · ${rideData.sourceSummary || "Waiting for source"}`;
 
+  const stagingTestPush = backendState?.staging === true && backendState?.stagingPushTestOnly === true;
   const notificationsReady = backendState?.ok === true &&
     backendState?.vapidConfigured === true &&
     notificationEngine?.status === "running";
   const notificationsLabel = backendState?.ok === false
     ? "Unavailable"
-    : notificationsReady
+    : stagingTestPush
+      ? "Test mode"
+      : notificationsReady
       ? "Ready"
       : !backendState?.vapidConfigured && backendState?.ok === true
         ? "Needs setup"
@@ -1059,9 +1062,11 @@ function renderSettings() {
           : backendState?.ok === true
             ? "Needs attention"
             : "Checking";
-  const notificationsTone = notificationsReady ? "good" : ["Unavailable","Needs setup","Needs attention"].includes(notificationsLabel) ? "bad" : "";
+  const notificationsTone = (notificationsReady || stagingTestPush) ? "good" : ["Unavailable","Needs setup","Needs attention"].includes(notificationsLabel) ? "bad" : "";
   const notificationsCopy = backendState?.ok === true
-    ? `Push ${backendState?.vapidConfigured ? "ready" : "not configured"} · Alerts ${notificationEngine?.status === "running" ? "running" : notificationEngine?.status || "checking"}`
+    ? stagingTestPush
+      ? "Staging device push ready · Automatic ride alerts disabled"
+      : `Push ${backendState?.vapidConfigured ? "ready" : "not configured"} · Alerts ${notificationEngine?.status === "running" ? "running" : notificationEngine?.status || "checking"}`
     : "Push + ride alert status";
 
   const baselineCopy = analyticsState?.ok

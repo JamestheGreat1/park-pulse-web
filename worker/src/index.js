@@ -15,6 +15,13 @@ const HISTORY_HEALTH_WINDOW_MS = 20 * 60 * 1000;
 const CROWD_MIN_SMALL_PARK = 4;
 const CROWD_MIN_LARGE_PARK = 6;
 
+function stagingPushTestReady(env) {
+  return env.STAGING_MODE === "true" &&
+    env.STAGING_ALLOW_PUSH === "true" &&
+    env.STAGING_PUSH_TEST_ONLY === "true" &&
+    Boolean(env.VAPID_SUBJECT && env.VAPID_SERVER_PUBLIC_KEY && env.VAPID_SERVER_PRIVATE_KEY);
+}
+
 const PARKS = new Map([
   [5, {
     rides: [
@@ -108,7 +115,7 @@ export default {
     try {
       // Stage-only safety rail: no browser can register a live push
       // subscription until staging-specific VAPID keys and a test origin exist.
-      if (env.STAGING_MODE === "true" && env.STAGING_ALLOW_PUSH !== "true" &&
+      if (env.STAGING_MODE === "true" && !stagingPushTestReady(env) &&
           url.pathname.startsWith("/subscriptions")) {
         return json({ error: "Push is disabled in staging", code: "STAGING_PUSH_DISABLED" }, 403, cors);
       }
@@ -119,7 +126,8 @@ export default {
           service: "parkpulse-api",
           version: VERSION,
           staging: env.STAGING_MODE === "true",
-          pushRegistrationEnabled: env.STAGING_MODE !== "true" || env.STAGING_ALLOW_PUSH === "true",
+          pushRegistrationEnabled: env.STAGING_MODE !== "true" || stagingPushTestReady(env),
+          stagingPushTestOnly: stagingPushTestReady(env),
           stagingHistoryOnly: env.STAGING_MODE === "true" && env.STAGING_ENABLE_CRON === "true" && env.STAGING_HISTORY_ONLY === "true",
           stagingFrontendPreview: env.STAGING_MODE === "true" && Boolean(env.ASSETS),
           primaryDataSource: "ThemeParks.wiki",
@@ -136,6 +144,10 @@ export default {
       }
 
       if (request.method === "GET" && url.pathname === "/vapid-key") {
+        if (env.STAGING_MODE === "true" && !stagingPushTestReady(env)) {
+          return json({ error: "Staging push is not configured", code: "STAGING_PUSH_DISABLED" },
+            503, cors);
+        }
         return json({ publicKey: env.VAPID_SERVER_PUBLIC_KEY }, 200, cors);
       }
 
@@ -267,6 +279,27 @@ export default {
         const body = await request.json().catch(() => ({}));
         const subscription = validateSubscription(body?.subscription);
         if (!subscription) return json({ error: "Invalid push subscription", code: "INVALID_SUBSCRIPTION" }, 400, cors);
+        if (env.STAGING_MODE === "true") {
+          // The preview has a public URL. Never allow arbitrary push endpoints to
+          // use our staging credentials: this endpoint is ONLY for registered
+          // subscriptions in the separate staging D1 database.
+          const registered = await env.DB.prepare(
+            "SELECT endpoint,p256dh,auth FROM subscriptions WHERE endpoint=?"
+          ).bind(subscription.endpoint).first();
+          if (!registered || registered.p256dh !== subscription.p256dh ||
+              registered.auth !== subscription.auth) {
+            return json({ error: "Register on this staging app before testing", code: "NOT_REGISTERED" },
+              403, cors);
+          }
+          // One deliberate device test per minute per subscription.
+          const recent = await env.DB.prepare(
+            "SELECT last_sent FROM notification_log_v2 WHERE endpoint=? AND ride_key=? AND kind=?"
+          ).bind(subscription.endpoint, "staging:device-test", "device-test").first();
+          if (recent && Date.now() - Number(recent.last_sent) < 60000) {
+            return json({ error: "Try another test after one minute", code: "TEST_COOLDOWN" },
+              429, cors);
+          }
+        }
 
         try {
           const delivered = await sendPush(subscription, {
@@ -284,6 +317,13 @@ export default {
             }, 410, cors);
           }
 
+          if (env.STAGING_MODE === "true") {
+            await env.DB.prepare(
+              `INSERT INTO notification_log_v2(endpoint,ride_key,kind,last_sent)
+               VALUES(?,?,?,?)
+               ON CONFLICT(endpoint,ride_key,kind) DO UPDATE SET last_sent=excluded.last_sent`
+            ).bind(subscription.endpoint, "staging:device-test", "device-test", Date.now()).run();
+          }
           return json({ ok: true, delivered: true }, 200, cors);
         } catch (error) {
           console.warn("Push test failed", error);

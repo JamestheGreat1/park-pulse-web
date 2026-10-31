@@ -11,6 +11,7 @@ const catalog = readFileSync(join(projectRoot, "assets/js/catalog.js"), "utf8");
 const argIndex = process.argv.indexOf("--database-id");
 const uuid = argIndex < 0 ? "" : String(process.argv[argIndex + 1] || "").trim();
 const enableHistoryCron = process.argv.includes("--enable-history-cron");
+const enableTestPush = process.argv.includes("--enable-test-push");
 const previewIndex = process.argv.indexOf("--preview-url");
 const previewUrl = previewIndex < 0 ? "" : String(process.argv[previewIndex + 1] || "").trim();
 function fail(message) { throw new Error("STAGING BUILD BLOCKED: " + message); }
@@ -23,7 +24,10 @@ if (uuid.toLowerCase() === productionUUID.toLowerCase()) fail("Staging database 
 if (!/^name\s*=\s*"parkpulse-api-staging"/m.test(template)) fail("Worker name is not staging.");
 if (!/^database_name\s*=\s*"parkpulse-staging"/m.test(template)) fail("Database name is not staging.");
 if (!/^STAGING_MODE\s*=\s*"true"/m.test(template)) fail("Staging safety flag missing.");
-if (!/^STAGING_ALLOW_PUSH\s*=\s*"false"/m.test(template)) fail("Push gate must be disabled.");
+if (!/^STAGING_ALLOW_PUSH\s*=\s*"false"/m.test(template) ||
+    !/^STAGING_PUSH_TEST_ONLY\s*=\s*"false"/m.test(template)) {
+  fail("Staging push must be disabled in the committed template.");
+}
 if (!/^STAGING_ENABLE_CRON\s*=\s*"false"/m.test(template)) fail("Cron gate must be disabled.");
 if ((template.match(/^\[triggers\]$/gm) || []).length !== 1 ||
     (template.match(/^crons = \[\]$/gm) || []).length !== 1) {
@@ -34,6 +38,9 @@ if (enableHistoryCron && !template.includes('STAGING_HISTORY_ONLY = "false"')) {
   fail("History-only guard missing from template.");
 }
 if (!/^name\s*=\s*"parkpulse-api"/m.test(prodConfig)) fail("Production Worker identity changed; review before building.");
+if (enableTestPush && (!previewUrl || !enableHistoryCron)) {
+  fail("Staging push tests require a staging preview origin and history-only cron.");
+}
 if (previewUrl) {
   let parsed;
   try { parsed = new URL(previewUrl); } catch { fail("Preview URL must be a full HTTPS workers.dev URL."); }
@@ -81,6 +88,16 @@ if (enableHistoryCron) {
     fail("History-only schedule was not activated.");
   }
 }
+if (enableTestPush) {
+  // Only the explicitly generated staging copy may register push subscriptions.
+  // Automatic ride alert delivery remains disabled by the scheduled handler.
+  stagingConfig = stagingConfig
+    .replace('STAGING_ALLOW_PUSH = "false"', 'STAGING_ALLOW_PUSH = "true"')
+    .replace('STAGING_PUSH_TEST_ONLY = "false"', 'STAGING_PUSH_TEST_ONLY = "true"');
+  if (!stagingConfig.includes('STAGING_PUSH_TEST_ONLY = "true"')) {
+    fail("Staging push test guard not activated.");
+  }
+}
 if (previewUrl) {
   const origin = new URL(previewUrl).origin;
   stagingConfig = stagingConfig
@@ -116,14 +133,19 @@ if (previewUrl) {
       if (entry.name === "push.js") {
         const supportCheck = 'export function pushSupported(){return Boolean(';
         if (!contents.includes(supportCheck)) fail("Staging push support guard missing.");
-        contents = contents.replace(supportCheck, 'export function pushSupported(){return Boolean(false && ');
+        contents = contents.replace(
+          supportCheck,
+          'export function pushSupported(){return Boolean(' + (enableTestPush ? '' : 'false && ')
+        );
       }
       if (entry.name === "index.html") {
         contents = contents
           .replace("<title>ParkPulse</title>", '<title>ParkPulse 2.0 — Staging Preview</title>')
           .replace("<head>", '<head>\n  <meta name="robots" content="noindex,nofollow">')
           .replace('<span class="brand-kicker">Ride watcher</span>',
-            '<span class="brand-kicker">2.0 Staging Preview · Alerts disabled</span>');
+            '<span class="brand-kicker">' +
+            (enableTestPush ? '2.0 Staging · Push test only' : '2.0 Staging Preview · Alerts disabled') +
+            '</span>');
       }
       if (entry.name === "version.json") {
         contents = JSON.stringify({ version: previewVersion, channel: "preview", released: new Date().toISOString().slice(0, 10) }, null, 2);
@@ -137,9 +159,11 @@ if (stagingConfig.includes(productionUUID)) fail("Generated config references pr
 writeFileSync(join(workerRoot, "wrangler.toml"), stagingConfig);
 console.log("Staging build created (no Cloudflare operations): .parkpulse-staging/worker/");
 console.log("Worker: parkpulse-api-staging | D1: parkpulse-staging | rides: WDW + DLR");
-if (previewUrl) console.log("Preview: " + previewUrl + " (same-origin staging API; alerts disabled)");
+if (previewUrl) console.log("Preview: " + previewUrl +
+  (enableTestPush ? " (test push enabled; automatic alerts disabled)" : " (alerts disabled)"));
 console.log(enableHistoryCron
-  ? "History-only cron enabled (every 5m); notifications disabled; production unchanged."
+  ? "History-only cron enabled (every 5m); " +
+    (enableTestPush ? "device-only push testing on; live ride alerts off." : "notifications disabled; production unchanged.")
   : "Cron disabled; subscription endpoints gated; production source remains unchanged.");
 console.log("Next: cd .parkpulse-staging/worker && npm install --no-save --package-lock=false");
 console.log("      npx wrangler deploy --config ./wrangler.toml --dry-run");

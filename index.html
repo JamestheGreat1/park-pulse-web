@@ -9,12 +9,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ParkPulse">
   <meta name="format-detection" content="telephone=no">
-  <meta name="description" content="ParkPulse keeps an eye on Walt Disney World ride waits, crowd pressure, and reopenings so you don’t have to.">
+  <meta name="description" content="ParkPulse tracks ride waits, crowd pressure, and reopenings at Walt Disney World and Disneyland Resort so you don’t have to.">
   <title>ParkPulse</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=1.9.5">
-  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png?v=1.9.5">
-  <link rel="icon" href="./assets/icons/icon-192.png?v=1.9.5" sizes="192x192">
-  <link rel="stylesheet" href="./assets/css/app.css?v=1.9.5">
+  <link rel="manifest" href="./manifest.webmanifest?v=2.0.0">
+  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png?v=2.0.0">
+  <link rel="icon" href="./assets/icons/icon-192.png?v=2.0.0" sizes="192x192">
+  <link rel="stylesheet" href="./assets/css/app.css?v=2.0.0">
 </head>
 <body>
   <div id="pullRefresh" class="pull-refresh" aria-hidden="true">
@@ -31,7 +31,7 @@
   <div id="app" class="app-shell">
     <header class="topbar shell-width">
       <div class="brand-lockup">
-        <img class="brand-icon" src="./assets/icons/icon-192.png?v=1.9.5" alt="" width="44" height="44">
+        <img class="brand-icon" src="./assets/icons/icon-192.png?v=2.0.0" alt="" width="44" height="44">
         <div class="brand-copy"><span class="brand-kicker">Ride watcher</span><h1>ParkPulse</h1></div>
       </div>
       <button id="refreshButton" class="icon-button glass-control" type="button" aria-label="Refresh live ride data" title="Refresh live ride data">
@@ -42,6 +42,7 @@
     <main id="mainContent" class="main-content shell-width">
       <section id="view-explore" class="view-panel active" data-view="explore" aria-labelledby="nav-explore"></section>
       <section id="view-watching" class="view-panel" data-view="watching" aria-labelledby="nav-watching"></section>
+      <section id="view-resorts" class="view-panel" data-view="resorts" aria-labelledby="nav-resorts"></section>
       <section id="view-settings" class="view-panel" data-view="settings" aria-labelledby="nav-settings"></section>
     </main>
     <footer class="source-footer shell-width">Wait data: <a href="https://www.themeparks.wiki/" target="_blank" rel="noopener noreferrer">ThemeParks.wiki</a> · <a href="https://queue-times.com/" target="_blank" rel="noopener noreferrer">Queue-Times fallback</a></footer>
@@ -52,8 +53,11 @@
       <button id="nav-watching" class="nav-item" type="button" data-view-target="watching">
         <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span id="watchingBadge" class="nav-badge hidden">0</span></span><span>Watching</span>
       </button>
+      <button id="nav-resorts" class="nav-item" type="button" data-view-target="resorts">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15"/></svg><span>Resorts</span>
+      </button>
       <button id="nav-settings" class="nav-item" type="button" data-view-target="settings">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5ZM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.5l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg><span>Settings</span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9.02 4.79 L10.25 4.4 L10.17 2.58 L13.83 2.58 L13.75 4.4 L14.98 4.79 L16.13 5.39 L17.37 4.04 L19.96 6.63 L18.61 7.87 L19.21 9.02 L19.6 10.25 L21.42 10.17 L21.42 13.83 L19.6 13.75 L19.21 14.98 L18.61 16.13 L19.96 17.37 L17.37 19.96 L16.13 18.61 L14.98 19.21 L13.75 19.6 L13.83 21.42 L10.17 21.42 L10.25 19.6 L9.02 19.21 L7.87 18.61 L6.63 19.96 L4.04 17.37 L5.39 16.13 L4.79 14.98 L4.4 13.75 L2.58 13.83 L2.58 10.17 L4.4 10.25 L4.79 9.02 L5.39 7.87 L4.04 6.63 L6.63 4.04 L7.87 5.39 Z"/><circle cx="12" cy="12" r="2.85"/></svg><span>Settings</span>
       </button>
     </nav>
   </div>
@@ -63,7 +67,7 @@
   <section id="installHelpSheet" class="install-help-sheet liquid-glass hidden" role="dialog" aria-modal="true" aria-labelledby="installHelpTitle" aria-hidden="true"></section>
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <noscript><div class="noscript">ParkPulse needs JavaScript to load live ride data and alerts.</div></noscript>
-  <script src="./assets/js/config.js?v=1.9.5"></script>
-  <script type="module" src="./assets/js/app.js?v=1.9.5"></script>
+  <script src="./assets/js/config.js?v=2.0.0"></script>
+  <script type="module" src="./assets/js/app.js?v=2.0.0"></script>
 </body>
 </html>

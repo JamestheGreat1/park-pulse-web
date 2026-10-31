@@ -1,7 +1,9 @@
 import { sendNotification } from "web-push-neo";
+import { PARKS as ENABLED_PARKS, parkTimezone } from "../../assets/js/catalog.js";
+import { disneylandRidesForPark } from "./disneyland-rides.js";
 import { ensureAlertQueueSchema, enqueueRideAlerts, processPendingRideAlerts, pruneExpiredRideAlerts } from "./alert-queue.js";
 
-const VERSION = "1.7.6";
+const VERSION = "2.0.0";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -13,10 +15,22 @@ const HISTORY_HEALTH_WINDOW_MS = 20 * 60 * 1000;
 const CROWD_MIN_SMALL_PARK = 4;
 const CROWD_MIN_LARGE_PARK = 6;
 
+function stagingPushTestReady(env) {
+  return env.STAGING_MODE === "true" &&
+    env.STAGING_ALLOW_PUSH === "true" &&
+    env.STAGING_PUSH_TEST_ONLY === "true" &&
+    Boolean(env.VAPID_SUBJECT && env.VAPID_SERVER_PUBLIC_KEY && env.VAPID_SERVER_PRIVATE_KEY);
+}
+
+function stagingLiveProbeReady(env) {
+  return stagingPushTestReady(env) &&
+    env.STAGING_LIVE_PROBE === "true" &&
+    env.STAGING_ENABLE_CRON === "true" &&
+    env.STAGING_HISTORY_ONLY === "true";
+}
+
 const PARKS = new Map([
   [5, {
-    name: "EPCOT",
-    themeParksId: "47f90d2c-e191-4239-a466-5892ef59a88b",
     rides: [
       ride("epcot:figment", "Journey Into Imagination With Figment", "World Celebration"),
       ride("epcot:spaceship-earth", "Spaceship Earth", "World Celebration"),
@@ -32,8 +46,6 @@ const PARKS = new Map([
     ]
   }],
   [6, {
-    name: "Magic Kingdom",
-    themeParksId: "75ea578a-adc8-4116-a54d-dccb60765ef9",
     rides: [
       ride("mk:jungle-cruise", "Jungle Cruise", "Adventureland"),
       ride("mk:pirates", "Pirates of the Caribbean", "Adventureland"),
@@ -59,8 +71,6 @@ const PARKS = new Map([
     ]
   }],
   [7, {
-    name: "Hollywood Studios",
-    themeParksId: "288747d1-8b4f-4a64-867e-ea7c9b27bad8",
     rides: [
       ride("dhs:star-tours", "Star Tours - The Adventures Continue", "Echo Lake", ["Star Tours – The Adventures Continue"]),
       ride("dhs:runaway-railway", "Mickey & Minnie's Runaway Railway", "Hollywood Boulevard"),
@@ -77,8 +87,6 @@ const PARKS = new Map([
     ]
   }],
   [8, {
-    name: "Animal Kingdom",
-    themeParksId: "1c84a229-8862-4648-9c71-378ddd2c7693",
     rides: [
       ride("ak:kilimanjaro-safaris", "Kilimanjaro Safaris", "Africa"),
       ride("ak:wildlife-express", "Wildlife Express Train", "Africa"),
@@ -88,7 +96,19 @@ const PARKS = new Map([
       ride("ak:navi-river-journey", "Na'vi River Journey", "Pandora - The World of Avatar")
     ]
   }]
-]);
+].map(([id, config]) => {
+  const park = ENABLED_PARKS.find((item) => item.id === id);
+  if (!park) throw new Error(`Missing enabled park metadata: ${id}`);
+  return [id, { ...config, name: park.name, themeParksId: park.themeParksId, timezone: parkTimezone(id), resortId: park.resortId }];
+}));
+
+// The curated California catalog is staged here but remains completely inactive
+// while Disneyland Resort and its parks have enabled:false in catalog.js.
+for (const park of ENABLED_PARKS.filter((item) => item.resortId === "dlr")) {
+  const rides = disneylandRidesForPark(park.id);
+  if (!rides.length) throw new Error(`No curated rides for enabled park: ${park.id}`);
+  PARKS.set(park.id, { ...park, rides });
+}
 
 export default {
   async fetch(request, env) {
@@ -100,12 +120,26 @@ export default {
     }
 
     try {
+      // Stage-only safety rail: no browser can register a live push
+      // subscription until staging-specific VAPID keys and a test origin exist.
+      if (env.STAGING_MODE === "true" && !stagingPushTestReady(env) &&
+          url.pathname.startsWith("/subscriptions")) {
+        return json({ error: "Push is disabled in staging", code: "STAGING_PUSH_DISABLED" }, 403, cors);
+      }
       if (request.method === "GET" && url.pathname === "/health") {
         const notificationEngine = await getNotificationHealth(env);
         return json({
           ok: true,
           service: "parkpulse-api",
           version: VERSION,
+          staging: env.STAGING_MODE === "true",
+          pushRegistrationEnabled: env.STAGING_MODE !== "true" || stagingPushTestReady(env),
+          stagingPushTestOnly: stagingPushTestReady(env),
+          stagingCronProbeAvailable: stagingPushTestReady(env) &&
+            env.STAGING_ENABLE_CRON === "true" && env.STAGING_HISTORY_ONLY === "true",
+          stagingLiveProbeAvailable: stagingLiveProbeReady(env),
+          stagingHistoryOnly: env.STAGING_MODE === "true" && env.STAGING_ENABLE_CRON === "true" && env.STAGING_HISTORY_ONLY === "true",
+          stagingFrontendPreview: env.STAGING_MODE === "true" && Boolean(env.ASSETS),
           primaryDataSource: "ThemeParks.wiki",
           fallbackDataSource: "Queue-Times",
           themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),
@@ -120,6 +154,10 @@ export default {
       }
 
       if (request.method === "GET" && url.pathname === "/vapid-key") {
+        if (env.STAGING_MODE === "true" && !stagingPushTestReady(env)) {
+          return json({ error: "Staging push is not configured", code: "STAGING_PUSH_DISABLED" },
+            503, cors);
+        }
         return json({ publicKey: env.VAPID_SERVER_PUBLIC_KEY }, 200, cors);
       }
 
@@ -185,7 +223,14 @@ export default {
         return json(await getAnalyticsStatus(env), 200, { ...cors, "Cache-Control": "no-store" });
       }
 
-      if (request.method === "POST" && url.pathname === "/api/admin/refresh") {
+      if (request.method === "POST" && url.pathname === "/api/admin/baselines" &&
+          env.STAGING_MODE !== "true") {
+        return json({ error: "Not found" }, 404, cors);
+      }
+
+      if (request.method === "POST" && (
+          url.pathname === "/api/admin/refresh" ||
+          url.pathname === "/api/admin/baselines")) {
         if (!env.REFRESH_ADMIN_TOKEN) {
           return json({
             error: "Manual refresh is not configured",
@@ -201,7 +246,9 @@ export default {
           }, 401, { ...cors, "Cache-Control": "no-store" });
         }
 
-        const result = await runManualRefresh(env);
+        const result = url.pathname === "/api/admin/baselines"
+          ? await runStagingBaselineBatch(env)
+          : await runManualRefresh(env);
         return json(result, 200, { ...cors, "Cache-Control": "no-store" });
       }
 
@@ -238,10 +285,304 @@ export default {
         return json({ ok: true, watched: rules.length }, 200, cors);
       }
 
+      // Explicit opt-in for ONE queued, scheduled staging alert test.
+      // A registered subscription + matching watch are both required.
+      if (request.method === "POST" && url.pathname === "/subscriptions/cron-probe") {
+        if (env.STAGING_MODE !== "true") return json({ error: "Not found" }, 404, cors);
+        if (!stagingPushTestReady(env) || env.STAGING_ENABLE_CRON !== "true" ||
+            env.STAGING_HISTORY_ONLY !== "true") {
+          return json({ error: "Staging scheduled tests are disabled", code: "STAGING_PROBE_DISABLED" },
+            403, cors);
+        }
+        const body = await request.json().catch(() => ({}));
+        const subscription = validateSubscription(body?.subscription);
+        const kind = body?.kind;
+        const rideId = String(body?.rideId || "");
+        if (!subscription || !["wait", "reopen"].includes(kind) ||
+            !/^[a-z0-9-]+:[a-z0-9-]+$/i.test(rideId) ||
+            body?.confirm !== true) {
+          return json({ error: "Choose a watched attraction and confirm this test",
+            code: "INVALID_PROBE" }, 400, cors);
+        }
+        const stored = await env.DB.prepare(
+          "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+        ).bind(subscription.endpoint).first();
+        if (!stored || stored.p256dh !== subscription.p256dh || stored.auth !== subscription.auth) {
+          return json({ error: "Your staging subscription is not registered",
+            code: "NOT_REGISTERED" }, 403, cors);
+        }
+        let watchList = [];
+        try { watchList = JSON.parse(stored.watch_ids || "[]"); } catch {}
+        const rule = normalizeRules(watchList).find((item) => item.rideId === rideId);
+        const catalog = catalogRideByKey(rideId);
+        if (!rule || !catalog || (kind === "wait" && rule.threshold == null) ||
+            (kind === "reopen" && !rule.reopen)) {
+          return json({ error: "First save a matching watch with this alert enabled",
+            code: "TEST_WATCH_REQUIRED" }, 400, cors);
+        }
+        const key = "staging-cron-probe";
+        const now = Date.now();
+        const previous = await env.DB.prepare(
+          "SELECT updated_at,payload FROM worker_state WHERE state_key=?"
+        ).bind(key).first();
+        let prior = {};
+        try { prior = JSON.parse(previous?.payload || "{}"); } catch {}
+        // One global active test protects every staging subscriber, and a
+        // short cooldown prevents repeated requests from the public preview.
+        if (["armed","running","retry"].includes(prior.status) &&
+            Number(prior.expiresAt) > now) {
+          return json({ error: "A scheduled test is already active",
+            code: "PROBE_ACTIVE" }, 409, cors);
+        }
+        if (Number(previous?.updated_at || 0) > now - 120000) {
+          return json({ error: "Try another scheduled test in two minutes",
+            code: "TEST_COOLDOWN" }, 429, cors);
+        }
+        const armed = {
+          status: "armed", endpoint: subscription.endpoint, rideId, kind,
+          armedAt: now, expiresAt: now + 20 * 60000
+        };
+        const payload = JSON.stringify(armed);
+        // Conditional insert/update ensures simultaneous arm requests cannot
+        // overwrite each other or bypass the global active-test guard.
+        const claimed = await env.DB.prepare(
+          `INSERT INTO worker_state(state_key,updated_at,payload)
+           VALUES(?,?,?)
+           ON CONFLICT(state_key) DO UPDATE SET
+             updated_at=excluded.updated_at,payload=excluded.payload
+           WHERE worker_state.payload=?`
+        ).bind(key, now, payload, previous?.payload || "").run();
+        if (Number(claimed?.meta?.changes || 0) !== 1) {
+          return json({ error: "Another scheduled test is already active",
+            code: "PROBE_ACTIVE" }, 409, cors);
+        }
+        return json({ ok: true, armed: true, kind, rideId,
+          message: "One staging test is armed for the next five-minute collection",
+          expiresAt: new Date(armed.expiresAt).toISOString()
+        }, 200, { ...cors, "Cache-Control": "no-store" });
+      }
+
+      // An explicitly enabled staging-only observer waits for a REAL feed
+      // transition for exactly one registered staging device and one ride.
+      if (request.method === "POST" && url.pathname === "/subscriptions/live-probe") {
+        if (!stagingLiveProbeReady(env)) {
+          return json({ error: "Live observation is disabled", code: "LIVE_PROBE_DISABLED" }, 403, cors);
+        }
+        const body = await request.json().catch(() => ({}));
+        const subscription = validateSubscription(body?.subscription);
+        const rideId = String(body?.rideId || "");
+        const kind = body?.kind;
+        if (!subscription || !["wait", "reopen"].includes(kind) ||
+            !/^[a-z0-9-]+:[a-z0-9-]+$/i.test(rideId) || body?.confirm !== true) {
+          return json({ error: "Confirm a watched ride and one live alert type",
+            code: "INVALID_LIVE_PROBE" }, 400, cors);
+        }
+        await ensureNotificationSchema(env);
+        const row = await env.DB.prepare(
+          "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+        ).bind(subscription.endpoint).first();
+        if (!row || row.p256dh !== subscription.p256dh || row.auth !== subscription.auth) {
+          return json({ error: "Your staging subscription is not registered",
+            code: "NOT_REGISTERED" }, 403, cors);
+        }
+        let saved = [];
+        try { saved = JSON.parse(row.watch_ids || "[]"); } catch {}
+        const rule = normalizeRules(saved).find(item => item.rideId === rideId);
+        if (!catalogRideByKey(rideId) || !rule ||
+            (rule.expiresAt != null && Number(rule.expiresAt) <= Date.now()) ||
+            (kind === "wait" && rule.threshold == null) ||
+            (kind === "reopen" && !rule.reopen)) {
+          return json({ error: "Save a matching, unexpired staging watch first",
+            code: "TEST_WATCH_REQUIRED" }, 400, cors);
+        }
+        const key = "staging-live-probe";
+        const now = Date.now();
+        const previous = await env.DB.prepare(
+          "SELECT updated_at,payload FROM worker_state WHERE state_key=?"
+        ).bind(key).first();
+        let prior = {};
+        try { prior = JSON.parse(previous?.payload || "{}"); } catch {}
+        if (["armed","monitoring","retry"].includes(prior.status) &&
+            Number(prior.expiresAt || 0) > now) {
+          return json({ error: "Another live staging observation is already active",
+            code: "PROBE_ACTIVE" }, 409, cors);
+        }
+        if (Number(previous?.updated_at || 0) > now - 120000) {
+          return json({ error: "Try again in two minutes", code: "TEST_COOLDOWN" }, 429, cors);
+        }
+        const armed = {
+          status: "armed", endpoint: subscription.endpoint, rideId, kind,
+          armedAt: now, expiresAt: now + 12 * 60 * 60000, observations: 0,
+          previous: null
+        };
+        const written = await env.DB.prepare(
+          `INSERT INTO worker_state(state_key,updated_at,payload) VALUES(?,?,?)
+           ON CONFLICT(state_key) DO UPDATE SET
+             updated_at=excluded.updated_at,payload=excluded.payload
+           WHERE worker_state.payload=?`
+        ).bind(key, now, JSON.stringify(armed), previous?.payload || "").run();
+        if (Number(written?.meta?.changes || 0) !== 1) {
+          return json({ error: "Another live observation was just armed",
+            code: "PROBE_ACTIVE" }, 409, cors);
+        }
+        return json({ ok: true, armed: true, rideId, kind,
+          expiresAt: new Date(armed.expiresAt).toISOString(),
+          message: "Staging will observe real live data every five minutes; no simulated transition."
+        }, 200, { ...cors, "Cache-Control": "no-store" });
+      }
+
+      // Device-scoped readback. Never leak the monitored subscription endpoint.
+      if (request.method === "POST" && url.pathname === "/subscriptions/live-probe/status") {
+        if (!stagingLiveProbeReady(env)) return json({ error: "Not found" }, 404, cors);
+        const body = await request.json().catch(() => ({}));
+        const subscription = validateSubscription(body?.subscription);
+        if (!subscription) return json({ error: "Invalid staging subscription" }, 400, cors);
+        const row = await env.DB.prepare(
+          "SELECT endpoint,p256dh,auth FROM subscriptions WHERE endpoint=?"
+        ).bind(subscription.endpoint).first();
+        if (!row || row.p256dh !== subscription.p256dh || row.auth !== subscription.auth) {
+          return json({ error: "Not registered" }, 403, cors);
+        }
+        const record = await env.DB.prepare(
+          "SELECT payload FROM worker_state WHERE state_key='staging-live-probe'"
+        ).first();
+        let probe = {};
+        try { probe = JSON.parse(record?.payload || "{}"); } catch {}
+        if (!record || probe.endpoint !== subscription.endpoint) {
+          return json({ ok: true, status: "idle" }, 200, { ...cors, "Cache-Control": "no-store" });
+        }
+        return json({ ok: true, status: probe.status, kind: probe.kind,
+          rideId: probe.rideId, observations: probe.observations || 0,
+          lastObserved: probe.lastObserved || null, expiresAt: new Date(probe.expiresAt).toISOString(),
+          delivery: probe.delivery || null
+        }, 200, { ...cors, "Cache-Control": "no-store" });
+      }
+
+      // Simulated watch transitions use the SAME evaluator and push sender as
+      // production, but never run the live alert cron or alter ride checkpoints.
+      if (request.method === "POST" && url.pathname === "/subscriptions/test-alert") {
+        if (env.STAGING_MODE !== "true") return json({ error: "Not found" }, 404, cors);
+        if (!stagingPushTestReady(env)) {
+          return json({ error: "Staging push testing is disabled", code: "STAGING_PUSH_DISABLED" },
+            403, cors);
+        }
+        const body = await request.json().catch(() => ({}));
+        const subscription = validateSubscription(body?.subscription);
+        const kind = body?.kind;
+        const rideKey = String(body?.rideId || "");
+        if (!subscription || !["wait", "reopen"].includes(kind) ||
+            !/^[a-z0-9-]+:[a-z0-9-]+$/i.test(rideKey)) {
+          return json({ error: "Invalid staged alert request", code: "INVALID_TEST" }, 400, cors);
+        }
+        const row = await env.DB.prepare(
+          "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+        ).bind(subscription.endpoint).first();
+        if (!row || row.p256dh !== subscription.p256dh || row.auth !== subscription.auth) {
+          return json({ error: "Register on this staging app first", code: "NOT_REGISTERED" }, 403, cors);
+        }
+        let rawRules = [];
+        try { rawRules = JSON.parse(row.watch_ids || "[]"); } catch {}
+        const rule = normalizeRules(rawRules).find((candidate) => candidate.rideId === rideKey);
+        const found = catalogRideByKey(rideKey);
+        if (!rule || !found || (kind === "wait" && rule.threshold == null) ||
+            (kind === "reopen" && !rule.reopen)) {
+          return json({ error: "Watch the selected attraction with this alert enabled first",
+            code: "TEST_WATCH_REQUIRED" }, 400, cors);
+        }
+        const now = Date.now();
+        const testKind = "staging:simulated-alert";
+        const cooldown = await env.DB.prepare(
+          "SELECT last_sent FROM notification_log_v2 WHERE endpoint=? AND ride_key=? AND kind=?"
+        ).bind(subscription.endpoint, testKind, testKind).first();
+        if (cooldown && now - Number(cooldown.last_sent) < 60000) {
+          return json({ error: "Test sent recently — try again in a minute",
+            code: "TEST_COOLDOWN" }, 429, cors);
+        }
+
+        // These values exist only in memory for this explicit device test.
+        // They are NOT live wait times and are never saved to ride_history,
+        // notification_ride_state, or the durable production alert queue.
+        const syntheticRide = {
+          id: rideKey,
+          parkId: found.parkId,
+          name: found.name,
+          isOpen: true,
+          waitTime: kind === "wait" ? Number(rule.threshold) : 15,
+          source: "simulation",
+          sourceStale: false,
+          sourceMissing: false
+        };
+        const before = {
+          isOpen: kind === "wait",
+          waitTime: kind === "wait" ? Number(rule.threshold) + 15 : null,
+          updatedAt: now - 60 * 1000
+        };
+        const activity = { operationalNow: true, operationalBefore: true, openingRamp: false };
+        const alert = evaluateRideTransitionAlert(
+          syntheticRide, before, rule, activity, now, env.APP_URL
+        );
+        if (!alert || alert.kind !== kind) {
+          return json({ error: "Simulated transition failed validation",
+            code: "TEST_TRANSITION_INVALID" }, 422, cors);
+        }
+        const payload = {
+          ...alert.payload,
+          title: `TEST · ${alert.payload.title}`,
+          body: `Simulation only · ${alert.payload.body}`,
+          tag: `staging-test-${safeTag(rideKey)}-${kind}`
+        };
+
+        try {
+          const delivered = await sendPush(subscription, payload, env);
+          if (!delivered) return json({
+            error: "Subscription expired", code: "SUBSCRIPTION_EXPIRED"
+          }, 410, cors);
+          await env.DB.prepare(
+            `INSERT INTO notification_log_v2(endpoint,ride_key,kind,last_sent)
+             VALUES(?,?,?,?)
+             ON CONFLICT(endpoint,ride_key,kind) DO UPDATE SET last_sent=excluded.last_sent`
+          ).bind(subscription.endpoint, testKind, testKind, Date.now()).run();
+          return json({
+            ok: true, delivered: true, simulated: true, kind, rideId: rideKey,
+            // Do not return live timings; they were synthetic test inputs.
+            opensRide: true
+          }, 200, { ...cors, "Cache-Control": "no-store" });
+        } catch (error) {
+          console.warn("Staging simulated alert failed", error?.pushStatus || error?.code || "send-failed");
+          return json({
+            error: "Simulated alert delivery failed",
+            code: error?.code === "PUSH_CONFIG_MISSING" ? "PUSH_CONFIG_MISSING" : "PUSH_SEND_FAILED",
+            pushStatus: Number(error?.pushStatus) || null
+          }, error?.code === "PUSH_CONFIG_MISSING" ? 503 : 502,
+          { ...cors, "Cache-Control": "no-store" });
+        }
+      }
+
       if (request.method === "POST" && url.pathname === "/subscriptions/test") {
         const body = await request.json().catch(() => ({}));
         const subscription = validateSubscription(body?.subscription);
         if (!subscription) return json({ error: "Invalid push subscription", code: "INVALID_SUBSCRIPTION" }, 400, cors);
+        if (env.STAGING_MODE === "true") {
+          // The preview has a public URL. Never allow arbitrary push endpoints to
+          // use our staging credentials: this endpoint is ONLY for registered
+          // subscriptions in the separate staging D1 database.
+          const registered = await env.DB.prepare(
+            "SELECT endpoint,p256dh,auth FROM subscriptions WHERE endpoint=?"
+          ).bind(subscription.endpoint).first();
+          if (!registered || registered.p256dh !== subscription.p256dh ||
+              registered.auth !== subscription.auth) {
+            return json({ error: "Register on this staging app before testing", code: "NOT_REGISTERED" },
+              403, cors);
+          }
+          // One deliberate device test per minute per subscription.
+          const recent = await env.DB.prepare(
+            "SELECT last_sent FROM notification_log_v2 WHERE endpoint=? AND ride_key=? AND kind=?"
+          ).bind(subscription.endpoint, "staging:device-test", "device-test").first();
+          if (recent && Date.now() - Number(recent.last_sent) < 60000) {
+            return json({ error: "Try another test after one minute", code: "TEST_COOLDOWN" },
+              429, cors);
+          }
+        }
 
         try {
           const delivered = await sendPush(subscription, {
@@ -259,6 +600,13 @@ export default {
             }, 410, cors);
           }
 
+          if (env.STAGING_MODE === "true") {
+            await env.DB.prepare(
+              `INSERT INTO notification_log_v2(endpoint,ride_key,kind,last_sent)
+               VALUES(?,?,?,?)
+               ON CONFLICT(endpoint,ride_key,kind) DO UPDATE SET last_sent=excluded.last_sent`
+            ).bind(subscription.endpoint, "staging:device-test", "device-test", Date.now()).run();
+          }
           return json({ ok: true, delivered: true }, 200, cors);
         } catch (error) {
           console.warn("Push test failed", error);
@@ -311,6 +659,18 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
+    if (env.STAGING_MODE === "true") {
+      // Hard stop on the alert pipeline, even if a Cloudflare trigger is added.
+      if (env.STAGING_ENABLE_CRON !== "true" ||
+          env.STAGING_HISTORY_ONLY !== "true" ||
+          controller.cron !== "*/5 * * * *") {
+        console.log("Staging alert engine disabled; no scheduled work");
+        return;
+      }
+      ctx.waitUntil(runStagingHistoryOnly(env));
+      return;
+    }
+    // Production behavior is unchanged.
     // Separate invocations: maintenance cannot consume the alert job's CPU budget.
     if (controller.cron === "17 * * * *") ctx.waitUntil(runScheduledMaintenance(env));
     else ctx.waitUntil(runRideWatch(env));
@@ -371,6 +731,29 @@ function findCatalogRide(park, name) {
   }
 
   return null;
+}
+
+// An overlay and its base attraction can appear as separate provider entries.
+// Prefer the fresh operating variant; do not overwrite it with a closed base entry.
+function collapseRideVariants(results, now = Date.now()) {
+  const unique = new Map();
+  for (const candidate of results) {
+    const prior = unique.get(candidate.id);
+    if (!prior) { unique.set(candidate.id, candidate); continue; }
+    const freshCandidate = isFreshSourceRide(candidate, now);
+    const freshPrior = isFreshSourceRide(prior, now);
+    const candidateHasWait = freshCandidate && candidate.isOpen && candidate.waitTime != null;
+    const priorHasWait = freshPrior && prior.isOpen && prior.waitTime != null;
+    const better = candidateHasWait !== priorHasWait
+      ? candidateHasWait
+      : freshCandidate !== freshPrior
+        ? freshCandidate
+        : Boolean(candidate.isOpen) !== Boolean(prior.isOpen)
+          ? Boolean(candidate.isOpen)
+          : sourceTimestampMs(candidate) > sourceTimestampMs(prior);
+    if (better) unique.set(candidate.id, candidate);
+  }
+  return [...unique.values()];
 }
 
 function sourceTimestampMs(ride) {
@@ -480,7 +863,7 @@ async function fetchParkHours(park, env) {
   }
 
   const payload = await response.json();
-  const timezone = String(payload?.timezone || "America/New_York");
+  const timezone = String(payload?.timezone || park.timezone);
   const date = dateKeyInZone(new Date(), timezone);
   const todayEntries = (payload?.schedule || []).filter((entry) => entry?.date === date);
   const operating = todayEntries.filter(
@@ -554,6 +937,7 @@ async function fetchThemeParksRides(parkId, park, env) {
   const results = [];
 
   for (const item of payload?.liveData || []) {
+    if (isSingleRiderName(item?.name)) continue;
     const catalogRide = findCatalogRide(park, item?.name);
     if (!catalogRide) continue;
 
@@ -579,7 +963,9 @@ async function fetchThemeParksRides(parkId, park, env) {
     });
   }
 
-  return [...new Map(results.map((item) => [item.id, item])).values()];
+  return park.resortId === "dlr"
+    ? collapseRideVariants(results)
+    : [...new Map(results.map((item) => [item.id, item])).values()];
 }
 
 async function fetchQueueTimesRides(parkId, park) {
@@ -632,7 +1018,9 @@ async function fetchQueueTimesRides(parkId, park) {
   }
   for (const item of payload?.rides || []) ingest(item);
 
-  return [...new Map(results.map((item) => [item.id, item])).values()];
+  return park.resortId === "dlr"
+    ? collapseRideVariants(results)
+    : [...new Map(results.map((item) => [item.id, item])).values()];
 }
 
 async function addDisplayFallbacks(env, parkId, park, snapshot) {
@@ -697,7 +1085,7 @@ function rideHasUsableComparison(ride, now = Date.now()) {
 async function attachCurrentBaselines(env, rides) {
   if (!rides?.length) return rides || [];
 
-  const slotMinute = Math.floor(easternMinutes(Date.now()) / 15) * 15;
+  const slotMinute = Math.floor(minutesInZone(Date.now(), parkTimezone(rides[0].parkId)) / 15) * 15;
 
   try {
     const rows = (await env.DB.prepare(
@@ -926,7 +1314,7 @@ async function attachDowntimeContext(env, rides, now = Date.now()) {
   if (!downRides.length) return rides || [];
 
   const rideKeys = downRides.map((ride) => String(ride.id));
-  const start = parkDayStartMs(new Date(now));
+  const start = parkDayStartMs(new Date(now), parkTimezone(downRides[0].parkId));
   let rows = [];
 
   try {
@@ -985,7 +1373,7 @@ async function attachCrowdTrend(env, parkId, crowdLevel, parkHours, now = Date.n
   const target = now - 30 * 60 * 1000;
   const windowStart = target - 10 * 60 * 1000;
   const windowEnd = target + 10 * 60 * 1000;
-  const slotMinute = Math.floor(easternMinutes(target) / 15) * 15;
+  const slotMinute = Math.floor(minutesInZone(target, parkTimezone(parkId)) / 15) * 15;
 
   let rows = [];
   try {
@@ -1160,19 +1548,378 @@ function ruleMatchesRide(rule, ride) {
   return normalizeName(rule.rideName) === normalizeName(ride.name);
 }
 
+// Limit upstream concurrency while preserving the deterministic ride order.
 async function fetchCurrentRideSnapshot(env) {
   const rides = [];
   let primaryParks = 0;
   let fallbackParks = 0;
+  const parks = [...PARKS.entries()];
+  for (let start = 0; start < parks.length; start += 2) {
+    const snapshots = await Promise.all(parks.slice(start, start + 2).map(async ([parkId, park]) =>
+      fetchFreshParkRides(parkId, park, env)
+    ));
+    for (const snapshot of snapshots) {
+      rides.push(...snapshot.rides);
+      if (snapshot.primaryAvailable) primaryParks++;
+      if (snapshot.fallbackUsed) fallbackParks++;
+    }
+  }
+  return { rides, primaryParks, fallbackParks };
+}
 
-  for (const [parkId, park] of PARKS) {
-    const snapshot = await fetchFreshParkRides(parkId, park, env);
-    rides.push(...snapshot.rides);
-    if (snapshot.primaryAvailable) primaryParks++;
-    if (snapshot.fallbackUsed) fallbackParks++;
+// Staging-only: sample state/history without notification evaluation,
+// checkpoints, historical backfill or hourly maintenance.
+async function runStagingHistoryOnly(env) {
+  if (env.STAGING_MODE !== "true" ||
+      env.STAGING_ENABLE_CRON !== "true" ||
+      env.STAGING_HISTORY_ONLY !== "true") {
+    throw new Error("Staging history collection is not explicitly enabled");
+  }
+  const { rides } = await fetchCurrentRideSnapshot(env);
+  await writeCurrentRideSnapshot(env, rides);
+  console.log("Staging history-only sample complete", rides.length);
+  // An explicit, one-shot staging-only request may now exercise the real
+  // durable queue and checkpoint. Ordinary history collection does not.
+  if (stagingPushTestReady(env)) await runArmedStagingCronProbe(env);
+  try {
+    if (stagingLiveProbeReady(env)) await runArmedStagingLiveProbe(env, rides);
+  } catch (error) {
+    // One-device validation must never interrupt ordinary staging history.
+    console.warn("Staging live observation deferred", error?.code || error?.message || "unknown");
+  }
+}
+
+// Opt-in staging verification of REAL provider snapshots. Ordinary staging
+// cron collection still never runs runRideWatch or the global alert pipeline.
+// The one-device probe has a separate worker_state checkpoint, and its queue
+// runner is restricted to that same endpoint, attraction and alert kind.
+async function runArmedStagingLiveProbe(env, rides) {
+  if (!stagingLiveProbeReady(env)) return;
+  const key = "staging-live-probe";
+  const record = await env.DB.prepare(
+    "SELECT payload FROM worker_state WHERE state_key=?"
+  ).bind(key).first();
+  if (!record) return;
+  let probe;
+  try { probe = JSON.parse(record.payload); } catch { return; }
+  if (!["armed", "monitoring", "retry"].includes(probe.status)) return;
+
+  const now = Date.now();
+  const save = async (next) => {
+    const changed = await env.DB.prepare(
+      "UPDATE worker_state SET updated_at=?,payload=? WHERE state_key=? AND payload=?"
+    ).bind(Date.now(), JSON.stringify(next), key, record.payload).run();
+    return Number(changed?.meta?.changes || 0) === 1;
+  };
+  if (now >= Number(probe.expiresAt || 0)) {
+    await save({ ...probe, status: "expired", completedAt: now });
+    return;
+  }
+  const row = await env.DB.prepare(
+    "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+  ).bind(probe.endpoint).first();
+  let saved = [];
+  try { saved = JSON.parse(row?.watch_ids || "[]"); } catch {}
+  const rules = normalizeRules(saved);
+  const rule = rules.find(item => item.rideId === probe.rideId);
+  if (!row || !rule || (rule.expiresAt != null && rule.expiresAt <= now) ||
+      (probe.kind === "wait" && rule.threshold == null) ||
+      (probe.kind === "reopen" && !rule.reopen)) {
+    await save({ ...probe, status: "cancelled-watch-changed", completedAt: now });
+    return;
   }
 
-  return { rides, primaryParks, fallbackParks };
+  const ride = rides.find(item => item.id === probe.rideId);
+  const sourceTime = Date.parse(ride?.lastUpdated || "");
+  const fresh = ride && !ride.sourceStale && !ride.sourceMissing &&
+    Number.isFinite(sourceTime) && sourceTime <= now + 120000 &&
+    now - sourceTime <= LIVE_FRESHNESS_MS;
+  const parkRides = rides.filter(item => item.parkId === ride?.parkId);
+  const openCount = parkRides.filter(item => item.isOpen && !item.sourceMissing && !item.sourceStale).length;
+  const previous = probe.previous;
+  const observation = fresh ? {
+    isOpen: ride.isOpen, waitTime: ride.waitTime, sourceUpdatedAt: sourceTime,
+    updatedAt: now, parkOpenCount: openCount
+  } : null;
+  const progress = { ...probe, status: "monitoring",
+    observations: Number(probe.observations || 0) + 1,
+    lastObserved: new Date(now).toISOString(), previous: observation };
+
+  // Real transitions need two fresh, distinct upstream observations in the
+  // same operating period. Never manufacture a before/after state.
+  if (probe.status !== "retry" && observation && previous &&
+      Number(previous.sourceUpdatedAt) < sourceTime &&
+      now - Number(previous.updatedAt || 0) <= LIVE_FRESHNESS_MS) {
+    const hour = zoneParts(new Date(now), parkTimezone(ride.parkId)).hour;
+    const activity = {
+      operationalBefore: previous.parkOpenCount >= 3,
+      operationalNow: openCount >= 3,
+      openingRamp: hour < 11 && openCount - previous.parkOpenCount >= 3
+    };
+    const alert = evaluateRideTransitionAlert(
+      ride, previous, rule, activity, now, env.APP_URL
+    );
+    if (alert?.kind === probe.kind && ruleMatchesRide(rule, ride)) {
+      await ensureNotificationSchema(env);
+      await enqueueRideAlerts(env, [{
+        endpoint: row.endpoint, rideId: ride.id, kind: alert.kind,
+        threshold: alert.threshold,
+        payload: {
+          ...alert.payload, title: `STAGING LIVE · ${alert.payload.title}`,
+          body: `Observed provider change · ${alert.payload.body}`,
+          tag: `staging-live-${safeTag(ride.id)}-${alert.kind}`
+        }
+      }], now);
+      progress.status = "retry";
+      progress.triggeredAt = new Date(now).toISOString();
+    }
+  }
+
+  if (progress.status === "retry" || probe.status === "retry") {
+    // A queued delivery can be retried without inventing another crossing.
+    await ensureNotificationSchema(env);
+    const deliveries = await processPendingRideAlerts(env, {
+      rides: ride ? [fresh ? ride : { ...ride, sourceStale: true }] : [],
+      subscriptions: [{ ...row, rules }],
+      matchesRule: ruleMatchesRide,
+      isCoolingDown: (endpoint, rideId, kind) => cooldownActive(env, endpoint, rideId, kind),
+      send: sendPush,
+      only: { endpoint: row.endpoint, rideId: probe.rideId, kind: probe.kind },
+      now
+    });
+    progress.delivery = deliveries;
+    const pending = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM pending_ride_alerts WHERE endpoint=? AND ride_key=? AND kind=? AND expires_at>?"
+    ).bind(row.endpoint, probe.rideId, probe.kind, now).first();
+    progress.status = deliveries.delivered > 0 ? "delivered" :
+      Number(pending?.n || 0) > 0 ? "retry" : "not-delivered";
+    if (progress.status !== "retry") progress.completedAt = Date.now();
+  }
+  if (await save(progress)) {
+    console.log("Staging live observation", progress.status, probe.kind,
+      progress.observations, JSON.stringify(progress.delivery || {}));
+  }
+}
+
+// One-shot staging scheduled integration drill. All synthetic states are
+// confined to this function and a staging-only notification checkpoint; the
+// live wait feed, history rows, and production alert scheduler are unchanged.
+async function runArmedStagingCronProbe(env) {
+  if (env.STAGING_MODE !== "true" || env.STAGING_ENABLE_CRON !== "true" ||
+      env.STAGING_HISTORY_ONLY !== "true" || !stagingPushTestReady(env)) return;
+  const key = "staging-cron-probe";
+  const record = await env.DB.prepare(
+    "SELECT payload FROM worker_state WHERE state_key=?"
+  ).bind(key).first();
+  if (!record) return;
+
+  let probe;
+  try { probe = JSON.parse(record.payload); } catch { return; }
+  const now = Date.now();
+  if (!["armed", "retry"].includes(probe.status)) return;
+  if (Number(probe.expiresAt || 0) <= now) {
+    await env.DB.prepare(
+      "UPDATE worker_state SET updated_at=?,payload=? WHERE state_key=? AND payload=?"
+    ).bind(now, JSON.stringify({ ...probe, status: "expired" }), key, record.payload).run();
+    return;
+  }
+  const state = { ...probe, status: "running", attemptedAt: now };
+  const lock = await env.DB.prepare(
+    "UPDATE worker_state SET updated_at=?,payload=? WHERE state_key=? AND payload=?"
+  ).bind(now, JSON.stringify(state), key, record.payload).run();
+  if (Number(lock?.meta?.changes || 0) !== 1) return;
+
+  let outcome = "failed";
+  let delivery = null;
+  try {
+    await ensureNotificationSchema(env);
+    const row = await env.DB.prepare(
+      "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+    ).bind(probe.endpoint).first();
+    const catalog = catalogRideByKey(probe.rideId);
+    let stored = [];
+    try { stored = JSON.parse(row?.watch_ids || "[]"); } catch {}
+    const rules = normalizeRules(stored);
+    const rule = rules.find((item) => item.rideId === probe.rideId);
+    if (!row || !catalog || !rule ||
+        (probe.kind === "wait" && rule.threshold == null) ||
+        (probe.kind === "reopen" && !rule.reopen)) {
+      outcome = "cancelled-watch-changed";
+    } else {
+      const ride = {
+        id: probe.rideId, parkId: catalog.parkId, name: catalog.name,
+        isOpen: true, waitTime: probe.kind === "wait" ? Number(rule.threshold) : 15,
+        source: "staging-cron-simulation", sourceStale: false, sourceMissing: false
+      };
+      const before = {
+        isOpen: probe.kind === "wait",
+        waitTime: probe.kind === "wait" ? Number(rule.threshold) + 15 : null,
+        updatedAt: now - 60000
+      };
+      const activity = { operationalNow: true, operationalBefore: true, openingRamp: false };
+      const alert = evaluateRideTransitionAlert(
+        ride, before, rule, activity, now, env.APP_URL
+      );
+      if (!alert || alert.kind !== probe.kind || !ruleMatchesRide(rule, ride)) {
+        throw new Error("Staging probe transition did not match the watch");
+      }
+      if (probe.status === "armed") {
+        await enqueueRideAlerts(env, [{
+          endpoint: row.endpoint, rideId: ride.id, kind: alert.kind,
+          threshold: alert.threshold,
+          payload: {
+            ...alert.payload,
+            title: `STAGING CRON TEST · ${alert.payload.title}`,
+            body: `Simulation only · ${alert.payload.body}`,
+            tag: `staging-cron-${safeTag(ride.id)}-${alert.kind}`
+          }
+        }], now);
+        // As in runRideWatch, the checkpoint advances only after queueing.
+        // The checkpoint is deliberately separate from ride history.
+        await writeCurrentRideSnapshot(env, [ride], true);
+      }
+      delivery = await processPendingRideAlerts(env, {
+        rides: [ride],
+        subscriptions: [{ ...row, rules }],
+        matchesRule: ruleMatchesRide,
+        isCoolingDown: (endpoint, rideId, kind) => cooldownActive(env, endpoint, rideId, kind),
+        send: sendPush,
+        now
+      });
+      outcome = delivery.delivered > 0 ? "delivered" :
+        delivery.pending > 0 ? "retry" : "not-delivered";
+    }
+  } catch (error) {
+    console.warn("Staging cron probe failed", error?.code || error?.message || "unknown");
+    outcome = "failed";
+  }
+
+  await env.DB.prepare(
+    "UPDATE worker_state SET updated_at=?,payload=? WHERE state_key=? AND payload=?"
+  ).bind(Date.now(), JSON.stringify({
+    ...state, status: outcome, completedAt: Date.now(),
+    delivery: delivery || null
+  }), key, JSON.stringify(state)).run();
+  console.log("Staging scheduled alert probe", outcome,
+    JSON.stringify(delivery || {}));
+}
+
+// Resolve ThemeParks IDs from the park's stable entity catalog, not from the
+// live-data provider. Queue-Times IDs are NOT interchangeable with these UUIDs.
+// This map is staging-only, refreshed daily and never affects live wait selection.
+async function stagingThemeParksRideIds(env) {
+  if (env.STAGING_MODE !== "true") throw new Error("Staging-only ride ID resolution");
+  const cacheKey = "staging-themeparks-ride-ids";
+  const now = Date.now();
+  const cached = await env.DB.prepare(
+    "SELECT updated_at,payload FROM worker_state WHERE state_key=?"
+  ).bind(cacheKey).first();
+
+  if (cached && now - Number(cached.updated_at || 0) < 24 * 60 * 60 * 1000) {
+    let saved = null;
+    try { saved = JSON.parse(cached.payload || "{}"); } catch {}
+    if (saved?.ids && typeof saved.ids === "object" && !Array.isArray(saved.ids)) {
+      const valid = Object.entries(saved.ids).filter(([key, id]) =>
+        /^[a-z0-9-]+:[a-z0-9-]+$/i.test(key) &&
+        /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id));
+      if (valid.length >= 1) return new Map(valid);
+    }
+  }
+
+  const ids = new Map();
+  const uuid = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i;
+  for (const [parkId, park] of PARKS.entries()) {
+    const response = await fetch(
+      `https://api.themeparks.wiki/v1/entity/${encodeURIComponent(park.themeParksId)}/children`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": `ParkPulse/${VERSION}`,
+          ...(env.THEMEPARKS_API_KEY ? { "x-api-key": env.THEMEPARKS_API_KEY } : {})
+        },
+        cf: { cacheEverything: true, cacheTtl: 3600 }
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`ThemeParks attraction directory unavailable (park ${parkId}, HTTP ${response.status})`);
+    }
+    const payload = await response.json();
+    if (!Array.isArray(payload?.children)) {
+      throw new Error(`ThemeParks attraction directory returned invalid data (park ${parkId})`);
+    }
+
+    const best = new Map();
+    for (const item of payload.children) {
+      if (String(item?.entityType || "").toUpperCase() !== "ATTRACTION" ||
+          !uuid.test(String(item?.id || "")) || isSingleRiderName(item?.name)) continue;
+      const matched = findCatalogRide(park, item.name);
+      if (!matched) continue;
+      const score = normalizeName(item.name) === normalizeName(matched.name) ? 2 : 1;
+      const previous = best.get(matched.key);
+      if (!previous || score > previous.score) {
+        best.set(matched.key, { score, id: String(item.id) });
+      }
+    }
+    for (const [rideKey, entry] of best) ids.set(rideKey, entry.id);
+  }
+  if (!ids.size) {
+    throw new Error("ThemeParks ride ID directory matched no tracked attractions");
+  }
+  await env.DB.prepare(
+    `INSERT INTO worker_state(state_key,updated_at,payload)
+     VALUES(?,?,?)
+     ON CONFLICT(state_key) DO UPDATE SET
+       updated_at=excluded.updated_at,payload=excluded.payload`
+  ).bind(cacheKey, now, JSON.stringify({ ids: Object.fromEntries(ids) })).run();
+  return ids;
+}
+
+// Protected, staging-only historical backfill. The public live feed may use
+// Queue-Times, but the history endpoint only ever gets a ThemeParks entity UUID.
+async function runStagingBaselineBatch(env) {
+  if (env.STAGING_MODE !== "true") throw new Error("Staging-only backfill");
+  if (!env.THEMEPARKS_API_KEY) {
+    return { ok: false, reason: "themeparks-api-key-not-configured" };
+  }
+  const rows = (await env.DB.prepare(
+    "SELECT ride_key,park_id,source_id,name,source,updated_at FROM ride_state_v2"
+  ).all()).results || [];
+  const now = Date.now();
+  const freshRows = rows.filter((row) => PARKS.has(Number(row.park_id)) &&
+    now - Number(row.updated_at || 0) <= HISTORY_HEALTH_WINDOW_MS);
+  const idMap = freshRows.some((row) => row.source !== "themeparks.wiki")
+    ? await stagingThemeParksRideIds(env)
+    : new Map();
+  const rides = freshRows.map((row) => {
+    const directId = row.source === "themeparks.wiki" ? row.source_id : null;
+    const sourceId = idMap.get(String(row.ride_key)) || directId;
+    return {
+      id: String(row.ride_key),
+      parkId: Number(row.park_id),
+      sourceId: sourceId || null,
+      name: String(row.name || row.ride_key),
+      source: sourceId ? "themeparks.wiki" : "unavailable",
+      sourceStale: !sourceId
+    };
+  });
+  const baseline = await refreshRideBaselines(env, rides, 4);
+  const analytics = await getAnalyticsStatus(env);
+  return {
+    ok: true,
+    staging: true,
+    polledParks: 0,
+    eligibleRides: rides.length,
+    mappedRides: rides.filter((ride) => ride.sourceId).length,
+    unmappedRides: rides.filter((ride) => !ride.sourceId).length,
+    baseline,
+    analytics: {
+      totalRides: analytics.totalRides,
+      baselineRides: analytics.baselineRides,
+      pendingRides: analytics.pendingRides,
+      errorRides: analytics.errorRides,
+      baselineErrors: analytics.baselineErrors
+    }
+  };
 }
 
 async function runManualRefresh(env) {
@@ -1205,6 +1952,51 @@ async function runManualRefresh(env) {
   };
 }
 
+// Shared transition evaluator. Production uses observed snapshots; staging
+// can feed explicitly labeled synthetic transitions without touching checkpoints.
+function evaluateRideTransitionAlert(ride, before, rule, activity, now, appUrl) {
+  if (!before || !rule || !activity || ride.sourceStale || ride.sourceMissing) return null;
+  const beforeFresh = now - Number(before.updatedAt || 0) <= LIVE_FRESHNESS_MS;
+  const reopened = beforeFresh && !before.isOpen && ride.isOpen &&
+    activity.operationalBefore && activity.operationalNow && !activity.openingRamp;
+  const name = notificationRideName(ride);
+  const parkName = PARKS.get(ride.parkId)?.name;
+  if (!parkName) return null;
+
+  if (reopened && rule.reopen) {
+    return {
+      kind: "reopen",
+      threshold: null,
+      payload: {
+        title: ride.waitTime > 0 ? `${name} reopened • ${ride.waitTime} min` : `${name} reopened`,
+        body: parkName,
+        url: `${appUrl || "/"}?ride=${encodeURIComponent(ride.id)}`,
+        tag: `ride-${safeTag(ride.id)}-reopen`,
+        renotify: true
+      }
+    };
+  }
+  if (rule.threshold != null && beforeFresh && before.isOpen && ride.isOpen &&
+      before.waitTime != null && ride.waitTime != null &&
+      Number.isFinite(Number(before.waitTime)) &&
+      Number.isFinite(Number(ride.waitTime)) &&
+      Number(before.waitTime) > rule.threshold &&
+      Number(ride.waitTime) <= rule.threshold) {
+    return {
+      kind: "wait",
+      threshold: rule.threshold,
+      payload: {
+        title: `${name} • ${ride.waitTime} min`,
+        body: `Target ≤${rule.threshold} • ${parkName}`,
+        url: `${appUrl || "/"}?ride=${encodeURIComponent(ride.id)}`,
+        tag: `ride-${safeTag(ride.id)}-wait`,
+        renotify: true
+      }
+    };
+  }
+  return null;
+}
+
 async function runRideWatch(env) {
   console.log("Alert job: start");
   await ensureNotificationSchema(env);
@@ -1223,12 +2015,28 @@ async function runRideWatch(env) {
   ).all()).results || [];
 
   const parsedSubs = [];
+  // Most watches have stable keys, so avoid checking every subscriber
+  // against every ride. Legacy name/ID rules keep their park fallback.
+  const watchersByRideKey = new Map();
+  const legacyWatchersByPark = new Map();
   for (const row of subscriptions) {
     let raw = [];
     try { raw = JSON.parse(row.watch_ids || "[]"); } catch {}
 
     const rules = normalizeRules(raw);
-    parsedSubs.push({ ...row, rules });
+    const subscriber = { ...row, rules };
+    parsedSubs.push(subscriber);
+    for (const rule of rules) {
+      const key = String(rule.rideId);
+      if (!watchersByRideKey.has(key)) watchersByRideKey.set(key, []);
+      watchersByRideKey.get(key).push(subscriber);
+      const parkId = Number(rule.parkId);
+      const park = PARKS.get(parkId);
+      if (park && !(park.rides || []).some((ride) => ride.key === key)) {
+        if (!legacyWatchersByPark.has(parkId)) legacyWatchersByPark.set(parkId, []);
+        legacyWatchersByPark.get(parkId).push(subscriber);
+      }
+    }
 
     if (JSON.stringify(rules) !== JSON.stringify(raw)) {
       await env.DB.prepare(
@@ -1239,32 +2047,25 @@ async function runRideWatch(env) {
 
   const now = Date.now();
   const alertsToQueue = [];
-  const easternHour = Number(new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23"
-  }).format(new Date(now)));
   const parkActivity = new Map();
   for (const [parkId, rides] of currentByPark) {
+    const localHour = zoneParts(new Date(now), parkTimezone(parkId)).hour;
     const nowOpen = rides.filter(item => item.isOpen).length;
     const beforeOpen = (priorByPark.get(parkId) || []).filter(item =>
       item.isOpen && now - Number(item.updatedAt || 0) <= LIVE_FRESHNESS_MS).length;
     parkActivity.set(parkId, { operationalNow: nowOpen >= 3,
-      operationalBefore: beforeOpen >= 3, openingRamp: easternHour < 11 && nowOpen - beforeOpen >= 3 });
+      operationalBefore: beforeOpen >= 3, openingRamp: localHour < 11 && nowOpen - beforeOpen >= 3 });
   }
 
   for (const ride of current) {
     const before = prior.get(ride.id);
     if (before) {
-      const beforeFresh = now - Number(before.updatedAt || 0) <= LIVE_FRESHNESS_MS;
-      const { operationalNow, operationalBefore, openingRamp } = parkActivity.get(ride.parkId);
-      const reopened =
-        beforeFresh &&
-        !before.isOpen &&
-        ride.isOpen &&
-        operationalBefore &&
-        operationalNow &&
-        !openingRamp;
-
-      const watchers = parsedSubs.filter((sub) =>
+      const activity = parkActivity.get(ride.parkId);
+      const candidates = [
+        ...(watchersByRideKey.get(String(ride.id)) || []),
+        ...(legacyWatchersByPark.get(Number(ride.parkId)) || [])
+      ];
+      const watchers = [...new Set(candidates)].filter((sub) =>
         sub.rules.some((rule) => ruleMatchesRide(rule, ride))
       );
 
@@ -1272,52 +2073,14 @@ async function runRideWatch(env) {
         const rule = watcher.rules.find((candidate) => ruleMatchesRide(candidate, ride));
         if (!rule) continue;
 
-        let payload = null;
-        let kind = null;
-
-        const pushRideName = notificationRideName(ride);
-        const pushParkName = PARKS.get(ride.parkId).name;
-
-        if (reopened && rule.reopen) {
-          kind = "reopen";
-          payload = {
-            title: ride.waitTime > 0
-              ? `${pushRideName} reopened • ${ride.waitTime} min`
-              : `${pushRideName} reopened`,
-            body: pushParkName,
-            url: `${env.APP_URL || "/"}?ride=${encodeURIComponent(ride.id)}`,
-            tag: `ride-${safeTag(ride.id)}-reopen`,
-            renotify: true
-          };
-        } else if (
-          rule.threshold != null &&
-          beforeFresh &&
-          before.isOpen &&
-          ride.isOpen &&
-          before.waitTime != null &&
-          ride.waitTime != null &&
-          Number.isFinite(Number(before.waitTime)) &&
-          Number.isFinite(Number(ride.waitTime)) &&
-          Number(before.waitTime) > rule.threshold &&
-          Number(ride.waitTime) <= rule.threshold
-        ) {
-          kind = "wait";
-          payload = {
-            title: `${pushRideName} • ${ride.waitTime} min`,
-            body: `Target ≤${rule.threshold} • ${pushParkName}`,
-            url: `${env.APP_URL || "/"}?ride=${encodeURIComponent(ride.id)}`,
-            tag: `ride-${safeTag(ride.id)}-wait`,
-            renotify: true
-          };
-        }
-
-        if (payload && kind && !ride.sourceStale && !ride.sourceMissing) {
+        const alert = evaluateRideTransitionAlert(
+          ride, before, rule, activity, now, env.APP_URL
+        );
+        if (alert) {
           alertsToQueue.push({
             endpoint: watcher.endpoint,
             rideId: ride.id,
-            kind,
-            payload,
-            threshold: kind === "wait" ? rule.threshold : null
+            ...alert
           });
         }
       }
@@ -1427,15 +2190,15 @@ function zonedDateToUtc(year, month, day, hour, timeZone = "America/New_York") {
   return guess;
 }
 
-function parkDayStartMs(now = new Date()) {
-  const p = zoneParts(now);
+function parkDayStartMs(now = new Date(), timeZone = "America/New_York") {
+  const p = zoneParts(now, timeZone);
   const date = new Date(Date.UTC(p.year, p.month - 1, p.day));
   if (p.hour < 3) date.setUTCDate(date.getUTCDate() - 1);
-  return zonedDateToUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), 3);
+  return zonedDateToUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), 3, timeZone);
 }
 
-function easternMinutes(ms) {
-  const p = zoneParts(new Date(ms));
+function minutesInZone(ms, timeZone = "America/New_York") {
+  const p = zoneParts(new Date(ms), timeZone);
   return p.hour * 60 + p.minute;
 }
 
@@ -1497,8 +2260,8 @@ function historyStateWait(state) {
   return wait == null || !Number.isFinite(Number(wait)) ? null : Math.max(0, Number(wait));
 }
 
-function buildTimeBaselines(historyPayload) {
-  const timezone = historyPayload?.timezone || "America/New_York";
+function buildTimeBaselines(historyPayload, fallbackTimezone = "America/New_York") {
+  const timezone = historyPayload?.timezone || fallbackTimezone;
   const endMs = localDayEndMs(historyPayload?.range?.to, timezone);
   const states = [];
 
@@ -1592,8 +2355,9 @@ async function fetchThemeParksHistory(env, ride) {
   // ThemeParks' 30-day credential window includes today. Because ParkPulse
   // intentionally builds baselines from completed park days only, the widest
   // default request is the previous 29 completed days.
-  let from = localDateOffset(-29);
-  const to = localDateOffset(-1);
+  const timeZone = parkTimezone(ride.parkId);
+  let from = localDateOffset(-29, Date.now(), timeZone);
+  const to = localDateOffset(-1, Date.now(), timeZone);
 
   let { response, payload } = await requestThemeParksHistory(env, ride, from, to);
 
@@ -1733,7 +2497,7 @@ async function refreshRideBaselines(env, currentRides, batchSize = BASELINE_BATC
   for (const ride of candidates) {
     try {
       const payload = await fetchThemeParksHistory(env, ride);
-      const rows = buildTimeBaselines(payload);
+      const rows = buildTimeBaselines(payload, parkTimezone(ride.parkId));
       await saveRideBaseline(env, ride, rows);
       refreshed++;
     } catch (error) {
@@ -1855,14 +2619,16 @@ async function getAnalyticsStatus(env) {
 // No averages masquerading as posted waits, and at most 1,441 points per response.
 async function getRideHistory(env, rideKey, range, now = Date.now()) {
   const bucketMinutes = range === "today" ? 5 : range === "7d" ? 15 : 30;
-  const start = range === "today" ? parkDayStartMs(new Date(now)) : now - (range === "7d" ? 7 : 30) * 86400000;
+  const catalog = catalogRideByKey(rideKey);
+  const timeZone = parkTimezone(catalog?.parkId);
+  const start = range === "today" ? parkDayStartMs(new Date(now), timeZone) : now - (range === "7d" ? 7 : 30) * 86400000;
   const rows = await env.DB.prepare(`SELECT h.wait_time,h.is_open,h.observed_at FROM ride_history h
     JOIN (SELECT MAX(observed_at) AS stamp FROM ride_history
       WHERE ride_key = ? AND observed_at >= ? AND observed_at <= ?
       GROUP BY CAST(observed_at / ? AS INTEGER)) buckets ON h.observed_at = buckets.stamp
     WHERE h.ride_key = ? ORDER BY h.observed_at LIMIT 1441`)
     .bind(rideKey, start, now, bucketMinutes * 60000, rideKey).all();
-  return { rideId: rideKey, range, timezone: "America/New_York", bucketMinutes,
+  return { rideId: rideKey, range, timezone: timeZone, bucketMinutes,
     startAt: new Date(start).toISOString(), endAt: new Date(now).toISOString(),
     points: (rows.results || []).map(row => ({ observedAt: new Date(row.observed_at).toISOString(),
       isOpen: row.is_open === 1, waitTime: row.wait_time == null ? null : Number(row.wait_time) })) };
@@ -1871,8 +2637,9 @@ async function getRideHistory(env, rideKey, range, now = Date.now()) {
 async function getRideInsights(env, rideKey) {
   const catalog = catalogRideByKey(rideKey);
   const now = Date.now();
-  const todayStart = parkDayStartMs(new Date(now));
-  const currentMinute = easternMinutes(now);
+  const timeZone = parkTimezone(catalog?.parkId);
+  const todayStart = parkDayStartMs(new Date(now), timeZone);
+  const currentMinute = minutesInZone(now, timeZone);
   const slotMinute = Math.floor(currentMinute / 15) * 15;
 
   let todayRows = [];
@@ -1926,7 +2693,7 @@ async function getRideInsights(env, rideKey) {
 
   const todayValues = todayRows.map((row) => Number(row.wait_time)).filter(Number.isFinite);
   const comparable = historyRows
-    .filter((row) => circularMinuteDifference(easternMinutes(Number(row.observed_at)), currentMinute) <= 30)
+    .filter((row) => circularMinuteDifference(minutesInZone(Number(row.observed_at), timeZone), currentMinute) <= 30)
     .map((row) => Number(row.wait_time))
     .filter(Number.isFinite);
 

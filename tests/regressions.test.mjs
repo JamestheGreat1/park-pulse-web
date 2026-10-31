@@ -4,8 +4,18 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const worker = fs.readFileSync(new URL('../worker/src/index.js', import.meta.url), 'utf8');
 const VERSION = JSON.parse(fs.readFileSync(new URL('../version.json', import.meta.url), 'utf8')).version;
+function legacyStoreHarnessCode() {
+  // Historical VM tests evaluate the store without the ESM module loader.
+  // Provide the currently enabled WDW catalog so migration logic executes.
+  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8');
+  return code.replace(/^import .*;\n/, `const PARKS = [{id:6,resortId:"wdw"},{id:5,resortId:"wdw"},{id:7,resortId:"wdw"},{id:8,resortId:"wdw"}];
+const RESORTS = [{id:"wdw",enabled:true}];
+const parksForResort = id => PARKS.filter(park => park.resortId === id);
+const resortForPark = id => RESORTS.find(resort => resort.id === PARKS.find(park => park.id === Number(id))?.resortId);
+`).replaceAll('export ', '');
+}
 function section(start, end) { return worker.slice(worker.indexOf(start), worker.indexOf(end)); }
-const watcher = section('async function runRideWatch(', 'function catalogRideByKey(');
+const watcher = section('function evaluateRideTransitionAlert(', 'function catalogRideByKey(');
 async function evaluate(beforeWait, currentWait) {
   const ride = { id: 'mk:test', parkId: 6, isOpen: true, waitTime: currentWait };
   const sent = [];
@@ -14,6 +24,7 @@ async function evaluate(beforeWait, currentWait) {
   const context = vm.createContext({
     Date, Intl, Map, JSON, Number, console, LIVE_FRESHNESS_MS: 1200000,
     PARKS: new Map([[6, { name: 'Magic Kingdom' }]]),
+    parkTimezone: () => 'America/New_York', zoneParts: () => ({ hour: 14 }),
     ensureNotificationSchema: async () => {},
     readPriorRideState: async () => [{ ...ride, waitTime: beforeWait, updatedAt: Date.now() }],
     fetchCurrentRideSnapshot: async () => ({ rides: [ride] }),
@@ -45,6 +56,7 @@ test('queued transitions are recorded before the notification checkpoint', async
   const context = vm.createContext({
     Date, Intl, Map, JSON, Number, console, LIVE_FRESHNESS_MS: 1200000,
     PARKS: new Map([[6, { name: 'Magic Kingdom' }]]),
+    parkTimezone: () => 'America/New_York', zoneParts: () => ({ hour: 14 }),
     ensureNotificationSchema: async () => {},
     readPriorRideState: async () => [{ ...ride, waitTime: 55, updatedAt: Date.now() }],
     fetchCurrentRideSnapshot: async () => ({ rides: [ride] }),
@@ -67,6 +79,7 @@ test('failed queue insertion never advances ride checkpoint', async () => {
   const context = vm.createContext({
     Date, Intl, Map, JSON, Number, console, LIVE_FRESHNESS_MS: 1200000,
     PARKS: new Map([[6, { name: 'Magic Kingdom' }]]),
+    parkTimezone: () => 'America/New_York', zoneParts: () => ({ hour: 14 }),
     ensureNotificationSchema: async () => {},
     readPriorRideState: async () => [{ ...ride, waitTime: 55, updatedAt: Date.now() }],
     fetchCurrentRideSnapshot: async () => ({ rides: [ride] }),
@@ -88,6 +101,7 @@ test('ThemeParks attraction waits stay live when the parent park is closed', asy
     VERSION: 'test',
     Number, String, Map,
     findCatalogRide: () => catalogRide,
+    isSingleRiderName: () => false,
     fetch: async () => ({
       ok: true,
       json: async () => ({
@@ -176,6 +190,8 @@ test('startup binds navigation and renders before pending diagnostics or registr
     refreshPushState: () => new Promise(() => {}), $$: () => [nav], $: () => ({}),
     window: { addEventListener() {} }, document: { addEventListener() {} }, handleDialogKeydown() {},
     checkForAppUpdate() {},
+    URL, location: { href: 'https://app.useparkpulse.com/' },
+    parkIdForRideKey: () => null, refreshRelevantParks: () => new Promise(() => {}),
     rideData: { addEventListener() {}, refresh: () => new Promise(() => {}) },
     store: { addEventListener() {}, snapshot: { activeView: 'explore' } }, views: { explore: {} },
     selectView() { rendered = true; }
@@ -245,6 +261,39 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   handlers.fetch({ request: { method: 'GET', url: `https://app.example/assets/js/data.js?v=${VERSION}` }, respondWith: promise => { pending = promise; } });
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
+});
+test('service worker bypasses cached same-origin park JSON and health endpoints', async () => {
+  const source=fs.readFileSync(new URL('../service-worker.js',import.meta.url),'utf8');
+  const handlers={}, cacheHits=[], writes=[], network=[];
+  const context=vm.createContext({
+    URL,Response,Request,
+    location:{origin:'https://parkpulse-api-staging.example'},
+    self:{addEventListener:(type,listener)=>{handlers[type]=listener}},
+    caches:{open:async()=>({
+      match:async request=>{cacheHits.push(request.url);return new Response('OLD STALE JSON')},
+      put:async(...args)=>writes.push(args)
+    })},
+    fetch:async(request,options)=>{network.push({url:request.url,cache:options?.cache});
+      return new Response(JSON.stringify({fresh:true}),{status:200,headers:{'Content-Type':'application/json'}});}
+  });
+  vm.runInContext(source,context);
+  for(const path of ['/api/park/16','/api/park/17','/api/analytics/status','/health','/vapid-key']){
+    let outcome;
+    const request={method:'GET',url:'https://parkpulse-api-staging.example'+path};
+    handlers.fetch({request,respondWith:promise=>{outcome=promise}});
+    assert(outcome,'SW should explicitly handle the same-origin API '+path);
+    assert.equal((await (await outcome).json()).fresh,true,
+      'Must get live network JSON instead of previously cached '+path);
+  }
+  assert.equal(network.length,5);
+  assert(network.every(item=>item.cache==='no-store'));
+  assert.deepEqual(cacheHits,[],'Dynamic requests must not even inspect stale shell cache');
+  assert.equal(writes.length,0,'Dynamic JSON must never go into offline cache');
+  let staticResult;
+  handlers.fetch({request:{method:'GET',url:'https://parkpulse-api-staging.example/assets/js/data.js?v=2.0.0-rc.1'},
+    respondWith:p=>{staticResult=p}});
+  assert.equal((await (await staticResult).text()),'OLD STALE JSON',
+    'Static shell assets must retain offline cache behavior');
 });
 test('editing a watch keeps its exact expiration unless a new duration is selected', async () => {
   for (const duration of ['keep', '3h']) {
@@ -414,7 +463,7 @@ test('favorites persist independently of notification watches', () => {
   const context = vm.createContext({ EventTarget, Event, structuredClone, Date, Number, JSON,
     CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
     window: {}, localStorage: { getItem: k => saved.get(k), setItem: (k,v) => saved.set(k,v) } });
-  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  const code = legacyStoreHarnessCode();
   vm.runInContext(code + ';store.toggleFavorite("mk:test");', context);
   const state = JSON.parse(saved.values().next().value);
   assert.deepEqual(state.favorites, ['mk:test']);
@@ -478,7 +527,7 @@ test('Next Up skips stale, closed, and source-missing rides', () => {
 test('history keeps zero waits, null waits, and closures distinct and bounds queries', async () => {
   let bindings, query;
   const now = Date.parse('2026-09-24T12:00:00Z');
-  const context = vm.createContext({ Date, Number, parkDayStartMs: () => now-8*3600000,
+  const context = vm.createContext({ Date, Number, catalogRideByKey: () => ({ parkId: 6 }), parkTimezone: () => "America/New_York", parkDayStartMs: () => now-8*3600000,
     env: {DB:{prepare(sql){query=sql;return {bind(...args){bindings=args;return {all:async()=>({results:[
       {wait_time:0,is_open:1,observed_at:now-60000},
       {wait_time:null,is_open:1,observed_at:now-30000},
@@ -561,7 +610,7 @@ test('removed For Me sort migrates back to Best Now', () => {
     window: { PARKPULSE_CONFIG: {} },
     localStorage: { getItem: k => saved.get(k) || null, setItem: (k,v) => saved.set(k,v) }
   });
-  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  const code = legacyStoreHarnessCode();
   vm.runInContext(code, context);
   assert.equal(vm.runInContext('store.snapshot.sort', context), 'recommended');
 });
@@ -580,6 +629,14 @@ test('condensed Status keeps four summary rows and expandable diagnostics', () =
   assert.match(settings, /Ride alert engine/);
 });
 
+
+test('Staging-only verification labels use no-wrap layout without changing standard statuses', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  assert.equal((app.match(/class="health-pill good staging-test-label">Staging only<\/span>/g)||[]).length,2);
+  assert.match(css,/\.settings-group \.setting-row \.health-pill\.staging-test-label\s*\{[^}]*white-space:nowrap;[^}]*overflow-wrap:normal;/s);
+  assert.match(css,/\.health-pill,\.setting-value\{[^}]*max-width:52%/);
+});
 
 test('Settings customization bindings survive diagnostics wiring', () => {
   const block = app.slice(app.indexOf('function bindDynamic('), app.indexOf('async function copyText('));
@@ -601,7 +658,7 @@ test('legacy Must-do state is discarded', () => {
     window: { PARKPULSE_CONFIG: {} },
     localStorage: { getItem: k => saved.get(k) || null, setItem: (k,v) => saved.set(k,v) }
   });
-  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  const code = legacyStoreHarnessCode();
   vm.runInContext(code, context);
   const snapshot = vm.runInContext('store.snapshot', context);
   assert.equal(snapshot.mustDo, undefined);
@@ -879,4 +936,584 @@ test('wait trend glyph stays compact and hides for stale cards', () => {
   const card = app.slice(app.indexOf('function rideCard('), app.indexOf('function rideListMarkup('));
   assert.match(card, /ride-wait-line/);
   assert.match(card, /rideTrendMarkup\(ride, status\)/);
+});
+
+test('stable catalog preserves WDW parks and includes both Disneyland parks', async () => {
+  const source = fs.readFileSync(new URL('../assets/js/catalog.js', import.meta.url), 'utf8');
+  const catalog = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(source));
+  assert.deepEqual(catalog.PARKS.map(p => p.id), [6, 5, 7, 8, 16, 17]);
+  assert.deepEqual(catalog.parksForResort('wdw').map(p => p.id), [6,5,7,8]);
+  assert.deepEqual(catalog.parksForResort('dlr').map(p => p.id), [16,17]);
+  assert.deepEqual(catalog.parksForResort('dlr', { includeDisabled: true }).map(p => p.id), [16,17]);
+  assert.equal(catalog.parkTimezone(6), 'America/New_York');
+  assert.equal(catalog.parkTimezone(16), 'America/Los_Angeles');
+  assert.equal(catalog.resortForPark(17).id, 'dlr');
+  assert.equal(catalog.parkName(5), 'EPCOT');
+  assert.equal(catalog.PARKS.some(p => p.resortId === 'dlr'), true);
+  const worker = fs.readFileSync(new URL('../worker/src/index.js', import.meta.url), 'utf8');
+  assert.match(worker, /import \{ PARKS as ENABLED_PARKS, parkTimezone \} from/);
+});
+
+test('park day and baseline slots use park-local time, including daylight saving', () => {
+  const script = section('const zoneFormatters =', 'function weightedQuantile(');
+  const context = vm.createContext({ Date, Intl, Number, Map, String, Math });
+  vm.runInContext(script, context);
+  const local = vm.runInContext('({ parkDayStartMs, minutesInZone, localDateOffset })', context);
+  const summer = new Date('2026-07-04T20:00:00Z');
+  assert.equal(new Date(local.parkDayStartMs(summer, 'America/New_York')).toISOString(), '2026-07-04T07:00:00.000Z');
+  assert.equal(new Date(local.parkDayStartMs(summer, 'America/Los_Angeles')).toISOString(), '2026-07-04T10:00:00.000Z');
+  assert.equal(local.minutesInZone(summer.getTime(), 'America/New_York'), 16*60);
+  assert.equal(local.minutesInZone(summer.getTime(), 'America/Los_Angeles'), 13*60);
+  const winter = new Date('2026-01-04T20:00:00Z');
+  assert.equal(new Date(local.parkDayStartMs(winter, 'America/Los_Angeles')).toISOString(), '2026-01-04T11:00:00.000Z');
+  assert.equal(local.localDateOffset(-1, Date.parse('2026-07-04T05:00:00Z'), 'America/Los_Angeles'), '2026-07-02');
+});
+
+test('today watch expiry is local to the ride park, not the current user resort', () => {
+  const app = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  const script = app.slice(app.indexOf('function zonedDateToUtc('), app.indexOf('function remaining('));
+  const context = vm.createContext({
+    Date, Math, Number, store: { snapshot: { selectedParkId: 6 } },
+    parkTimezone: (id) => id === 16 ? 'America/Los_Angeles' : 'America/New_York',
+    zoneParts: (date, timeZone) => {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone, year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle:'h23'
+      }).formatToParts(date);
+      return Object.fromEntries(parts.filter(p=>p.type!=='literal').map(p=>[p.type, Number(p.value)]));
+    }
+  });
+  vm.runInContext(script, context);
+  assert.equal(vm.runInContext('durationExpiry.toString().includes("parkDayEnd(parkId)")', context), true);
+  const timestamp = Date.parse('2026-07-04T20:00:00Z');
+  assert.equal(new Date(vm.runInContext('parkDayEnd(6, new Date('+timestamp+'))',context)).toISOString(), '2026-07-05T07:00:00.000Z');
+  assert.equal(new Date(vm.runInContext('parkDayEnd(16, new Date('+timestamp+'))',context)).toISOString(), '2026-07-05T10:00:00.000Z');
+  assert.match(app, /durationExpiry\(duration, model\.parkId\)/);
+});
+
+test('Worker uses per-park timezone for baselines, events, and history', () => {
+  const worker = fs.readFileSync(new URL('../worker/src/index.js', import.meta.url), 'utf8');
+  assert.match(worker, /minutesInZone\(Date\.now\(\), parkTimezone\(rides\[0\]\.parkId\)\)/);
+  assert.match(worker, /minutesInZone\(target, parkTimezone\(parkId\)\)/);
+  assert.match(worker, /localHour = zoneParts\(new Date\(now\), parkTimezone\(parkId\)\)\.hour/);
+  assert.match(worker, /localDateOffset\(-29, Date\.now\(\), timeZone\)/);
+  assert.match(worker, /parkDayStartMs\(new Date\(now\), timeZone\)/);
+  assert.doesNotMatch(worker, /easternMinutes|easternHour/);
+  const app = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(app, /easternParkDayEnd/);
+});
+
+
+test('Disneyland catalogs are curated and enabled in stable public release', async () => {
+  const file = fs.readFileSync(new URL('../worker/src/disneyland-rides.js', import.meta.url), 'utf8');
+  const { DISNEYLAND_RIDES, disneylandRidesForPark } =
+    await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(file));
+  assert.equal(disneylandRidesForPark(16).length, 35);
+  assert.equal(disneylandRidesForPark(17).length, 19);
+  const all = [...DISNEYLAND_RIDES.values()].flat();
+  assert.equal(new Set(all.map(ride => ride.key)).size, all.length);
+  assert.equal(all.every(ride => /^(dl|dca):/.test(ride.key)), true);
+  assert.equal(all.every(ride => ride.name && ride.land && Array.isArray(ride.aliases)), true);
+  assert.equal(all.some(ride => /single rider|tiki room|phil(har)?magic|turtle talk|world of color|villains grove|treehouse/i.test(ride.name)), false);
+  assert.equal(disneylandRidesForPark(17).find(ride => ride.key === 'dca:guardians').aliases.includes('Guardians of the Galaxy - Monsters After Dark'), true);
+  assert.notEqual(disneylandRidesForPark(17).find(ride => ride.key === 'dca:pal-a-round-swinging'),
+                  disneylandRidesForPark(17).find(ride => ride.key === 'dca:pal-a-round-non-swinging'));
+  const catalog = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(
+    fs.readFileSync(new URL('../assets/js/catalog.js', import.meta.url), 'utf8')));
+  assert.deepEqual(catalog.PARKS.map(p => p.id), [6, 5, 7, 8, 16, 17]);
+  assert.equal(catalog.parksForResort('dlr').length, 2);
+  assert.match(worker, /ENABLED_PARKS\.filter\(\(item\) => item\.resortId === "dlr"\)/);
+});
+
+test('California ride name matching excludes single rider and non-rides', async () => {
+  const file = fs.readFileSync(new URL('../worker/src/disneyland-rides.js', import.meta.url), 'utf8');
+  const { disneylandRidesForPark } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(file));
+  const code = section('function normalizeName(', '// An overlay and its base attraction');
+  const context = vm.createContext({ String, Array, RegExp });
+  vm.runInContext(code, context);
+  const match = vm.runInContext('findCatalogRide', context);
+  const rejectsSingleRider = vm.runInContext('isSingleRiderName', context);
+  const dl = { rides: disneylandRidesForPark(16) };
+  const dca = { rides: disneylandRidesForPark(17) };
+  assert.equal(match(dl, 'Indiana Jones™ Adventure')?.key, 'dl:indiana-jones');
+  assert.equal(match(dl, 'Haunted Mansion Holiday')?.key, 'dl:haunted-mansion');
+  assert.equal(match(dl, 'Haunted Mansion')?.key, 'dl:haunted-mansion');
+  assert.equal(match(dl, 'Space Mountain')?.key, 'dl:space-mountain');
+  assert.equal(match(dca, 'Guardians of the Galaxy - Monsters After Dark')?.key, 'dca:guardians');
+  assert.equal(match(dca, 'Luigi\'s Honkin\' Haul-O-Ween')?.key, 'dca:luigis');
+  assert.equal(match(dca, 'Mater\'s Graveyard JamBOOree')?.key, 'dca:maters');
+  assert.equal(match(dca, 'Soarin’ Across America')?.key, 'dca:soarin');
+  assert.equal(match(dca, 'Pixar Pal-A-Round – Non-Swinging')?.key, 'dca:pal-a-round-non-swinging');
+  assert.equal(match(dca, 'Pixar Pal-A-Round - Swinging')?.key, 'dca:pal-a-round-swinging');
+  assert.equal(match(dca, 'WEB SLINGERS: A Spider-Man Adventure')?.key, 'dca:web-slingers');
+  assert.equal(match(dl, 'Walt Disney\'s Enchanted Tiki Room'), null);
+  assert.equal(match(dca, 'Mickey\'s PhilharMagic'), null);
+  assert.equal(match(dca, 'World of Color – ONE'), null);
+  assert.equal(rejectsSingleRider('WEB SLINGERS: A Spider-Man Adventure Single Rider'), true);
+});
+
+test('Seasonal overlays choose a fresh operating variant even if base entry follows', async () => {
+  const file = fs.readFileSync(new URL('../worker/src/disneyland-rides.js', import.meta.url), 'utf8');
+  const { disneylandRidesForPark } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(file));
+  const code = section('function normalizeName(', 'async function fetchFreshParkRides(');
+  const context = vm.createContext({ Date, Map, Number, String, Array, Math, LIVE_FRESHNESS_MS: 15 * 60 * 1000 });
+  vm.runInContext(code, context);
+  const collapse = vm.runInContext('collapseRideVariants', context);
+  const match = vm.runInContext('findCatalogRide', context);
+  const park = { rides: disneylandRidesForPark(17) };
+  const stamp = new Date().toISOString();
+  const sample = [
+    { id: match(park,'Guardians of the Galaxy - Monsters After Dark').key, rawName:'Guardians of the Galaxy - Monsters After Dark', isOpen:true, waitTime:40, lastUpdated:stamp },
+    { id: match(park,'Guardians of the Galaxy - Mission: BREAKOUT!').key, rawName:'Guardians of the Galaxy - Mission: BREAKOUT!', isOpen:false, waitTime:0, lastUpdated:stamp }
+  ];
+  assert.equal(collapse(sample).length, 1);
+  assert.equal(collapse(sample)[0].isOpen, true);
+  assert.equal(collapse([...sample].reverse())[0].isOpen, true);
+  assert.equal(collapse([...sample, { ...sample[0], id:'dca:soarin', waitTime:0 }]).length, 2);
+  assert.equal(collapse([{ ...sample[0], lastUpdated:'2020-01-01T00:00:00Z' }, sample[1]])[0].isOpen, false);
+});
+
+test('California provider normalization respects stable IDs, excludes shows, and retains fallback', async () => {
+  const file = fs.readFileSync(new URL('../worker/src/disneyland-rides.js', import.meta.url), 'utf8');
+  const { disneylandRidesForPark } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(file));
+  const code = section('function normalizeName(', 'async function fetchFreshParkRides(')
+    + section('async function fetchThemeParksRides(', 'async function addDisplayFallbacks(');
+  const now = new Date().toISOString();
+  const theme = { liveData: [
+    { id:'tp-haunted', name:'Haunted Mansion Holiday', status:'OPERATING', queue:{STANDBY:{waitTime:35}},lastUpdated:now },
+    { id:'tp-single', name:'Tiana\'s Bayou Adventure Single Rider', status:'OPERATING', queue:{STANDBY:{waitTime:0}},lastUpdated:now },
+    { id:'tp-tiki', name:'Walt Disney\'s Enchanted Tiki Room',status:'OPERATING',queue:{STANDBY:{waitTime:0}},lastUpdated:now }
+  ] };
+  const queue = { lands:[{ name:'New Orleans Square', rides:[
+    {id:325,name:'Haunted Mansion Holiday',is_open:true,wait_time:30,last_updated:now },
+    {id:14326,name:'Tiana\'s Bayou Adventure Single Rider',is_open:true,wait_time:0,last_updated:now }
+  ]}], rides:[] };
+  const context=vm.createContext({
+    Date, Map, Number, String, Array, Math, LIVE_FRESHNESS_MS:15*60*1000,
+    VERSION:'test', fetch:async (url)=>({ok:true, json:async()=>String(url).includes('themeparks.wiki')?theme:queue})
+  });
+  vm.runInContext(code, context);
+  const park={id:16,themeParksId:'test-id',resortId:'dlr',rides:disneylandRidesForPark(16)};
+  const primary=await vm.runInContext('fetchThemeParksRides',context)(16,park,{});
+  const fallback=await vm.runInContext('fetchQueueTimesRides',context)(16,park);
+  assert.deepEqual(Array.from(primary, ride => ride.id), ['dl:haunted-mansion']);
+  assert.equal(primary[0].sourceId,'tp-haunted');
+  assert.equal(primary[0].waitTime,35);
+  assert.deepEqual(Array.from(fallback, ride => ride.id), ['dl:haunted-mansion']);
+  assert.equal(fallback[0].sourceId,'325');
+  assert.equal(fallback[0].waitTime,30);
+  assert.equal(primary.some(ride=>ride.id==='dl:tianas'),false);
+});
+
+
+test('Resorts view is the fourth accessible tab and preserves glass navigation layout', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../assets/css/app.css', import.meta.url), 'utf8');
+  const app = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  const nav = [...html.matchAll(/data-view-target="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(nav, ['explore', 'watching', 'resorts', 'settings']);
+  assert.match(html, /id="view-resorts" class="view-panel"/);
+  assert.match(css, /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(css, /grid-template-columns:repeat\(4,auto\)/);
+  assert.match(css, /\.resort-card\.selected/);
+  assert.match(css, /\.resort-card\.unavailable/);
+  assert.match(css, /\.resort-card:focus-visible/);
+  assert.match(css, /prefers-reduced-motion:reduce/);
+  assert.match(app, /function renderResorts\(\)/);
+  assert.match(app, /data-resort=/);
+  assert.match(app, /disabled aria-disabled/);
+  assert.match(app, /parksForResort\(state.selectedResortId\)\.map/);
+  assert.match(app, /activeResort.name/);
+});
+
+test('Stored resort state migrates old WDW settings and rejects disabled destinations', () => {
+  const script = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8')
+    .replace(/^import .*;\n/, '')
+    .replace(/export class Store/, 'class Store')
+    .replace(/export const store = new Store\(\);/, '');
+  const catalog = { wdw:{id:'wdw',enabled:true}, dlr:{id:'dlr',enabled:false} };
+  const resorts = [catalog.wdw,catalog.dlr];
+  const parks = [{id:6,resortId:'wdw'},{id:5,resortId:'wdw'},{id:16,resortId:'dlr'}];
+  const enabledParks = parks.filter(p=>catalog[p.resortId].enabled);
+  const parkList = id => enabledParks.filter(p=>p.resortId===id);
+  const storage = new Map();
+  storage.set('parkpulse.rideWatcher.v1', JSON.stringify({
+    selectedParkId:5,
+    rules:[{rideId:'epcot:figment',parkId:5,rideName:'Figment'}],
+    favorites:['epcot:figment'],accent:'violet',useLocalTime:false
+  }));
+  const context=vm.createContext({
+    Number,String,Date,Array,Set,JSON,EventTarget,structuredClone,
+    CustomEvent:class extends Event{constructor(name,opts){super(name);this.detail=opts.detail;}},
+    RESORTS:resorts,PARKS:enabledParks,parksForResort:parkList,
+    resortForPark:id=>resorts.find(r=>r.id===parks.find(p=>p.id===Number(id))?.resortId),
+    window:{PARKPULSE_CONFIG:{DEFAULT_PARK_ID:6}},
+    localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)}
+  });
+  const StoreType=vm.runInContext(script+'\nStore',context);
+  const instance=new StoreType();
+  assert.equal(instance.snapshot.selectedResortId,'wdw');
+  assert.equal(instance.snapshot.selectedParkId,5);
+  assert.equal(instance.snapshot.lastParkByResort.wdw,5);
+  assert.deepEqual(Array.from(instance.snapshot.favorites),['epcot:figment']);
+  assert.equal(instance.snapshot.rules[0].rideId,'epcot:figment');
+  assert.equal(instance.snapshot.accent,'violet');
+  assert.equal(instance.snapshot.useLocalTime,false);
+  assert.equal(instance.selectResort('dlr'),false);
+  assert.equal(instance.selectPark(16),false);
+  assert.equal(instance.snapshot.selectedParkId,5);
+  assert.equal(instance.selectPark(6),true);
+  assert.equal(instance.snapshot.lastParkByResort.wdw,6);
+  instance.update(state=>{state.activeView='resorts'},'view');
+  assert.equal(instance.selectResort('wdw'),true);
+  assert.equal(instance.snapshot.activeView,'resorts');
+  assert.equal(instance.snapshot.selectedParkId,6);
+  const reloaded=new StoreType();
+  assert.equal(reloaded.snapshot.selectedParkId,6);
+  assert.equal(reloaded.snapshot.selectedResortId,'wdw');
+  assert.equal(reloaded.snapshot.rules[0].rideId,'epcot:figment');
+});
+
+test('When Disneyland is enabled later, selection remembers each resort last park', () => {
+  const script=fs.readFileSync(new URL('../assets/js/store.js',import.meta.url),'utf8')
+    .replace(/^import .*;\n/,'').replace(/export class Store/,'class Store')
+    .replace(/export const store = new Store\(\);/,'');
+  const resorts=[{id:'wdw',enabled:true},{id:'dlr',enabled:true}];
+  const parks=[{id:6,resortId:'wdw'},{id:5,resortId:'wdw'},{id:16,resortId:'dlr'},{id:17,resortId:'dlr'}];
+  const storage=new Map();
+  const context=vm.createContext({
+    Number,String,Date,Array,Set,JSON,EventTarget,structuredClone,
+    CustomEvent:class extends Event{constructor(name,opts){super(name);this.detail=opts.detail;}},
+    RESORTS:resorts,PARKS:parks,
+    parksForResort:id=>parks.filter(p=>p.resortId===id),
+    resortForPark:id=>resorts.find(r=>r.id===parks.find(p=>p.id===Number(id))?.resortId),
+    window:{PARKPULSE_CONFIG:{DEFAULT_PARK_ID:6}},
+    localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)}
+  });
+  const StoreType=vm.runInContext(script+'\nStore',context);
+  const instance=new StoreType();
+  assert.equal(instance.selectPark(5),true);
+  assert.equal(instance.selectResort('dlr'),true);
+  assert.equal(instance.snapshot.selectedParkId,16);
+  assert.equal(instance.selectPark(17),true);
+  assert.equal(instance.selectResort('wdw'),true);
+  assert.equal(instance.snapshot.selectedParkId,5);
+  assert.equal(instance.selectResort('dlr'),true);
+  assert.equal(instance.snapshot.selectedParkId,17);
+  const next=new StoreType();
+  assert.equal(next.snapshot.selectedResortId,'dlr');
+  assert.equal(next.snapshot.selectedParkId,17);
+  assert.equal(next.selectResort('wdw'),true);
+  assert.equal(next.snapshot.selectedParkId,5);
+});
+
+
+test('Shared ride keys resolve to the correct enabled resort', async () => {
+  const source=fs.readFileSync(new URL('../assets/js/catalog.js',import.meta.url),'utf8');
+  const catalog=await import('data:text/javascript;charset=utf-8,'+encodeURIComponent(source));
+  for(const [key,park] of [['mk:space-mountain',6],['epcot:remy',5],['dhs:rise',7],['ak:everest',8]]) {
+    assert.equal(catalog.parkIdForRideKey(key),park);
+  }
+  assert.equal(catalog.parkIdForRideKey('dl:space-mountain'),16);
+  assert.equal(catalog.parkIdForRideKey('dca:guardians'),17);
+  assert.equal(catalog.parkIdForRideKey('dl:space-mountain',{includeDisabled:true}),16);
+  assert.equal(catalog.parkIdForRideKey('dca:guardians',{includeDisabled:true}),17);
+  assert.equal(catalog.parkIdForRideKey('invalid'),null);
+  assert.equal(catalog.parkIdForRideKey(''),null);
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  assert.match(app,/const sharedParkId = parkIdForRideKey\(deepLinkRide\)/);
+  assert.match(app,/store\.selectPark\(sharedParkId\)/);
+  assert.match(app,/const active = sharedParkId != null \? "explore"/);
+  assert.match(app,/if \(deepLinkRide && rideData\.rideById\(deepLinkRide\)\) openRide\(deepLinkRide\)/);
+});
+
+test('Live refresh is scoped to visible resorts and cross-resort watches', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const code=app.slice(app.indexOf('function parkIdsToRefresh('),app.indexOf('async function triggerPullRefresh('));
+  const parks=[
+    {id:6,resortId:'wdw'},{id:5,resortId:'wdw'},{id:7,resortId:'wdw'},{id:8,resortId:'wdw'},
+    {id:16,resortId:'dlr'},{id:17,resortId:'dlr'}
+  ];
+  const context=vm.createContext({
+    Set,Number,Array,PARKS:parks,store:{snapshot:{}},
+    parksForResort:id=>parks.filter(p=>p.resortId===id),
+    rideData:{ refresh:opts=>opts }
+  });
+  vm.runInContext(code,context);
+  const fn=vm.runInContext('parkIdsToRefresh',context);
+  const selected={selectedResortId:'dlr',rules:[{parkId:6,rideId:'mk:space-mountain'},{parkId:5,rideId:'epcot:remy'},{parkId:17,rideId:'dca:guardians'}]};
+  assert.deepEqual(Array.from(fn(selected)),[16,17,6,5]);
+  assert.deepEqual(Array.from(fn({selectedResortId:'wdw',rules:[]})),[6,5,7,8]);
+  assert.deepEqual(Array.from(fn({selectedResortId:'dlr',rules:[{parkId:999}]})),[16,17]);
+  assert.match(app,/const sharedParkId = parkIdForRideKey\(deepLinkRide\)/);
+  assert.doesNotMatch(app,/rideData\.refresh\(\)/);
+});
+
+test('Resort changes refresh all selected parks even with cached data', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const start=app.indexOf('  store.addEventListener("change", (e) => {');
+  const end=app.indexOf('  // A shared ride link',start);
+  assert(start>=0 && end>start, 'store change event handler must exist');
+  let listener=null, refreshes=0, fullRenders=0;
+  const context=vm.createContext({
+    store:{addEventListener:(event,callback)=>{assert.equal(event,'change');listener=callback;}},
+    refreshRelevantParks:()=>{refreshes++;},
+    renderRideResults:()=>{},render:()=>{fullRenders++;},
+    nextUpOffset:4,rulesSynced:true
+  });
+  vm.runInContext(app.slice(start,end),context);
+  assert.equal(typeof listener,'function');
+  listener({detail:{reason:'resort'}});
+  assert.equal(refreshes,1,'resort switch should fetch even if a park is already cached');
+  assert.equal(fullRenders,1);
+  listener({detail:{reason:'park'}});
+  assert.equal(refreshes,1,'ordinary park selection should not trigger a redundant full-resort fetch');
+  listener({detail:{reason:'rules'}});
+  assert.equal(refreshes,2,'cross-resort watch changes should still refresh');
+  const clickHandler=app.slice(
+    app.indexOf("document.querySelectorAll('[data-resort]').forEach"),
+    app.indexOf("document.querySelectorAll('[data-next-up-another]')")
+  );
+  assert.match(clickHandler,/store\.selectResort\(resortId\)/);
+  assert.doesNotMatch(clickHandler,/rideData\.refresh\(/,
+    'resort click and change-event handlers must not issue duplicate requests');
+});
+
+test('In-flight refresh queues a newly selected resort rather than silently dropping it', async () => {
+  const api=fs.readFileSync(new URL('../assets/js/api.js',import.meta.url),'utf8');
+  const code=api.slice(api.indexOf('export class RideData'),api.indexOf('export const rideData')).replace('export ','');
+  const calls=[];
+  let releaseFirst;
+  const first=new Promise(resolve=>{releaseFirst=resolve;});
+  const data=(id)=>({rides:[{id:id===16?'dl:test':'mk:test',parkId:id}],parkHours:null,crowdLevel:null});
+  const ctx=vm.createContext({
+    EventTarget,Event,Map,Set,JSON,Date,Number,Promise,
+    PARKS:[{id:6},{id:16}],navigator:{onLine:true},
+    fetchPark:async id=>{calls.push(id);if(id===6)await first;return data(id);},
+    localStorage:{getItem:()=>null,setItem:()=>{}}
+  });
+  vm.runInContext(code+';globalThis.instance=new RideData()',ctx);
+  const instance=ctx.instance;
+  const one=instance.refresh({parkIds:[6]});
+  await Promise.resolve();
+  await instance.refresh({parkIds:[16]});
+  assert.equal(instance.ridesForPark(16).length,0);
+  releaseFirst();
+  await one;
+  for(let i=0;i<15 && instance.ridesForPark(16).length===0;i++)await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,[6,16]);
+  assert.equal(instance.ridesForPark(16)[0].id,'dl:test');
+  assert.equal(instance.ridesForPark(6)[0].id,'mk:test');
+});
+
+
+test('Six-park Worker polling uses at most two concurrent requests in catalog order', async () => {
+  const block=section('async function fetchCurrentRideSnapshot(', 'async function runManualRefresh(');
+  const input=[5,6,7,8,16,17];
+  const parks=new Map(input.map(id=>[id,{name:String(id)}]));
+  let active=0,peak=0;
+  const fetched=[];
+  const context=vm.createContext({
+    Map,Promise,PARKS:parks,
+    fetchFreshParkRides:async id=>{
+      active++;peak=Math.max(peak,active);fetched.push(id);
+      await new Promise(resolve=>setImmediate(resolve));
+      active--;
+      return {rides:[{id:'ride-'+id,parkId:id}],primaryAvailable:true,fallbackUsed:id===17};
+    }
+  });
+  vm.runInContext(block,context);
+  const result=await vm.runInContext('fetchCurrentRideSnapshot({})',context);
+  assert.equal(peak,2);
+  assert.deepEqual(fetched,input);
+  assert.deepEqual(Array.from(result.rides,ride=>ride.parkId),input);
+  assert.equal(result.primaryParks,6);
+  assert.equal(result.fallbackParks,1);
+});
+
+test('Cross-resort alerts keep WDW and Disneyland Space Mountains separate', async () => {
+  const now=Date.now();
+  const rides=[
+    {id:'mk:space-mountain',parkId:6,name:'Space Mountain',isOpen:true,waitTime:20,updatedAt:now},
+    {id:'dl:space-mountain',parkId:16,name:'Space Mountain',isOpen:true,waitTime:25,updatedAt:now}
+  ];
+  const subs=[
+    {endpoint:'wdw',watch_ids:JSON.stringify([{rideId:'mk:space-mountain',parkId:6,threshold:30,reopen:false}])},
+    {endpoint:'dlr',watch_ids:JSON.stringify([{rideId:'dl:space-mountain',parkId:16,threshold:30,reopen:false}])},
+    {endpoint:'other',watch_ids:JSON.stringify([{rideId:'epcot:spaceship-earth',parkId:5,threshold:30,reopen:false}])}
+  ];
+  const queued=[];
+  const grouped=items=>{
+    const result=new Map();
+    for(const ride of items){
+      if(!result.has(ride.parkId))result.set(ride.parkId,[]);
+      result.get(ride.parkId).push(ride);
+    }
+    return result;
+  };
+  const env={DB:{prepare:()=>({all:async()=>({results:subs}),bind:()=>({run:async()=>({})})})}};
+  const ctx=vm.createContext({
+    Date,Number,String,JSON,console,Map,Set,
+    env,LIVE_FRESHNESS_MS:15*60*1000,
+    PARKS:new Map([
+      [6,{name:'Magic Kingdom',rides:[{key:'mk:space-mountain'}]}],
+      [16,{name:'Disneyland Park',rides:[{key:'dl:space-mountain'}]}]
+    ]),
+    parkTimezone:id=>id===16?'America/Los_Angeles':'America/New_York',
+    zoneParts:()=>({hour:13}),
+    readPriorRideState:async()=>rides.map(ride=>({...ride,waitTime:65})),
+    fetchCurrentRideSnapshot:async()=>({rides}),
+    groupByPark:grouped,
+    ensureNotificationSchema:async()=>{},
+    normalizeRules:rules=>rules,
+    ruleMatchesRide:(rule,ride)=>String(rule.rideId)===String(ride.id),
+    notificationRideName:ride=>ride.name,
+    safeTag:id=>String(id).replace(':','-'),
+    enqueueRideAlerts:async(_,alerts)=>{queued.push(...alerts);return alerts.length;},
+    sendPush:async()=>true,
+    processPendingRideAlerts:async()=>({delivered:2,pending:0,retried:0,failed:0,discarded:0}),
+    writeCurrentRideSnapshot:async()=>{}
+  });
+  vm.runInContext(watcher,ctx);
+  await vm.runInContext('runRideWatch(env)',ctx);
+  assert.equal(queued.length,2);
+  assert.deepEqual(queued.map(alert=>alert.endpoint).sort(),['dlr','wdw']);
+  const dlr=queued.find(alert=>alert.endpoint==='dlr');
+  const wdw=queued.find(alert=>alert.endpoint==='wdw');
+  assert.equal(dlr.rideId,'dl:space-mountain');
+  assert.match(dlr.payload.body,/Disneyland Park/);
+  assert.match(dlr.payload.url,/ride=dl%3Aspace-mountain/);
+  assert.equal(wdw.rideId,'mk:space-mountain');
+  assert.match(wdw.payload.body,/Magic Kingdom/);
+  assert.match(wdw.payload.url,/ride=mk%3Aspace-mountain/);
+});
+
+test('Ride history returns its own park timezone and park-day bounds', async () => {
+  const now=Date.parse('2026-07-04T20:00:00Z');
+  const history=section('async function getRideHistory(','async function getRideInsights(');
+  const starts=[];
+  const ctx=vm.createContext({
+    Date,Number,String,Promise,
+    catalogRideByKey:key=>({parkId:key.startsWith('dl:')?16:6}),
+    parkTimezone:id=>id===16?'America/Los_Angeles':'America/New_York',
+    parkDayStartMs:(date,zone)=>zone==='America/Los_Angeles'
+      ? Date.parse('2026-07-04T10:00:00Z') : Date.parse('2026-07-04T07:00:00Z'),
+    env:{DB:{prepare:()=>({bind(...args){starts.push(args);return{all:async()=>({results:[]})}}})}}
+  });
+  vm.runInContext(history,ctx);
+  const california=await vm.runInContext("getRideHistory(env,'dl:space-mountain','today',"+now+")",ctx);
+  const florida=await vm.runInContext("getRideHistory(env,'mk:space-mountain','today',"+now+")",ctx);
+  assert.equal(california.timezone,'America/Los_Angeles');
+  assert.equal(california.startAt,'2026-07-04T10:00:00.000Z');
+  assert.equal(florida.startAt,'2026-07-04T07:00:00.000Z');
+  assert.equal(starts[0][0],'dl:space-mountain');
+  assert.equal(starts[0][1],Date.parse('2026-07-04T10:00:00Z'));
+});
+
+
+test('Every frontend shared-catalog import is re-exported through data.js', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const api=fs.readFileSync(new URL('../assets/js/api.js',import.meta.url),'utf8');
+  const data=fs.readFileSync(new URL('../assets/js/data.js',import.meta.url),'utf8');
+  const catalog=fs.readFileSync(new URL('../assets/js/catalog.js',import.meta.url),'utf8');
+  const declared=new Set([...catalog.matchAll(/export (?:const|function) ([A-Za-z0-9_]+)/g)].map(match=>match[1]));
+  const exported=data.match(/export \{ ([^}]+) \} from "\.\/catalog\.js/)?.[1] || '';
+  const forwarded=new Set(exported.split(',').map(s=>s.trim()));
+  for(const file of [app,api]) {
+    const imports=[...file.matchAll(/import \{ ([^}]+) \} from "\.\/data\.js/g)];
+    for(const [,keys] of imports) for(const key of keys.split(',').map(s=>s.trim())) {
+      if(declared.has(key))assert(forwarded.has(key),'data.js forgot to re-export '+key);
+    }
+  }
+  assert(forwarded.has('parkIdForRideKey'));
+});
+
+
+test('Settings tab uses a fully closed, symmetric outline gear across glass modes', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const settings = html.match(/<button id="nav-settings"[\s\S]*?<\/button>/)?.[0];
+  assert(settings, 'Settings tab exists');
+  assert.match(settings, /<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">/);
+  const d = settings.match(/<path d="([^"]+)"\/>/)?.[1];
+  assert(d && /^M[\d.\s]+(?:L[\d.\s]+)+Z$/.test(d), 'gear path is explicitly closed');
+  const points = [...d.matchAll(/(?:M|L)([\d.]+)\s+([\d.]+)/g)].map(match => [+match[1], +match[2]]);
+  assert.equal(points.length, 40, '8 identical five-point teeth');
+  for (let i=0; i<20; i++) {
+    assert(Math.abs(points[i][0] + points[i+20][0] - 24) < 0.02, 'opposite X coordinates are symmetrical');
+    assert(Math.abs(points[i][1] + points[i+20][1] - 24) < 0.02, 'opposite Y coordinates are symmetrical');
+  }
+  assert.match(settings, /<circle cx="12" cy="12" r="2.85"\/>/);
+  assert.doesNotMatch(settings, /M12 15\.5A3\.5 3\.5|M9\.671 4\.136/);
+  assert.match(settings, /<span>Settings<\/span>/);
+});
+
+
+test('Liquid dock uses four equal phone slots and four desktop slots', () => {
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  const oldThreeCols=/grid-template-columns:repeat\(3,(?:auto|1fr)\)!important/;
+  assert.doesNotMatch(css,oldThreeCols);
+  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)!important/);
+  assert.match(css,/grid-template-columns:repeat\(4,auto\)!important/);
+  assert.match(css,/\.resort-card\.selected::after/);
+  assert.match(css,/\.resort-card-status\.selected/);
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const clickHandler=app.slice(app.indexOf("document.querySelectorAll('[data-resort]').forEach"),app.indexOf("document.querySelectorAll('[data-next-up-another]')"));
+  assert.doesNotMatch(clickHandler,/selectView\("explore"\)/);
+  const store=fs.readFileSync(new URL('../assets/js/store.js',import.meta.url),'utf8');
+  const selection=store.slice(store.indexOf("selectResort(resortId)"),store.indexOf("selectPark(parkId)"));
+  assert.doesNotMatch(selection,/activeView\s*=\s*"explore"/);
+});
+
+
+test('Frosted and Liquid Glass snap their backdrop tint on tab changes', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  const section=app.slice(app.indexOf('function selectView(name) {'),app.indexOf('function sortedRides('));
+  assert(section.startsWith('function selectView(name) {'));
+  assert.match(css, /:root\.glass-color-snap:is\(\[data-preview-surface="liquid"\],\[data-preview-surface="neutral"\]\) \.settings-group/);
+  for(const surface of ['liquid','neutral']){
+    const classes=new Set(),frames=[];
+    const root={
+      dataset:{previewSurface:surface},
+      classList:{add:value=>classes.add(value),remove:value=>classes.delete(value)}
+    };
+    const views={
+      explore:{childElementCount:1,offsetWidth:300,classList:{toggle(){}}},
+      settings:{childElementCount:1,offsetWidth:300,classList:{toggle(){}}}
+    };
+    const links=['explore','settings'].map(name=>({
+      dataset:{viewTarget:name},classList:{toggle(){}},
+      setAttribute(){},removeAttribute(){}
+    }));
+    const ctx=vm.createContext({
+      views,document:{documentElement:root,querySelectorAll:()=>links},
+      store:{update(){}},requestAnimationFrame:callback=>frames.push(callback),
+      window:{scrollTo(){}},Object,render(){throw new Error('Should reuse existing view nodes');}
+    });
+    vm.runInContext(section,ctx);
+    vm.runInContext('selectView("settings")',ctx);
+    assert(classes.has('glass-color-snap'),surface+' must snap before painting the new page');
+    assert.equal(frames.length,1,surface+' must schedule snap cleanup');
+    frames.shift()();
+    assert(!classes.has('glass-color-snap'),surface+' must restore transitions next frame');
+    vm.runInContext('selectView("explore")',ctx);
+    assert(classes.has('glass-color-snap'),surface+' must also snap on return navigation');
+  }
+});
+
+test('Both glass styles disable the page-level fade that repaints WebKit blur layers', () => {
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  // The base fade animates opacity/transform over 200ms. That puts frosted
+  // backdrop-filter descendants in a temporary compositing group.
+  assert.match(css,/\.view-panel\{display:none;animation:fade \.2s ease\}/);
+  assert.match(css,/:root:is\(\[data-preview-surface="liquid"\],\[data-preview-surface="neutral"\]\) \.view-panel\.active\{\s*animation:none!important;\s*\}/);
+  assert.match(css,/:root:is\(\[data-preview-surface="liquid"\],\[data-preview-surface="neutral"\]\) \.view-panel\{\s*transform:none;\s*\}/);
+});
+
+test('2.0 mobile header clears translucent iOS safe area without changing desktop layout', () => {
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  assert.equal((css.match(/padding-top:calc\(env\(safe-area-inset-top,0px\) \+ 30px\)/g)||[]).length,2);
+  assert.doesNotMatch(css,/\.topbar\{[^}]*padding-top:calc\(env\(safe-area-inset-top,0px\) \+ 14px\)/);
+  assert.match(css,/@media \(min-width:1024px\) \{[\s\S]*?\.topbar\{\s*min-height:84px;\s*padding-top:16px;/);
+  assert.match(css,/ParkPulse 2\.0: Keep the mobile wordmark/);
 });

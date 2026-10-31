@@ -1,7 +1,11 @@
+import { PARKS, RESORTS, parksForResort, resortForPark } from "./catalog.js?v=2.0.0";
+
 const KEY = "parkpulse.rideWatcher.v1";
 
 const defaults = {
   selectedParkId: Number(window.PARKPULSE_CONFIG?.DEFAULT_PARK_ID || 6),
+  selectedResortId: "wdw",
+  lastParkByResort: {},
   activeView: "explore",
   query: "",
   openOnly: false,
@@ -43,6 +47,29 @@ export class Store extends EventTarget {
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];
     if (!["blue","cyan","violet","pink","orange","green","red","gold"].includes(this.state.accent)) this.state.accent = "blue";
     if (typeof this.state.useLocalTime !== "boolean") this.state.useLocalTime = true;
+    // Old installs only saved a park; derive their resort without resetting watches.
+    const availableResorts = RESORTS.filter((resort) => resort.enabled && parksForResort(resort.id).length);
+    const savedPark = PARKS.find((park) => park.id === Number(saved.selectedParkId));
+    const savedResort = availableResorts.find((resort) => resort.id === saved.selectedResortId);
+    const activeResort = savedResort ||
+      availableResorts.find((resort) => resort.id === savedPark?.resortId) ||
+      availableResorts[0];
+    this.state.selectedResortId = activeResort?.id || "wdw";
+    const previous = saved.lastParkByResort && typeof saved.lastParkByResort === "object"
+      && !Array.isArray(saved.lastParkByResort) ? saved.lastParkByResort : {};
+    this.state.lastParkByResort = {};
+    for (const resort of availableResorts) {
+      const parks = parksForResort(resort.id);
+      const last = parks.find((park) => park.id === Number(previous[resort.id])) ||
+        (savedPark?.resortId === resort.id ? savedPark : null) || parks[0];
+      if (last) this.state.lastParkByResort[resort.id] = last.id;
+    }
+    const selectedPark = parksForResort(this.state.selectedResortId)
+      .find((park) => park.id === Number(saved.selectedParkId));
+    this.state.selectedParkId = selectedPark?.id ??
+      this.state.lastParkByResort[this.state.selectedResortId] ?? defaults.selectedParkId;
+    this.state.lastParkByResort[this.state.selectedResortId] = this.state.selectedParkId;
+    if (!["explore", "watching", "resorts", "settings"].includes(this.state.activeView)) this.state.activeView = "explore";
     this.pruneExpired(false);
   }
   get snapshot() { return structuredClone(this.state); }
@@ -51,6 +78,34 @@ export class Store extends EventTarget {
     this.pruneExpired(false);
     localStorage.setItem(KEY, JSON.stringify(this.state));
     this.dispatchEvent(new CustomEvent("change", { detail: { reason } }));
+  }
+  selectResort(resortId) {
+    const resort = RESORTS.find((item) => item.id === resortId && item.enabled);
+    const parks = resort ? parksForResort(resort.id) : [];
+    if (!parks.length) return false;
+    this.update((state) => {
+      state.lastParkByResort[state.selectedResortId] = state.selectedParkId;
+      const selectedPark = parks.find((park) =>
+        park.id === Number(state.lastParkByResort[resort.id])) || parks[0];
+      state.selectedResortId = resort.id;
+      state.selectedParkId = selectedPark.id;
+      state.lastParkByResort[resort.id] = selectedPark.id;
+      // Keep the current tab (especially Resorts) while updating its selection.
+      state.query = "";
+    }, "resort");
+    return true;
+  }
+  selectPark(parkId) {
+    const park = PARKS.find((item) => item.id === Number(parkId));
+    const resort = park && resortForPark(park.id);
+    if (!park || !resort?.enabled) return false;
+    this.update((state) => {
+      state.selectedResortId = resort.id;
+      state.selectedParkId = park.id;
+      state.lastParkByResort[resort.id] = park.id;
+      state.query = "";
+    }, "park");
+    return true;
   }
   pruneExpired(emit = true) {
     const before = this.state.rules.length;

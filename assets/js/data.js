@@ -1,16 +1,6 @@
-export const PARKS = [
-  { id: 6, name: "Magic Kingdom", short: "MK", emoji: "🏰" },
-  { id: 5, name: "EPCOT", short: "EPCOT", emoji: "🌐" },
-  { id: 7, name: "Hollywood Studios", short: "DHS", emoji: "🎬" },
-  { id: 8, name: "Animal Kingdom", short: "AK", emoji: "🌿" }
-];
+export { PARKS, ALL_PARKS, PARK_BY_ID, RESORTS, RESORT_BY_ID, parksForResort, resortForPark, parkIdForRideKey, parkTimezone, parkName } from "./catalog.js?v=2.0.0";
 
-export const PARK_BY_ID = new Map(PARKS.map((park) => [park.id, park]));
 export const STALE_AFTER_MS = 15 * 60 * 1000;
-
-export function parkName(id) {
-  return PARK_BY_ID.get(Number(id))?.name || "Walt Disney World";
-}
 
 export function normalizeRideName(value) {
   return String(value || "")

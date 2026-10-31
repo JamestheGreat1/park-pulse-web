@@ -2,17 +2,17 @@
 
 **Less refreshing. More riding.**
 
-ParkPulse is basically the Walt Disney World wait-time app I wanted while actually in the parks.
+ParkPulse is the Disney theme-park wait-time app I wanted while actually in the parks. Version 2.0 adds Disneyland Resort alongside Walt Disney World.
 
 Open it, see what looks good right now, save the rides you care about, and let ParkPulse keep an eye on the rest. The whole point is to spend less time staring at wait times and more time actually doing stuff.
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 1.9.5**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 2.0.0**
 
 ## What ParkPulse does
 
-- **Live waits and ride status** for Magic Kingdom, EPCOT, Hollywood Studios, and Animal Kingdom.
+- **Live waits and ride status** for four Walt Disney World parks, plus Disneyland Park and Disney California Adventure.
 - **Best Now** compares the current wait with what is normally expected for that ride around the same time of day.
 - **Wait comparisons** quickly show when something is running better or worse than typical.
 - **Wait trends** add a subtle up/down arrow when the live wait moves by at least 5 minutes in about 15 minutes.
@@ -53,7 +53,7 @@ On iPhone and iPad, the Home Screen version is also the one you should use for p
 
 ### 2. Pick a park
 
-Choose **MK**, **EPCOT**, **DHS**, or **AK** at the top.
+Choose your resort under **Resorts**, then pick a park from the top bar. ParkPulse remembers your last park in each resort.
 
 The default **Best Now** sort is usually the easiest place to start. Instead of only sorting by the smallest number, it asks whether a ride's current wait is actually good *for that ride*.
 
@@ -177,7 +177,7 @@ You can choose:
 - **Appearance:** System, Dark, or Light
 - **Accent color:** Blue, Cyan, Violet, Pink, Orange, Green, Red, or Gold
 - **Glass style:** Frosted or Liquid
-- **Use my local time:** On by default; turn it off to show Orlando / park time instead
+- **Use my local time:** On by default; turn it off to show the selected park's local time instead
 - **Seasonal effects:** On or Off
 
 **Frosted** is the softer, blurrier glass style. **Liquid** is clearer and more refractive, with stronger edge highlights and more of the background showing through.
@@ -257,7 +257,7 @@ For backend setup and deployment details, see the **[Worker README](worker/READM
 
 ## About
 
-ParkPulse is a personal independent project built because I wanted something simpler and more useful while actually walking around Walt Disney World.
+ParkPulse is a personal independent project built because I wanted something simpler and more useful while actually walking around Disney theme parks.
 
 It is not affiliated with, sponsored by, or endorsed by Disney.
 

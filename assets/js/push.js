@@ -1,4 +1,4 @@
-import { workerBase } from "./api.js?v=1.9.5";
+import { workerBase } from "./api.js?v=2.0.0";
 
 function base64ToBytes(value) {
   const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, "=").replace(/-/g, "+").replace(/_/g, "/");
@@ -144,8 +144,104 @@ export async function sendTestPush(){
       const reason=result.pushReason? ` · ${result.pushReason}` : "";
       throw new Error(`Push service rejected the request${result.pushStatus?` (${result.pushStatus})`:""}${reason}.`);
     }
+    if(response.status===429||result.code==="TEST_COOLDOWN") {
+      throw new Error("Test already sent! Try again in a minute.");
+    }
     throw new Error(`Push test failed${response.status?` (${response.status})`:""}.`);
   }
 
+  return result;
+}
+
+
+// Staging only: simulate the same wait/reopening transition evaluator used by
+// the live alert engine. No live attraction status is modified.
+export async function simulateStagingRideAlert(kind, rideId) {
+  if (!["wait", "reopen"].includes(kind) || !rideId) {
+    throw new Error("Choose a watched attraction to test.");
+  }
+  const sub = await currentSubscription();
+  if (!sub) throw new Error("Enable notifications on this device first.");
+  const response = await request(`${workerBase}/subscriptions/test-alert`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ subscription: sub.toJSON(), kind, rideId })
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    if (response.status === 429 || result.code === "TEST_COOLDOWN") {
+      throw new Error("Test already sent! Try again in a minute.");
+    }
+    if (result.code === "TEST_WATCH_REQUIRED") {
+      throw new Error("Add a matching watch with this alert type enabled first.");
+    }
+    if (result.code === "NOT_REGISTERED") {
+      throw new Error("Your watches aren't synced yet. Reopen Settings and try again.");
+    }
+    throw new Error(`Simulated alert failed (${response.status}).`);
+  }
+  return result;
+}
+
+
+// One-shot staging cron integration test. The registered watch is required,
+// and the Worker sends at most one labeled push on a future scheduled tick.
+export async function armStagingCronProbe(kind, rideId) {
+  if (!["wait","reopen"].includes(kind) || !rideId) {
+    throw new Error("Watch an attraction before arming this test.");
+  }
+  const subscription = await currentSubscription();
+  if (!subscription) throw new Error("Enable staging notifications first.");
+  const response = await request(`${workerBase}/subscriptions/cron-probe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subscription: subscription.toJSON(), kind, rideId, confirm: true
+    })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (result.code === "PROBE_ACTIVE") {
+      throw new Error("A scheduled test is already armed.");
+    }
+    if (result.code === "TEST_COOLDOWN") {
+      throw new Error("Try arming another scheduled test in two minutes.");
+    }
+    if (result.code === "TEST_WATCH_REQUIRED") {
+      throw new Error("Save a matching watch first, then try again.");
+    }
+    throw new Error(result.error || `Scheduled test failed (${response.status}).`);
+  }
+  return result;
+}
+
+
+// Staging-only real feed validation. No simulated wait/closed states are sent.
+// The Worker observes one ride for this device during normal history cron.
+export async function armStagingLiveProbe(kind, rideId) {
+  if (!["wait", "reopen"].includes(kind) || !rideId)
+    throw new Error("Choose a watched attraction and one alert type.");
+  const subscription = await currentSubscription();
+  if (!subscription) throw new Error("Enable staging notifications first.");
+  const response = await request(`${workerBase}/subscriptions/live-probe`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subscription: subscription.toJSON(), kind, rideId, confirm: true
+    })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || `Live observation failed (${response.status}).`);
+  return result;
+}
+
+export async function stagingLiveProbeStatus() {
+  const subscription = await currentSubscription();
+  if (!subscription) throw new Error("Enable staging notifications first.");
+  const response = await request(`${workerBase}/subscriptions/live-probe/status`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subscription: subscription.toJSON() })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || `Couldn't check live observation (${response.status}).`);
   return result;
 }

@@ -100,6 +100,23 @@ test('temporary 503 keeps a persisted transition for the next scheduled run', as
   assert.equal(env.sqlite.prepare('SELECT COUNT(*) AS n FROM notification_log_v2').get().n, 1);
 });
 
+test('one-device live staging probe cannot process another pending subscriber', async () => {
+  const env = await setup();
+  const first = makeAlert();
+  const other = makeAlert({ endpoint: 'https://push.example/device-2' });
+  await enqueueRideAlerts(env, [first, other], NOW);
+  let delivered = 0;
+  const result = await processPendingRideAlerts(env, config(env, {
+    only: { endpoint: first.endpoint, rideId: first.rideId, kind: first.kind },
+    send: async () => { delivered++; return true; }
+  }));
+  assert.equal(result.delivered, 1);
+  assert.equal(delivered, 1);
+  assert.equal(queued(env).length, 1);
+  assert.equal(queued(env)[0].endpoint, other.endpoint);
+  assert.equal(env.sqlite.prepare('SELECT COUNT(*) AS n FROM notification_log_v2').get().n, 1);
+});
+
 test('duplicate inserts are idempotent and concurrent runs claim once', async () => {
   const env = await setup();
   await enqueueRideAlerts(env, [makeAlert()], NOW);

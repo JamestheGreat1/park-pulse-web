@@ -1,19 +1,19 @@
-import { PARKS, parkName, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
-import { store } from "./store.js?v=1.9.5";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.5";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.5";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.5";
+import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=2.0.0";
+import { store } from "./store.js?v=2.0.0";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=2.0.0";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe, armStagingLiveProbe, stagingLiveProbeStatus } from "./push.js?v=2.0.0";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=2.0.0";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-const views = { explore: $("#view-explore"), watching: $("#view-watching"), settings: $("#view-settings") };
+const views = { explore: $("#view-explore"), watching: $("#view-watching"), resorts: $("#view-resorts"), settings: $("#view-settings") };
 const sheet = $("#rideSheet");
 const backdrop = $("#sheetBackdrop");
 const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "1.9.5";
+const APP_VERSION = "2.0.0";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -72,6 +72,17 @@ function setPullRefreshDistance(rawDistance) {
   pullRefresh.classList.toggle("armed", armed);
   pullRefreshLabel.textContent = armed ? "Release to refresh" : "Pull to refresh";
 }
+function parkIdsToRefresh(state = store.snapshot) {
+  const selected = parksForResort(state.selectedResortId).map((park) => park.id);
+  const watched = state.rules.map((rule) => Number(rule.parkId));
+  return [...new Set([...selected, ...watched])]
+    .filter((id) => PARKS.some((park) => park.id === id));
+}
+
+function refreshRelevantParks() {
+  return rideData.refresh({ parkIds: parkIdsToRefresh() });
+}
+
 async function triggerPullRefresh() {
   if (!pullRefreshAvailable() || pullRefreshing || rideData.refreshing) {
     resetPullRefresh();
@@ -87,7 +98,7 @@ async function triggerPullRefresh() {
   pullRefreshLabel.textContent = "Refreshing…";
 
   const before = rideData.updatedAt;
-  await rideData.refresh();
+  await refreshRelevantParks();
 
   const updated = Boolean(rideData.updatedAt && rideData.updatedAt !== before);
   pullRefresh.classList.remove("refreshing");
@@ -452,16 +463,16 @@ function zonedDateToUtc(year, month, day, hour, timeZone) {
   guess -= represented - guess;
   return guess;
 }
-function easternParkDayEnd() {
-  const timeZone = "America/New_York";
-  const nowParts = zoneParts(new Date(), timeZone);
+function parkDayEnd(parkId, now = new Date()) {
+  const timeZone = parkTimezone(parkId);
+  const nowParts = zoneParts(now, timeZone);
   const date = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day));
   if (nowParts.hour >= 3) date.setUTCDate(date.getUTCDate() + 1);
   return zonedDateToUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), 3, timeZone);
 }
-function durationExpiry(value) {
+function durationExpiry(value, parkId = store.snapshot.selectedParkId) {
   if (value === "3h") return Date.now() + 3 * 60 * 60 * 1000;
-  if (value === "today") return easternParkDayEnd();
+  if (value === "today") return parkDayEnd(parkId);
   return null;
 }
 function remaining(rule) {
@@ -708,7 +719,7 @@ function renderStatusBanner() {
   if (action === "retry-data") button.onclick = async () => {
     button.disabled = true;
     button.textContent = "Trying…";
-    await rideData.refresh();
+    await refreshRelevantParks();
     renderStatusBanner();
   };
 }
@@ -786,8 +797,11 @@ function selectView(name) {
   if (!target.childElementCount) render();
 
   const root = document.documentElement;
-  const liquid = root.dataset.previewSurface === "liquid";
-  if (liquid) root.classList.add("glass-color-snap");
+  // Frosted and Liquid both use backdrop-filter layers. Force their glass
+  // compositing to snap with the tab switch instead of tinting one frame later.
+  const glassSurface = root.dataset.previewSurface;
+  const snapGlass = glassSurface === "liquid" || glassSurface === "neutral";
+  if (snapGlass) root.classList.add("glass-color-snap");
 
   for (const [key, el] of Object.entries(views)) el.classList.toggle("active", key === name);
   document.querySelectorAll(".nav-item").forEach((button) => {
@@ -797,7 +811,7 @@ function selectView(name) {
     else button.removeAttribute("aria-current");
   });
 
-  if (liquid) {
+  if (snapGlass) {
     void target.offsetWidth;
     requestAnimationFrame(() => root.classList.remove("glass-color-snap"));
   }
@@ -892,14 +906,15 @@ function renderExplore() {
   const parkStatus = parkOperatingState(parkSchedule);
   const ticketedEvents = formatTicketedEvents(parkSchedule, state.useLocalTime);
   const crowd = rideData.crowdForPark(state.selectedParkId);
+  const activeResort = RESORT_BY_ID.get(state.selectedResortId) || RESORTS[0];
   views.explore.innerHTML = `
     <section class="hero-card liquid-glass">
-      <div><span class="eyebrow">Walt Disney World</span><h2>Stop refreshing wait times.</h2><p>Pick a wait you’d actually take. ParkPulse will keep an eye on it and buzz you when it gets there.</p></div>
+      <div><button class="resort-switch" type="button" data-view-jump="resorts" aria-label="Switch resort; current destination: ${escapeHtml(activeResort.name)}"><span class="eyebrow">${escapeHtml(activeResort.name)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button><h2>Stop refreshing wait times.</h2><p>Pick a wait you’d actually take. ParkPulse will keep an eye on it and buzz you when it gets there.</p></div>
       <button class="hero-watch" type="button" data-view-jump="watching" aria-label="View ${activeCount} active ${activeCount === 1 ? "watch" : "watches"}"><strong>${activeCount}</strong><span>${activeCount === 1 ? "active watch" : "active watches"}</span></button>
     </section>
     ${firstRunVisible() ? `<section class="first-run-card liquid-glass" aria-label="ParkPulse quick start"><div class="first-run-mark" aria-hidden="true">✦</div><div class="first-run-copy"><span class="eyebrow">Quick start</span><h3>Best Now does the useful part for you.</h3><p>It compares each ride with what’s normal right now. Tap a ride to watch it, then let ParkPulse keep checking. That’s basically it.</p></div><button type="button" class="first-run-dismiss" data-dismiss-first-run>Got it</button></section>` : ""}
     <div class="park-strip" aria-label="Choose a park">
-      ${PARKS.map((p) => {
+      ${parksForResort(state.selectedResortId).map((p) => {
         const chipStatus = parkOperatingState(rideData.hoursForPark(p.id));
         const statusLabel = chipStatus.key === "unknown" ? "" : `, ${chipStatus.label.toLowerCase()}`;
         return `<button type="button" class="park-chip ${p.id === state.selectedParkId ? "active" : ""}" data-park="${p.id}" aria-pressed="${p.id === state.selectedParkId}" aria-label="${escapeHtml(p.name + statusLabel)}"><span class="park-chip-icon" aria-hidden="true">${p.emoji}</span>${p.short}<span class="park-chip-status ${parkChipStatusClass(chipStatus)}" aria-hidden="true"></span></button>`;
@@ -914,6 +929,27 @@ function renderExplore() {
     <div class="park-feature-slot" data-park-state="${parkStatus.key}">${parkFeatureMarkup(state, parkSchedule, parkStatus)}</div>
     <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><div class="park-title-row"><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-status-slot">${parkStatusPillMarkup(parkStatus)}</span></div><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
     <div class="ride-list">${rideListMarkup(state)}</div>`;
+}
+function renderResorts() {
+  const state = store.snapshot;
+  views.resorts.innerHTML = `
+    <div class="page-heading"><span class="eyebrow">Your destination</span><h2>Resorts</h2><p>Pick your resort. Your parks, waits and recommendations follow along.</p></div>
+    <div class="resort-list" aria-label="Available and upcoming resorts">
+      ${RESORTS.map((resort) => {
+        const parks = parksForResort(resort.id);
+        const enabled = resort.enabled && parks.length > 0;
+        const selected = enabled && resort.id === state.selectedResortId;
+        const count = resort.parkIds.length;
+        const symbol = resort.id === "wdw" ? "🏰" : resort.id === "dlr" ? "🎡" : "🎢";
+        const caption = `${count} theme ${count === 1 ? "park" : "parks"}`;
+        return `<button type="button" class="resort-card liquid-glass ${selected ? "selected" : ""} ${enabled ? "" : "unavailable"}" data-resort="${escapeHtml(resort.id)}" aria-pressed="${selected}" ${enabled ? "" : 'disabled aria-disabled="true"'}>
+          <span class="resort-card-mark" aria-hidden="true">${symbol}</span>
+          <span class="resort-card-copy"><strong>${escapeHtml(resort.name)}</strong><span>${escapeHtml(resort.location || "")}</span><small>${escapeHtml(caption)}</small></span>
+          <span class="resort-card-status ${selected ? "selected" : ""}">${selected ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>Selected</span>' : enabled ? '<span>Choose</span>' : '<span>Coming soon</span>'}</span>
+        </button>`;
+      }).join("")}
+    </div>
+    <p class="resort-helper">Your choice is saved on this device. Favorites and ride alerts stay with you across resorts.</p>`;
 }
 function renderWatching() {
   const rules = store.snapshot.rules;
@@ -962,6 +998,46 @@ function renderSettings() {
       : pushBlocked
         ? `<span class="health-pill bad">Blocked</span>`
         : `<button type="button" data-toggle-push class="setting-action">Enable</button>`;
+  const stagedPush = backendState?.stagingPushTestOnly === true;
+  const waitWatch = state.rules.find((rule) => rule.threshold != null);
+  const reopenWatch = state.rules.find((rule) => rule.reopen === true);
+  const stagingAlertTests = stagedPush && pushOn
+    ? `<div class="setting-row"><div><strong>Simulated ride alerts</strong>
+          <small>Test the real alert rules with pretend transitions. Live ride data won't change.</small>
+        </div><span class="health-pill good staging-test-label">Staging only</span></div>
+        ${waitWatch ? `<div class="setting-row"><div><strong>Wait target test</strong>
+          <small>Simulate a drop below your target for ${escapeHtml(waitWatch.rideName)}.</small></div>
+          <button type="button" data-simulate-alert="wait" data-ride-id="${escapeHtml(waitWatch.rideId)}"
+            class="setting-action">Send test</button></div>` : ""}
+        ${reopenWatch ? `<div class="setting-row"><div><strong>Reopening test</strong>
+          <small>Simulate ${escapeHtml(reopenWatch.rideName)} reopening.</small></div>
+          <button type="button" data-simulate-alert="reopen" data-ride-id="${escapeHtml(reopenWatch.rideId)}"
+            class="setting-action">Send test</button></div>` : ""}
+        ${!waitWatch || !reopenWatch ? `<div class="setting-row"><div><strong>More test options</strong>
+          <small>Add a ride watch with ${!waitWatch && !reopenWatch ? "a wait target and reopening alerts" : !waitWatch ? "a wait target" : "reopening alerts"} enabled to unlock both tests.</small></div>
+          <button type="button" data-view-jump="explore" class="setting-action">Find ride</button></div>` : ""}`
+    : "";
+  const scheduledProbeWatch = waitWatch || reopenWatch;
+  const scheduledProbe = backendState?.stagingCronProbeAvailable === true && pushOn
+    ? `<div class="setting-row"><div><strong>Scheduled queue test</strong>
+        <small>Arm one labeled alert for the next five-minute staging run. Tests the D1 queue, push delivery and notification checkpoint.</small></div>
+        ${scheduledProbeWatch
+          ? `<button type="button" class="setting-action" data-arm-cron-probe
+              data-kind="${waitWatch ? "wait" : "reopen"}"
+              data-ride-id="${escapeHtml(scheduledProbeWatch.rideId)}">Arm test</button>`
+          : `<button type="button" class="setting-action" data-view-jump="explore">Find ride</button>`}</div>`
+    : "";
+  const liveProbe = backendState?.stagingLiveProbeAvailable === true && pushOn
+    ? `<div class="setting-row"><div><strong>Real ride-change verification</strong>
+        <small>One device only. Observe live source updates every five minutes for up to 12 hours; no pretend wait times. Stops after the first qualifying real change; provider retries may occur.</small></div>
+        <span class="health-pill good staging-test-label">Staging only</span></div>
+      ${waitWatch ? `<div class="setting-row"><div><strong>Real wait-drop test</strong><small>Watch ${escapeHtml(waitWatch.rideName)} cross your saved target.</small></div>
+        <button type="button" class="setting-action" data-arm-live-probe data-kind="wait" data-ride-id="${escapeHtml(waitWatch.rideId)}">Observe</button></div>` : ""}
+      ${reopenWatch ? `<div class="setting-row"><div><strong>Real reopening test</strong><small>Watch ${escapeHtml(reopenWatch.rideName)} reopen naturally.</small></div>
+        <button type="button" class="setting-action" data-arm-live-probe data-kind="reopen" data-ride-id="${escapeHtml(reopenWatch.rideId)}">Observe</button></div>` : ""}
+      <div class="setting-row"><div><strong>Observation status</strong><small>Check the saved progress and delivery result for this device.</small></div>
+        <button type="button" class="setting-action" data-check-live-probe>Check</button></div>`
+    : "";
   const installRow = install.visible
     ? `<div class="setting-row install-status-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>`
     : "";
@@ -1012,12 +1088,15 @@ function renderSettings() {
   const systemTone = backendState?.ok === true ? "good" : backendState?.ok === false ? "bad" : "";
   const systemCopy = `Ride data ${refreshCopy} · ${rideData.sourceSummary || "Waiting for source"}`;
 
+  const stagingTestPush = backendState?.staging === true && backendState?.stagingPushTestOnly === true;
   const notificationsReady = backendState?.ok === true &&
     backendState?.vapidConfigured === true &&
     notificationEngine?.status === "running";
   const notificationsLabel = backendState?.ok === false
     ? "Unavailable"
-    : notificationsReady
+    : stagingTestPush
+      ? "Test mode"
+      : notificationsReady
       ? "Ready"
       : !backendState?.vapidConfigured && backendState?.ok === true
         ? "Needs setup"
@@ -1026,9 +1105,11 @@ function renderSettings() {
           : backendState?.ok === true
             ? "Needs attention"
             : "Checking";
-  const notificationsTone = notificationsReady ? "good" : ["Unavailable","Needs setup","Needs attention"].includes(notificationsLabel) ? "bad" : "";
+  const notificationsTone = (notificationsReady || stagingTestPush) ? "good" : ["Unavailable","Needs setup","Needs attention"].includes(notificationsLabel) ? "bad" : "";
   const notificationsCopy = backendState?.ok === true
-    ? `Push ${backendState?.vapidConfigured ? "ready" : "not configured"} · Alerts ${notificationEngine?.status === "running" ? "running" : notificationEngine?.status || "checking"}`
+    ? stagingTestPush
+      ? "Staging device push ready · Automatic ride alerts disabled"
+      : `Push ${backendState?.vapidConfigured ? "ready" : "not configured"} · Alerts ${notificationEngine?.status === "running" ? "running" : notificationEngine?.status || "checking"}`
     : "Push + ride alert status";
 
   const baselineCopy = analyticsState?.ok
@@ -1045,6 +1126,9 @@ function renderSettings() {
     <section class="settings-group liquid-glass">
       <div class="setting-row"><div><strong>Push notifications</strong><small>${escapeHtml(pushCopy)}</small></div>${pushAction}</div>
       ${pushOn ? `<div class="setting-row"><div><strong>Test notification</strong><small>Make sure push is actually working on this device.</small></div><button type="button" data-test-push class="setting-action">Send test</button></div>` : ""}
+      ${stagingAlertTests}
+      ${scheduledProbe}
+      ${liveProbe}
       ${installRow}
     </section>
     <div class="settings-section-title">Customization</div>
@@ -1100,7 +1184,7 @@ function renderParkHours() {
   const statusSlot = $(".park-status-slot", views.explore);
   if (statusSlot) statusSlot.innerHTML = parkStatusPillMarkup(status);
 
-  PARKS.forEach((park) => {
+  parksForResort(store.snapshot.selectedResortId).forEach((park) => {
     const button = $(`[data-park="${park.id}"]`, views.explore);
     if (!button) return;
     const chipStatus = parkOperatingState(rideData.hoursForPark(park.id));
@@ -1143,12 +1227,28 @@ function renderRideDataUpdate() {
 }
 function render() {
   store.pruneExpired(false);
-  renderExplore(); renderWatching(); renderSettings();
+  renderExplore(); renderWatching(); renderResorts(); renderSettings();
   updateWatchBadge();
   setTheme(); bindDynamic();
 }
 function bindDynamic() {
-  document.querySelectorAll('[data-park]').forEach((b) => b.onclick = () => { nextUpOffset = 0; store.update((s) => { s.selectedParkId = Number(b.dataset.park); s.query = ""; }, "park"); if (!rideData.ridesForPark(Number(b.dataset.park)).length) rideData.refresh({ parkId: Number(b.dataset.park) }); });
+  document.querySelectorAll('[data-park]').forEach((b) => b.onclick = () => {
+    const parkId = Number(b.dataset.park);
+    if (!store.selectPark(parkId)) return;
+    nextUpOffset = 0;
+    if (!rideData.ridesForPark(parkId).length) rideData.refresh({ parkId });
+  });
+  document.querySelectorAll('[data-resort]').forEach((b) => b.onclick = () => {
+    const resortId = b.dataset.resort;
+    if (!store.selectResort(resortId)) return;
+    nextUpOffset = 0;
+    // The Resort tab is a selector, not a redirect. Keep it visible so the
+    // selection indicator updates in place; Explore is one explicit tap away.
+    const newCard = [...document.querySelectorAll('[data-resort]')]
+      .find((card) => card.dataset.resort === resortId);
+    if (newCard) newCard.focus({ preventScroll: true });
+    // The resort-change event refreshes every park, even when cached waits exist.
+  });
   document.querySelectorAll('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
   bindRideCards(views.explore);
   document.querySelectorAll('[data-dismiss-first-run]').forEach((b) => b.onclick = dismissFirstRun);
@@ -1162,6 +1262,13 @@ function bindDynamic() {
   $$('[data-toggle-push]').forEach((b) => b.onclick = pushOn ? deactivatePush : activatePush);
   $$('[data-install]').forEach((b) => b.onclick = installApp);
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
+  $$('[data-simulate-alert]').forEach((button) => button.onclick = () =>
+    testStagingRideAlert(button.dataset.simulateAlert, button.dataset.rideId));
+  $$('[data-arm-cron-probe]').forEach((button) => button.onclick = () =>
+    armScheduledStagingTest(button.dataset.kind, button.dataset.rideId));
+  $$('[data-arm-live-probe]').forEach((button) => button.onclick = () =>
+    armRealStagingObservation(button.dataset.kind, button.dataset.rideId));
+  $$('[data-check-live-probe]').forEach((button) => button.onclick = checkRealStagingObservation);
   document.querySelectorAll('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const diagnosticsDetails = $(".diagnostics-details");
   if (diagnosticsDetails) diagnosticsDetails.ontoggle = () => { diagnosticsExpanded = diagnosticsDetails.open; };
@@ -1310,7 +1417,7 @@ function openRide(id) {
     const waitTarget = thresholdEnabled ? threshold : null;
     if (!reopen && !waitTarget) return toast("Choose at least one alert.");
     const duration = $("#durationSelect").value;
-    store.saveRule({ rideId: id, parkId: model.parkId, rideName: model.name || model.rideName, land: model.land || "", reopen, threshold: waitTarget, expiresAt: duration === "keep" ? existing.expiresAt : durationExpiry(duration), createdAt: existing?.createdAt || Date.now() });
+    store.saveRule({ rideId: id, parkId: model.parkId, rideName: model.name || model.rideName, land: model.land || "", reopen, threshold: waitTarget, expiresAt: duration === "keep" ? existing.expiresAt : durationExpiry(duration, model.parkId), createdAt: existing?.createdAt || Date.now() });
     if (!pushOn) toast("Watch saved — turn on notifications if you want it to buzz you.");
     else { if (await safeSync()) toast("Watch saved"); }
     closeSheet();
@@ -1597,6 +1704,53 @@ async function testNotification() {
   try { await sendTestPush(); toast("Test sent — you should get it in a second."); }
   catch (error) { toast(error.message || "Couldn't send test notification."); }
 }
+async function testStagingRideAlert(kind, rideId) {
+  if (backendState?.stagingPushTestOnly !== true) return;
+  try {
+    const result = await simulateStagingRideAlert(kind, rideId);
+    if (result.delivered) toast("Simulated " + (kind === "wait" ? "wait target" : "reopening") + " alert sent!");
+  } catch (error) {
+    toast(error.message || "Couldn't send simulated ride alert.");
+  }
+}
+async function armScheduledStagingTest(kind, rideId) {
+  if (backendState?.stagingCronProbeAvailable !== true) return;
+  try {
+    const result = await armStagingCronProbe(kind, rideId);
+    if (result.armed) toast("Scheduled test armed! It will run on the next 5-minute check.");
+  } catch (error) {
+    toast(error.message || "Couldn't arm the scheduled staging test.");
+  }
+}
+async function armRealStagingObservation(kind, rideId) {
+  if (backendState?.stagingLiveProbeAvailable !== true) return;
+  try {
+    const result = await armStagingLiveProbe(kind, rideId);
+    if (result.armed) toast("Watching real changes · one alert maximum · up to 12 hours.");
+  } catch (error) {
+    toast(error.message || "Couldn't arm real-data verification.");
+  }
+}
+async function checkRealStagingObservation() {
+  if (backendState?.stagingLiveProbeAvailable !== true) return;
+  try {
+    const result = await stagingLiveProbeStatus();
+    const labels = {
+      idle: "No live observation armed on this device.",
+      armed: "Armed · waiting for first source sample.",
+      monitoring: "Observing real waits · no qualifying change yet.",
+      retry: "A real change was queued · delivery is retrying.",
+      delivered: "Real observed change delivered to this device!",
+      "not-delivered": "A real change occurred, but the alert wasn't delivered.",
+      expired: "No qualifying real change within the 12-hour window.",
+      "cancelled-watch-changed": "Observation stopped because the watch changed."
+    };
+    toast((labels[result.status] || "Live observation: " + result.status) +
+      (result.observations ? ` (${result.observations} samples)` : ""));
+  } catch (error) {
+    toast(error.message || "Couldn't check real-data verification.");
+  }
+}
 async function copyDiagnostics() {
   const lines = [
     `ParkPulse v${APP_VERSION}`,
@@ -1745,7 +1899,7 @@ setupSheetDismissGesture();
   });
   refreshPushState({ sync: true });
   $$('[data-view-target]').forEach((button) => button.onclick = () => selectView(button.dataset.viewTarget));
-  $("#refreshButton").onclick = () => rideData.refresh();
+  $("#refreshButton").onclick = refreshRelevantParks;
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     installPrompt = e;
@@ -1760,7 +1914,7 @@ setupSheetDismissGesture();
   });
   window.addEventListener("online", async () => {
     renderStatusBanner();
-    await rideData.refresh({ parkId: store.snapshot.selectedParkId });
+    await refreshRelevantParks();
     await refreshPushState({ sync: true });
     await Promise.all([refreshBackendState(), refreshAnalyticsState()]);
     renderStatusBanner();
@@ -1785,21 +1939,34 @@ setupSheetDismissGesture();
     renderStatusBanner();
   });
   store.addEventListener("change", (e) => {
-    if (["rules", "expired", "rule-migration"].includes(e.detail.reason)) rulesSynced = false;
+    if (["rules", "expired", "rule-migration"].includes(e.detail.reason)) {
+      rulesSynced = false;
+      // Watches from another resort remain in Watching, even when browsing WDW.
+      if (e.detail.reason === "rules") void refreshRelevantParks();
+    }
     if (e.detail.reason === "park") nextUpOffset = 0;
+    // Refresh the complete destination on every resort switch, not only
+    // the first park on its first visit. RideData queues requests if a
+    // different resort is already being fetched.
+    if (e.detail.reason === "resort") void refreshRelevantParks();
     if (e.detail.reason === "search") renderRideResults();
     else if (e.detail.reason !== "view") render();
   });
-  const active = store.snapshot.activeView in views ? store.snapshot.activeView : "explore";
+  // A shared ride link takes priority over the last displayed park so users
+  // land on the right resort even after a fresh launch. Disabled parks stay gated.
+  const deepLinkRide = new URL(location.href).searchParams.get("ride");
+  const sharedParkId = parkIdForRideKey(deepLinkRide);
+  if (sharedParkId != null) store.selectPark(sharedParkId);
+  const active = sharedParkId != null ? "explore" :
+    store.snapshot.activeView in views ? store.snapshot.activeView : "explore";
   selectView(active);
   renderStatusBanner();
-  await rideData.refresh();
+  await refreshRelevantParks();
   migrateLegacyRules();
   if (pushOn) await safeSync({ quiet: true });
-  const deepLinkRide = new URL(location.href).searchParams.get("ride");
   if (deepLinkRide && rideData.rideById(deepLinkRide)) openRide(deepLinkRide);
   setInterval(async () => {
-    await rideData.refresh();
+    await refreshRelevantParks();
     renderSettings();
     bindDynamic();
   }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));

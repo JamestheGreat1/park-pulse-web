@@ -12,7 +12,7 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
       const url = new URL(route.request().url());
       if (url.pathname === '/health') return; // Deliberately unresolved: UI must still work.
       const match = url.pathname.match(/\/api\/park\/(\d+)/);
-      const data = match ? { parkPulseFormat: 2, rides: [{ id: `test:${match[1]}`, name: 'Test Mountain', isOpen: true, waitTime: 30, lastUpdated: new Date().toISOString(), source: 'test' }] } : {};
+      const data = match ? { parkPulseFormat: 2, rides: [{ id: match[1] === '5' ? 'epcot:test' : `test:${match[1]}`, name: 'Test Mountain', isOpen: true, waitTime: 30, lastUpdated: new Date().toISOString(), source: 'test' }] } : {};
       await route.fulfill({ json: data });
     });
     await page.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
@@ -20,10 +20,45 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.waitForSelector('[data-dismiss-first-run]', { timeout: 5000 });
     await page.locator('[data-dismiss-first-run]').click();
     await page.waitForFunction(() => !document.querySelector('[data-dismiss-first-run]'));
-    for (const name of ['watching', 'settings', 'explore']) {
+    for (const name of ['watching', 'resorts', 'settings', 'explore']) {
       await page.locator(`#nav-${name}`).click();
       assert.equal(await page.locator(`#nav-${name}`).getAttribute('aria-current'), 'page');
     }
+    await page.locator('#nav-resorts').click();
+    assert.equal(await page.locator('[data-resort="wdw"]').getAttribute('aria-pressed'), 'true');
+    // Stable 2.0 must actually expose both resort choices, not the old
+    // gated "Coming soon" card.
+    assert.equal(await page.locator('[data-resort="dlr"]').isDisabled(), false);
+    assert.doesNotMatch(await page.locator('[data-resort="dlr"]').innerText(), /Coming soon/);
+    await page.locator('[data-resort="dlr"]').click();
+    assert.equal(await page.locator('[data-resort="dlr"]').getAttribute('aria-pressed'), 'true');
+    await page.locator('[data-resort="wdw"]').click();
+    // The fourth nav item must remain reachable without clipping on a small phone.
+    await page.setViewportSize({ width: 320, height: 640 });
+    const mobileNav = await page.locator('.bottom-nav .nav-item').evaluateAll(items =>
+      items.map(item => {
+        const box = item.getBoundingClientRect();
+        return { left: box.left, right: box.right, width: box.width };
+      }));
+    assert.equal(mobileNav.length, 4);
+    assert(mobileNav.every(item => item.width >= 44 && item.left >= 0 && item.right <= 320));
+    assert(mobileNav.every((item, index) => index === 0 || mobileNav[index - 1].right <= item.left + 1));
+    const resortCard = await page.locator('[data-resort="dlr"]').boundingBox();
+    assert(resortCard && resortCard.x >= 0 && resortCard.x + resortCard.width <= 320);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const desktopNav = await page.locator('.bottom-nav .nav-item').evaluateAll(items =>
+      items.map(item => item.getBoundingClientRect().width));
+    assert.equal(desktopNav.length, 4);
+    assert(desktopNav.every(width => width >= 108));
+    await page.locator('[data-resort="wdw"]').click();
+    assert.equal(await page.locator('#nav-resorts').getAttribute('aria-current'), 'page');
+    await page.locator('#nav-explore').click();
+    await page.locator('#view-explore [data-park="5"]').click();
+    assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.evaluate(() => {
+      const state = JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1'));
+      return state.selectedResortId === 'wdw' && state.selectedParkId === 5 && state.lastParkByResort.wdw === 5;
+    }), true);
     await page.locator('[data-view-jump="watching"]').click();
     await page.locator('[data-view-jump="explore"]').click();
     await page.locator('#view-explore [data-open-ride]').first().click();
@@ -52,9 +87,92 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#view-explore [data-open-ride]', { timeout: 5000 });
     assert.equal(await page.locator('[data-dismiss-first-run]').count(), 0);
+    assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('#nav-resorts').count(), 1);
     assert.match(await page.locator('#networkBanner').textContent(), /offline/i);
+    // Deep link from another WDW park must select its destination before showing
+    // the ride, despite the last-saved resort/park and offline cache.
+    await context.setOffline(false);
+    await page.locator('#view-explore [data-park="6"]').click();
+    await page.goto('http://127.0.0.1:8765/?ride=epcot:test', {waitUntil:'domcontentloaded'});
+    await page.waitForSelector('#rideSheet:not(.hidden)', {timeout: 10000});
+    assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
+    assert.match(await page.locator('#sheetTitle').textContent(), /Test Mountain/);
     assert.deepEqual(errors, []);
     console.log('PASS: startup with hanging health, onboarding, navigation, view jumps, keyboard dialog, expiration preservation, complete cache, offline relaunch');
     await context.close();
+
+    // Staged multi-resort integration test: serve the public catalog in an
+    // isolated fixture, with the network responses fully mocked.
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const catalogSource = fs.readFileSync(path.join(__dirname, '../assets/js/catalog.js'), 'utf8')
+      .split('\n').map(line => {
+        if (line.includes('id: "dlr"') || line.includes('id: 16,') || line.includes('id: 17,')) {
+          return line.replace('enabled: false', 'enabled: true');
+        }
+        return line;
+      }).join('\n');
+    const stage = await browser.newContext({ serviceWorkers: 'block' });
+    const stagedPage = await stage.newPage();
+    const stagedErrors = [];
+    const requestedParks = [];
+    stagedPage.on('pageerror', error => stagedErrors.push(error.message));
+    await stagedPage.route('**/assets/js/catalog.js*', async route =>
+      route.fulfill({body:catalogSource,contentType:'application/javascript'}));
+    await stagedPage.route('https://parkpulse-api.jamesp5297.workers.dev/**', async route => {
+      const url = new URL(route.request().url());
+      const match = url.pathname.match(/\/api\/park\/(\d+)/);
+      if (match) {
+        const id = Number(match[1]);
+        requestedParks.push(id);
+        const names = {
+          5:['epcot:remy','Remy\'s Ratatouille Adventure'],
+          6:['mk:space-mountain','Space Mountain'],
+          7:['dhs:rise','Star Wars: Rise of the Resistance'],
+          8:['ak:everest','Expedition Everest'],
+          16:['dl:space-mountain','Space Mountain'],
+          17:['dca:guardians','Guardians of the Galaxy - Mission: BREAKOUT!']
+        };
+        const entry = names[id];
+        return route.fulfill({json:{parkPulseFormat:2,parkId:id,rides:entry?[{
+          id:entry[0],name:entry[1],parkId:id,land:'Test Land',isOpen:true,
+          waitTime:30,operationalStatus:'OPERATING',
+          source:'themeparks.wiki',lastUpdated:new Date().toISOString()
+        }]:[]}});
+      }
+      return route.fulfill({json:{ok:true}});
+    });
+    await stagedPage.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
+    await stagedPage.locator('#nav-resorts').click();
+    assert.equal(await stagedPage.locator('[data-resort="dlr"]').isDisabled(),false);
+    await stagedPage.locator('[data-resort="dlr"]').click();
+    assert.equal(await stagedPage.locator('#nav-resorts').getAttribute('aria-current'), 'page');
+    await stagedPage.locator('#nav-explore').click();
+    await stagedPage.waitForSelector('[data-ride-id="dl:space-mountain"]',{timeout:10000});
+    assert.equal(await stagedPage.locator('#view-explore [data-park]').count(),2);
+    await stagedPage.locator('#view-explore [data-park="17"]').click();
+    await stagedPage.waitForSelector('[data-ride-id="dca:guardians"]',{timeout:10000});
+    await stagedPage.locator('#view-explore [data-park="16"]').click();
+    await stagedPage.locator('[data-ride-id="dl:space-mountain"] [data-open-ride]').first().click();
+    await stagedPage.locator('#durationSelect').selectOption('forever');
+    await stagedPage.locator('#watchForm button[type="submit"]').click();
+    await stagedPage.locator('#nav-resorts').click();
+    await stagedPage.locator('[data-resort="wdw"]').click();
+    await stagedPage.locator('#nav-watching').click();
+    assert.match(await stagedPage.locator('.watch-list').innerText(),/Space Mountain/);
+    assert.equal(await stagedPage.evaluate(()=>JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1')).rules[0].parkId),16);
+    await stagedPage.locator('#nav-resorts').click();
+    await stagedPage.locator('[data-resort="dlr"]').click();
+    assert.equal(await stagedPage.locator('#view-explore [data-park="16"]').getAttribute('aria-pressed'),'true');
+    await stagedPage.locator('#nav-resorts').click();
+    await stagedPage.locator('[data-resort="wdw"]').click();
+    await stagedPage.goto('http://127.0.0.1:8765/?ride=dl:space-mountain',{waitUntil:'domcontentloaded'});
+    await stagedPage.waitForSelector('#rideSheet:not(.hidden)',{timeout:10000});
+    assert.equal(await stagedPage.locator('#view-explore [data-park="16"]').getAttribute('aria-pressed'),'true');
+    assert.match(await stagedPage.locator('#sheetTitle').innerText(),/Space Mountain/);
+    assert(requestedParks.includes(16) && requestedParks.includes(17));
+    assert.deepEqual(stagedErrors,[]);
+    await stage.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

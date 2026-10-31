@@ -211,3 +211,9 @@ node worker/scripts/backfill-staging.mjs --check
 ```
 
 Even if the runner finishes, readiness may require checking enough valid historical days per attraction; review `/api/analytics/status` and real ride analytics before launch.
+
+### Staging history IDs while Queue-Times supplies live waits
+
+The staging-only baseline endpoint now resolves ThemeParks attraction UUIDs from the official park `/children` directory rather than the chosen live source. The curated catalog matches names to identifiers, and a 24-hour D1 `worker_state` cache avoids repeated directory lookups. This never changes the Queue-Times live fallback, changes no production configuration, and rejects constructing history requests from Queue-Times IDs. The protected endpoint reports `mappedRides` and `unmappedRides` for diagnosis.
+
+After redeploying the staging Worker with `--enable-history-cron` and `--preview-url`, run one manual baseline batch and inspect the mapping counts and zero failures before restarting the paced backfill runner.

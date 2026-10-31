@@ -239,3 +239,74 @@ test("paced baseline automation checks staging safety without a token or network
   assert.notEqual(invalid.status,0);
   assert.match(invalid.stderr,/STAGING BACKFILL STOPPED/);
 });
+
+
+test("staging ThemeParks history UUID directory lookup is cached and ignores non-rides", async () => {
+  const source=read("worker/src/index.js");
+  const start=source.indexOf("async function stagingThemeParksRideIds(env) {");
+  const end=source.indexOf("async function runStagingBaselineBatch(env) {");
+  assert(start !== -1 && end > start);
+  const vm=await import("node:vm");
+  const id="a8a5b7e4-1234-5678-abcd-ef0123456789";
+  const parkId="75ea578a-adc8-4116-a54d-dccb60765ef9";
+  let persisted=null,fetches=0;
+  const env={STAGING_MODE:"true",THEMEPARKS_API_KEY:"fixture",DB:{prepare(sql){
+    if(sql.startsWith("SELECT"))return{bind:()=>({first:async()=>persisted})};
+    assert.match(sql,/INSERT INTO worker_state/);
+    return{bind:(_key,time,payload)=>({run:async()=>{persisted={updated_at:time,payload};return{}}})};
+  }}};
+  const ctx=vm.createContext({
+    Date,Map,Object,String,RegExp,JSON,VERSION:"1.7.6",
+    PARKS:new Map([[6,{themeParksId:parkId,rides:[{key:"mk:space-mountain",name:"Space Mountain"}]}]]),
+    isSingleRiderName:name=>/single rider/i.test(name),
+    normalizeName:name=>String(name).toLowerCase(),
+    findCatalogRide:(park,name)=>park.rides.find(x=>x.name===name),
+    fetch:async(url,options)=>{
+      fetches++;
+      assert.equal(url,"https://api.themeparks.wiki/v1/entity/"+parkId+"/children");
+      assert.equal(options.headers["x-api-key"],"fixture");
+      return{ok:true,json:async()=>({children:[
+        {id,name:"Space Mountain",entityType:"ATTRACTION"},
+        {id,name:"Space Mountain",entityType:"RESTAURANT"},
+        {id,name:"Space Mountain Single Rider",entityType:"ATTRACTION"},
+        {id:"371",name:"Space Mountain",entityType:"ATTRACTION"}
+      ]})};
+    }
+  });
+  vm.runInContext(source.slice(start,end),ctx);
+  const resolve=vm.runInContext("stagingThemeParksRideIds",ctx);
+  await assert.rejects(resolve({...env,STAGING_MODE:"false"}),/Staging-only/);
+  assert.equal((await resolve(env)).get("mk:space-mountain"),id);
+  assert.equal((await resolve(env)).get("mk:space-mountain"),id);
+  assert.equal(fetches,1,"directory fetched once; subsequent batch uses stored mapping");
+});
+
+test("staging Queue-Times rides use resolved ThemeParks UUIDs, never numeric fallback IDs", async () => {
+  const source=read("worker/src/index.js");
+  const start=source.indexOf("async function runStagingBaselineBatch(env) {");
+  const end=source.indexOf("async function runManualRefresh(env) {");
+  const vm=await import("node:vm"),now=Date.now();
+  const id="a8a5b7e4-1234-5678-abcd-ef0123456789";
+  const ctx=vm.createContext({
+    Date,Number,String,Map,
+    PARKS:new Map([[6,{}]]),HISTORY_HEALTH_WINDOW_MS:1200000,
+    stagingThemeParksRideIds:async()=>new Map([["mk:space-mountain",id]]),
+    refreshRideBaselines:async(_,rides,batchSize)=>{
+      assert.equal(batchSize,4);
+      assert.equal(rides[0].sourceId,id);
+      assert.equal(rides[0].source,"themeparks.wiki");
+      assert.equal(rides[1].sourceId,null);
+      assert.equal(rides[1].sourceStale,true);
+      return{processed:1,refreshed:1,failed:0};
+    },
+    getAnalyticsStatus:async()=>({totalRides:101,baselineRides:17,pendingRides:84,errorRides:0,baselineErrors:[]})
+  });
+  vm.runInContext(source.slice(start,end),ctx);
+  const run=vm.runInContext("runStagingBaselineBatch",ctx);
+  const result=await run({STAGING_MODE:"true",THEMEPARKS_API_KEY:"fixture",DB:{prepare:()=>({all:async()=>({results:[
+    {ride_key:"mk:space-mountain",park_id:6,source_id:"371",name:"Space Mountain",source:"queue-times",updated_at:now},
+    {ride_key:"mk:unmapped",park_id:6,source_id:"372",name:"Unmapped",source:"queue-times",updated_at:now}
+  ]})})}});
+  assert.equal(result.mappedRides,1);
+  assert.equal(result.unmappedRides,1);
+});

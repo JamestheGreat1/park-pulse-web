@@ -110,7 +110,9 @@ try {
     const { processed, refreshed, failed } = result.baseline;
     const { totalRides, baselineRides, pendingRides, errorRides } = result.analytics;
     console.log("Batch " + round + ": +" + refreshed + " refreshed | " +
-      baselineRides + "/" + totalRides + " complete | " + pendingRides + " remaining");
+      baselineRides + "/" + totalRides + " complete | " + pendingRides +
+      " remaining | history IDs mapped " + (result.mappedRides ?? "?") +
+      "/" + result.eligibleRides);
 
     if (failed > 0 || errorRides > 0) {
       abort("An upstream history request or stored baseline failed. Check /api/analytics/status errors.");

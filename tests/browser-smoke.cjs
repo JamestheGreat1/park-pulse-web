@@ -95,5 +95,76 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.deepEqual(errors, []);
     console.log('PASS: startup with hanging health, onboarding, navigation, view jumps, keyboard dialog, expiration preservation, complete cache, offline relaunch');
     await context.close();
+
+    // Staged multi-resort integration test: enable DLR only in this browser's
+    // intercepted module response. The actual repo and deployed app stay gated.
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const catalogSource = fs.readFileSync(path.join(__dirname, '../assets/js/catalog.js'), 'utf8')
+      .split('\n').map(line => {
+        if (line.includes('id: "dlr"') || line.includes('id: 16,') || line.includes('id: 17,')) {
+          return line.replace('enabled: false', 'enabled: true');
+        }
+        return line;
+      }).join('\n');
+    const stage = await browser.newContext({ serviceWorkers: 'block' });
+    const stagedPage = await stage.newPage();
+    const stagedErrors = [];
+    const requestedParks = [];
+    stagedPage.on('pageerror', error => stagedErrors.push(error.message));
+    await stagedPage.route('**/assets/js/catalog.js*', async route =>
+      route.fulfill({body:catalogSource,contentType:'application/javascript'}));
+    await stagedPage.route('https://parkpulse-api.jamesp5297.workers.dev/**', async route => {
+      const url = new URL(route.request().url());
+      const match = url.pathname.match(/\/api\/park\/(\d+)/);
+      if (match) {
+        const id = Number(match[1]);
+        requestedParks.push(id);
+        const names = {
+          5:['epcot:remy','Remy\'s Ratatouille Adventure'],
+          6:['mk:space-mountain','Space Mountain'],
+          7:['dhs:rise','Star Wars: Rise of the Resistance'],
+          8:['ak:everest','Expedition Everest'],
+          16:['dl:space-mountain','Space Mountain'],
+          17:['dca:guardians','Guardians of the Galaxy - Mission: BREAKOUT!']
+        };
+        const entry = names[id];
+        return route.fulfill({json:{parkPulseFormat:2,parkId:id,rides:entry?[{
+          id:entry[0],name:entry[1],parkId:id,land:'Test Land',isOpen:true,
+          waitTime:30,operationalStatus:'OPERATING',
+          source:'themeparks.wiki',lastUpdated:new Date().toISOString()
+        }]:[]}});
+      }
+      return route.fulfill({json:{ok:true}});
+    });
+    await stagedPage.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
+    await stagedPage.locator('#nav-resorts').click();
+    assert.equal(await stagedPage.locator('[data-resort="dlr"]').isDisabled(),false);
+    await stagedPage.locator('[data-resort="dlr"]').click();
+    await stagedPage.waitForSelector('[data-ride-id="dl:space-mountain"]',{timeout:10000});
+    assert.equal(await stagedPage.locator('#view-explore [data-park]').count(),2);
+    await stagedPage.locator('#view-explore [data-park="17"]').click();
+    await stagedPage.waitForSelector('[data-ride-id="dca:guardians"]',{timeout:10000});
+    await stagedPage.locator('#view-explore [data-park="16"]').click();
+    await stagedPage.locator('[data-ride-id="dl:space-mountain"] [data-open-ride]').first().click();
+    await stagedPage.locator('#durationSelect').selectOption('forever');
+    await stagedPage.locator('#watchForm button[type="submit"]').click();
+    await stagedPage.locator('#nav-resorts').click();
+    await stagedPage.locator('[data-resort="wdw"]').click();
+    await stagedPage.locator('#nav-watching').click();
+    assert.match(await stagedPage.locator('.watch-list').innerText(),/Space Mountain/);
+    assert.equal(await stagedPage.evaluate(()=>JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1')).rules[0].parkId),16);
+    await stagedPage.locator('#nav-resorts').click();
+    await stagedPage.locator('[data-resort="dlr"]').click();
+    assert.equal(await stagedPage.locator('#view-explore [data-park="16"]').getAttribute('aria-pressed'),'true');
+    await stagedPage.locator('#nav-resorts').click();
+    await stagedPage.locator('[data-resort="wdw"]').click();
+    await stagedPage.goto('http://127.0.0.1:8765/?ride=dl:space-mountain',{waitUntil:'domcontentloaded'});
+    await stagedPage.waitForSelector('#rideSheet:not(.hidden)',{timeout:10000});
+    assert.equal(await stagedPage.locator('#view-explore [data-park="16"]').getAttribute('aria-pressed'),'true');
+    assert.match(await stagedPage.locator('#sheetTitle').innerText(),/Space Mountain/);
+    assert(requestedParks.includes(16) && requestedParks.includes(17));
+    assert.deepEqual(stagedErrors,[]);
+    await stage.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

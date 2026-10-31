@@ -3,7 +3,7 @@ import { PARKS as ENABLED_PARKS, parkTimezone } from "../../assets/js/catalog.js
 import { disneylandRidesForPark } from "./disneyland-rides.js";
 import { ensureAlertQueueSchema, enqueueRideAlerts, processPendingRideAlerts, pruneExpiredRideAlerts } from "./alert-queue.js";
 
-const VERSION = "2.0.0";
+const VERSION = "2.0.1";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;

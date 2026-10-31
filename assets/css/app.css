@@ -4231,11 +4231,13 @@ body{
 }
 
 
-/* v1.8.1-preview.34 — preserve Liquid Glass compositor layers across page changes. */
-:root[data-preview-surface="liquid"] .view-panel.active{
+/* Keep frosted and liquid backdrop-filter layers out of the 200ms
+   page fade/transform. A page-level opacity animation forces WebKit to
+   re-composite its nested glass after the view has already appeared. */
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .view-panel.active{
   animation:none!important;
 }
-:root[data-preview-surface="liquid"] .view-panel{
+:root:is([data-preview-surface="liquid"],[data-preview-surface="neutral"]) .view-panel{
   transform:none;
 }
 

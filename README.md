@@ -164,7 +164,7 @@ On a phone:
 - **Pull down from the top of the main screen** to refresh ride data.
 - **Pull down on a ride sheet when you are already scrolled to the top** to close it.
 - Ride pages are designed as bottom sheets so you can check something quickly and get back to the park list.
-- The bottom navigation keeps Explore, Watching, and Settings easy to reach.
+- The bottom navigation keeps Explore, Watching, Resorts, and Settings easy to reach.
 
 Small stuff, but it makes ParkPulse feel a lot less like "website pretending to be an app."
 

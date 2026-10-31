@@ -121,6 +121,7 @@ export default {
           staging: env.STAGING_MODE === "true",
           pushRegistrationEnabled: env.STAGING_MODE !== "true" || env.STAGING_ALLOW_PUSH === "true",
           stagingHistoryOnly: env.STAGING_MODE === "true" && env.STAGING_ENABLE_CRON === "true" && env.STAGING_HISTORY_ONLY === "true",
+          stagingFrontendPreview: env.STAGING_MODE === "true" && Boolean(env.ASSETS),
           primaryDataSource: "ThemeParks.wiki",
           fallbackDataSource: "Queue-Times",
           themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),
@@ -200,7 +201,14 @@ export default {
         return json(await getAnalyticsStatus(env), 200, { ...cors, "Cache-Control": "no-store" });
       }
 
-      if (request.method === "POST" && url.pathname === "/api/admin/refresh") {
+      if (request.method === "POST" && url.pathname === "/api/admin/baselines" &&
+          env.STAGING_MODE !== "true") {
+        return json({ error: "Not found" }, 404, cors);
+      }
+
+      if (request.method === "POST" && (
+          url.pathname === "/api/admin/refresh" ||
+          url.pathname === "/api/admin/baselines")) {
         if (!env.REFRESH_ADMIN_TOKEN) {
           return json({
             error: "Manual refresh is not configured",
@@ -216,7 +224,9 @@ export default {
           }, 401, { ...cors, "Cache-Control": "no-store" });
         }
 
-        const result = await runManualRefresh(env);
+        const result = url.pathname === "/api/admin/baselines"
+          ? await runStagingBaselineBatch(env)
+          : await runManualRefresh(env);
         return json(result, 200, { ...cors, "Cache-Control": "no-store" });
       }
 
@@ -1245,6 +1255,46 @@ async function runStagingHistoryOnly(env) {
   const { rides } = await fetchCurrentRideSnapshot(env);
   await writeCurrentRideSnapshot(env, rides);
   console.log("Staging history-only sample complete", rides.length);
+}
+
+// Protected, staging-only historical backfill. Reuse D1's fresh ride/source
+// identifiers: do not re-poll six parks or touch notification checkpoints.
+async function runStagingBaselineBatch(env) {
+  if (env.STAGING_MODE !== "true") throw new Error("Staging-only backfill");
+  if (!env.THEMEPARKS_API_KEY) {
+    return { ok: false, reason: "themeparks-api-key-not-configured" };
+  }
+  const rows = (await env.DB.prepare(
+    "SELECT ride_key,park_id,source_id,name,source,updated_at FROM ride_state_v2"
+  ).all()).results || [];
+  const now = Date.now();
+  const rides = rows
+    .filter((row) => PARKS.has(Number(row.park_id)) &&
+      now - Number(row.updated_at || 0) <= HISTORY_HEALTH_WINDOW_MS)
+    .map((row) => ({
+      id: String(row.ride_key),
+      parkId: Number(row.park_id),
+      sourceId: row.source_id || null,
+      name: String(row.name || row.ride_key),
+      source: String(row.source || "unknown"),
+      sourceStale: false
+    }));
+  const baseline = await refreshRideBaselines(env, rides, 4);
+  const analytics = await getAnalyticsStatus(env);
+  return {
+    ok: true,
+    staging: true,
+    polledParks: 0,
+    eligibleRides: rides.length,
+    baseline,
+    analytics: {
+      totalRides: analytics.totalRides,
+      baselineRides: analytics.baselineRides,
+      pendingRides: analytics.pendingRides,
+      errorRides: analytics.errorRides,
+      baselineErrors: analytics.baselineErrors
+    }
+  };
 }
 
 async function runManualRefresh(env) {

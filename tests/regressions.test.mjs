@@ -1162,3 +1162,72 @@ test('When Disneyland is enabled later, selection remembers each resort last par
   assert.equal(next.selectResort('wdw'),true);
   assert.equal(next.snapshot.selectedParkId,5);
 });
+
+
+test('Shared ride keys resolve to the correct resort without permitting disabled parks', async () => {
+  const source=fs.readFileSync(new URL('../assets/js/catalog.js',import.meta.url),'utf8');
+  const catalog=await import('data:text/javascript;charset=utf-8,'+encodeURIComponent(source));
+  for(const [key,park] of [['mk:space-mountain',6],['epcot:remy',5],['dhs:rise',7],['ak:everest',8]]) {
+    assert.equal(catalog.parkIdForRideKey(key),park);
+  }
+  assert.equal(catalog.parkIdForRideKey('dl:space-mountain'),null);
+  assert.equal(catalog.parkIdForRideKey('dca:guardians'),null);
+  assert.equal(catalog.parkIdForRideKey('dl:space-mountain',{includeDisabled:true}),16);
+  assert.equal(catalog.parkIdForRideKey('dca:guardians',{includeDisabled:true}),17);
+  assert.equal(catalog.parkIdForRideKey('invalid'),null);
+  assert.equal(catalog.parkIdForRideKey(''),null);
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  assert.match(app,/const sharedParkId = parkIdForRideKey\(deepLinkRide\)/);
+  assert.match(app,/store\.selectPark\(sharedParkId\)/);
+  assert.match(app,/const active = sharedParkId != null \? "explore"/);
+  assert.match(app,/if \(deepLinkRide && rideData\.rideById\(deepLinkRide\)\) openRide\(deepLinkRide\)/);
+});
+
+test('Live refresh is scoped to visible resorts and cross-resort watches', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const code=app.slice(app.indexOf('function parkIdsToRefresh('),app.indexOf('async function triggerPullRefresh('));
+  const parks=[
+    {id:6,resortId:'wdw'},{id:5,resortId:'wdw'},{id:7,resortId:'wdw'},{id:8,resortId:'wdw'},
+    {id:16,resortId:'dlr'},{id:17,resortId:'dlr'}
+  ];
+  const context=vm.createContext({
+    Set,Number,Array,PARKS:parks,store:{snapshot:{}},
+    parksForResort:id=>parks.filter(p=>p.resortId===id),
+    rideData:{ refresh:opts=>opts }
+  });
+  vm.runInContext(code,context);
+  const fn=vm.runInContext('parkIdsToRefresh',context);
+  const selected={selectedResortId:'dlr',rules:[{parkId:6,rideId:'mk:space-mountain'},{parkId:5,rideId:'epcot:remy'},{parkId:17,rideId:'dca:guardians'}]};
+  assert.deepEqual(Array.from(fn(selected)),[16,17,6,5]);
+  assert.deepEqual(Array.from(fn({selectedResortId:'wdw',rules:[]})),[6,5,7,8]);
+  assert.deepEqual(Array.from(fn({selectedResortId:'dlr',rules:[{parkId:999}]})),[16,17]);
+  assert.match(app,/const sharedParkId = parkIdForRideKey\(deepLinkRide\)/);
+  assert.doesNotMatch(app,/rideData\.refresh\(\)/);
+});
+
+test('In-flight refresh queues a newly selected resort rather than silently dropping it', async () => {
+  const api=fs.readFileSync(new URL('../assets/js/api.js',import.meta.url),'utf8');
+  const code=api.slice(api.indexOf('export class RideData'),api.indexOf('export const rideData')).replace('export ','');
+  const calls=[];
+  let releaseFirst;
+  const first=new Promise(resolve=>{releaseFirst=resolve;});
+  const data=(id)=>({rides:[{id:id===16?'dl:test':'mk:test',parkId:id}],parkHours:null,crowdLevel:null});
+  const ctx=vm.createContext({
+    EventTarget,Event,Map,Set,JSON,Date,Number,Promise,
+    PARKS:[{id:6},{id:16}],navigator:{onLine:true},
+    fetchPark:async id=>{calls.push(id);if(id===6)await first;return data(id);},
+    localStorage:{getItem:()=>null,setItem:()=>{}}
+  });
+  vm.runInContext(code+';globalThis.instance=new RideData()',ctx);
+  const instance=ctx.instance;
+  const one=instance.refresh({parkIds:[6]});
+  await Promise.resolve();
+  await instance.refresh({parkIds:[16]});
+  assert.equal(instance.ridesForPark(16).length,0);
+  releaseFirst();
+  await one;
+  for(let i=0;i<15 && instance.ridesForPark(16).length===0;i++)await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,[6,16]);
+  assert.equal(instance.ridesForPark(16)[0].id,'dl:test');
+  assert.equal(instance.ridesForPark(6)[0].id,'mk:test');
+});

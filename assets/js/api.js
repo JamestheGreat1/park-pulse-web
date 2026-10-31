@@ -141,6 +141,7 @@ export class RideData extends EventTarget {
     this.crowdByPark = new Map();
     this.updatedAt = null;
     this.refreshing = false;
+    this.pendingParkIds = new Set();
     this.error = null;
     this.sourceSummary = null;
     try {
@@ -182,13 +183,21 @@ export class RideData extends EventTarget {
     return this.ridesForPark(parkId).find((ride) => [ride.name, ...(ride.aliases || [])].some((name) => normalizeRideName(name) === wanted)) || null;
   }
 
-  async refresh({ parkId = null } = {}) {
-    if (this.refreshing) return;
+  async refresh({ parkId = null, parkIds = null } = {}) {
+    // Never poll disabled parks. A resort switch during an in-flight request
+    // queues the new park rather than silently waiting for the next 5m refresh.
+    const ids = parkId != null ? [parkId] : Array.isArray(parkIds) ? parkIds : PARKS.map((park) => park.id);
+    const requested = new Set(ids.map(Number).filter(Number.isInteger));
+    const targets = PARKS.filter((park) => requested.has(park.id));
+    if (!targets.length) return;
+    if (this.refreshing) {
+      for (const park of targets) this.pendingParkIds.add(park.id);
+      return;
+    }
     this.refreshing = true;
     this.dispatchEvent(new Event("status"));
 
     try {
-      const targets = parkId ? PARKS.filter((park) => park.id === Number(parkId)) : PARKS;
       const results = await Promise.allSettled(
         targets.map(async (park) => [park.id, await fetchPark(park.id)])
       );
@@ -225,6 +234,11 @@ export class RideData extends EventTarget {
     } finally {
       this.refreshing = false;
       this.dispatchEvent(new Event("update"));
+      if (this.pendingParkIds.size) {
+        const pending = [...this.pendingParkIds];
+        this.pendingParkIds.clear();
+        void this.refresh({ parkIds: pending });
+      }
     }
   }
 }

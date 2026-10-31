@@ -32,6 +32,19 @@ export function resortForPark(parkId) {
   return RESORT_BY_ID.get(PARK_BY_ID.get(Number(parkId))?.resortId) || null;
 }
 
+// Stable ParkPulse key prefixes also let shared links switch resorts before data loads.
+// Never infer a resort from a ride name: several WDW/DLR rides share names.
+export const RIDE_PARK_PREFIXES = Object.freeze({
+  epcot: 5, mk: 6, dhs: 7, ak: 8, dl: 16, dca: 17
+});
+
+export function parkIdForRideKey(rideId, { includeDisabled = false } = {}) {
+  const prefix = String(rideId || "").split(":")[0];
+  const park = PARK_BY_ID.get(RIDE_PARK_PREFIXES[prefix]);
+  if (!park || (!includeDisabled && !PARKS.some((entry) => entry.id === park.id))) return null;
+  return park.id;
+}
+
 export function parkTimezone(parkId) {
   return PARK_BY_ID.get(Number(parkId))?.timezone || "America/New_York";
 }

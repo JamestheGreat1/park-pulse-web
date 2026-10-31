@@ -12,7 +12,7 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
       const url = new URL(route.request().url());
       if (url.pathname === '/health') return; // Deliberately unresolved: UI must still work.
       const match = url.pathname.match(/\/api\/park\/(\d+)/);
-      const data = match ? { parkPulseFormat: 2, rides: [{ id: `test:${match[1]}`, name: 'Test Mountain', isOpen: true, waitTime: 30, lastUpdated: new Date().toISOString(), source: 'test' }] } : {};
+      const data = match ? { parkPulseFormat: 2, rides: [{ id: match[1] === '5' ? 'epcot:test' : `test:${match[1]}`, name: 'Test Mountain', isOpen: true, waitTime: 30, lastUpdated: new Date().toISOString(), source: 'test' }] } : {};
       await route.fulfill({ json: data });
     });
     await page.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
@@ -84,6 +84,14 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await page.locator('#nav-resorts').count(), 1);
     assert.match(await page.locator('#networkBanner').textContent(), /offline/i);
+    // Deep link from another WDW park must select its destination before showing
+    // the ride, despite the last-saved resort/park and offline cache.
+    await context.setOffline(false);
+    await page.locator('#view-explore [data-park="6"]').click();
+    await page.goto('http://127.0.0.1:8765/?ride=epcot:test', {waitUntil:'domcontentloaded'});
+    await page.waitForSelector('#rideSheet:not(.hidden)', {timeout: 10000});
+    assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
+    assert.match(await page.locator('#sheetTitle').textContent(), /Test Mountain/);
     assert.deepEqual(errors, []);
     console.log('PASS: startup with hanging health, onboarding, navigation, view jumps, keyboard dialog, expiration preservation, complete cache, offline relaunch');
     await context.close();

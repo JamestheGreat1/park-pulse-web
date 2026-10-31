@@ -1,4 +1,4 @@
-import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
+import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
 import { store } from "./store.js?v=1.9.5";
 import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.5";
 import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush } from "./push.js?v=1.9.5";
@@ -72,6 +72,17 @@ function setPullRefreshDistance(rawDistance) {
   pullRefresh.classList.toggle("armed", armed);
   pullRefreshLabel.textContent = armed ? "Release to refresh" : "Pull to refresh";
 }
+function parkIdsToRefresh(state = store.snapshot) {
+  const selected = parksForResort(state.selectedResortId).map((park) => park.id);
+  const watched = state.rules.map((rule) => Number(rule.parkId));
+  return [...new Set([...selected, ...watched])]
+    .filter((id) => PARKS.some((park) => park.id === id));
+}
+
+function refreshRelevantParks() {
+  return rideData.refresh({ parkIds: parkIdsToRefresh() });
+}
+
 async function triggerPullRefresh() {
   if (!pullRefreshAvailable() || pullRefreshing || rideData.refreshing) {
     resetPullRefresh();
@@ -87,7 +98,7 @@ async function triggerPullRefresh() {
   pullRefreshLabel.textContent = "Refreshing…";
 
   const before = rideData.updatedAt;
-  await rideData.refresh();
+  await refreshRelevantParks();
 
   const updated = Boolean(rideData.updatedAt && rideData.updatedAt !== before);
   pullRefresh.classList.remove("refreshing");
@@ -708,7 +719,7 @@ function renderStatusBanner() {
   if (action === "retry-data") button.onclick = async () => {
     button.disabled = true;
     button.textContent = "Trying…";
-    await rideData.refresh();
+    await refreshRelevantParks();
     renderStatusBanner();
   };
 }
@@ -1779,7 +1790,7 @@ setupSheetDismissGesture();
   });
   refreshPushState({ sync: true });
   $$('[data-view-target]').forEach((button) => button.onclick = () => selectView(button.dataset.viewTarget));
-  $("#refreshButton").onclick = () => rideData.refresh();
+  $("#refreshButton").onclick = refreshRelevantParks;
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     installPrompt = e;
@@ -1794,7 +1805,7 @@ setupSheetDismissGesture();
   });
   window.addEventListener("online", async () => {
     renderStatusBanner();
-    await rideData.refresh({ parkId: store.snapshot.selectedParkId });
+    await refreshRelevantParks();
     await refreshPushState({ sync: true });
     await Promise.all([refreshBackendState(), refreshAnalyticsState()]);
     renderStatusBanner();
@@ -1819,21 +1830,30 @@ setupSheetDismissGesture();
     renderStatusBanner();
   });
   store.addEventListener("change", (e) => {
-    if (["rules", "expired", "rule-migration"].includes(e.detail.reason)) rulesSynced = false;
+    if (["rules", "expired", "rule-migration"].includes(e.detail.reason)) {
+      rulesSynced = false;
+      // Watches from another resort remain in Watching, even when browsing WDW.
+      if (e.detail.reason === "rules") void refreshRelevantParks();
+    }
     if (e.detail.reason === "park") nextUpOffset = 0;
     if (e.detail.reason === "search") renderRideResults();
     else if (e.detail.reason !== "view") render();
   });
-  const active = store.snapshot.activeView in views ? store.snapshot.activeView : "explore";
+  // A shared ride link takes priority over the last displayed park so users
+  // land on the right resort even after a fresh launch. Disabled parks stay gated.
+  const deepLinkRide = new URL(location.href).searchParams.get("ride");
+  const sharedParkId = parkIdForRideKey(deepLinkRide);
+  if (sharedParkId != null) store.selectPark(sharedParkId);
+  const active = sharedParkId != null ? "explore" :
+    store.snapshot.activeView in views ? store.snapshot.activeView : "explore";
   selectView(active);
   renderStatusBanner();
-  await rideData.refresh();
+  await refreshRelevantParks();
   migrateLegacyRules();
   if (pushOn) await safeSync({ quiet: true });
-  const deepLinkRide = new URL(location.href).searchParams.get("ride");
   if (deepLinkRide && rideData.rideById(deepLinkRide)) openRide(deepLinkRide);
   setInterval(async () => {
-    await rideData.refresh();
+    await refreshRelevantParks();
     renderSettings();
     bindDynamic();
   }, Number(window.PARKPULSE_CONFIG?.REFRESH_INTERVAL_MS || 300000));

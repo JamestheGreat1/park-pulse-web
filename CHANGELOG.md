@@ -1,3 +1,12 @@
+## 2.0.0-rc.1 — 2026-10-31 (release candidate, not deployed)
+
+- Prepared the multi-resort ParkPulse candidate: Walt Disney World plus Disneyland Resort, with stable ride keys for six parks and 101 curated attractions.
+- Included a Resorts tab, remembered per-resort park selection, local/Pacific timezone support, cross-resort favorites/watches and shared ride links.
+- Retained existing history, Best Now, crowd context and quiet glass styling; no new planner or UI clutter.
+- Aligned frontend, service-worker cache/import references and candidate Worker identity with `2.0.0-rc.1`.
+- Updated isolated staging preview generator to use the current app version rather than a hard-coded 1.9.5 reference; added RC safety checks in CI.
+- **Not yet shipped:** Disneyland/DCA source flags remain off; production Worker, D1 and PWA are unchanged. Natural live alert validation, final production migration/rollback audit and final `2.0.0` version/flag changes remain release gates (see [release plan](docs/parkpulse-2-release-plan.md)).
+
 # Changelog
 
 ## 1.9.5 — 2026-10-18

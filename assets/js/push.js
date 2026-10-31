@@ -182,3 +182,35 @@ export async function simulateStagingRideAlert(kind, rideId) {
   }
   return result;
 }
+
+
+// One-shot staging cron integration test. The registered watch is required,
+// and the Worker sends at most one labeled push on a future scheduled tick.
+export async function armStagingCronProbe(kind, rideId) {
+  if (!["wait","reopen"].includes(kind) || !rideId) {
+    throw new Error("Watch an attraction before arming this test.");
+  }
+  const subscription = await currentSubscription();
+  if (!subscription) throw new Error("Enable staging notifications first.");
+  const response = await request(`${workerBase}/subscriptions/cron-probe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subscription: subscription.toJSON(), kind, rideId, confirm: true
+    })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (result.code === "PROBE_ACTIVE") {
+      throw new Error("A scheduled test is already armed.");
+    }
+    if (result.code === "TEST_COOLDOWN") {
+      throw new Error("Try arming another scheduled test in two minutes.");
+    }
+    if (result.code === "TEST_WATCH_REQUIRED") {
+      throw new Error("Save a matching watch first, then try again.");
+    }
+    throw new Error(result.error || `Scheduled test failed (${response.status}).`);
+  }
+  return result;
+}

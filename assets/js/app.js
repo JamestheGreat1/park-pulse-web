@@ -1,7 +1,7 @@
 import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=1.9.5";
 import { store } from "./store.js?v=1.9.5";
 import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=1.9.5";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert } from "./push.js?v=1.9.5";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe } from "./push.js?v=1.9.5";
 import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=1.9.5";
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -1014,6 +1014,16 @@ function renderSettings() {
           <small>Add a ride watch with ${!waitWatch && !reopenWatch ? "a wait target and reopening alerts" : !waitWatch ? "a wait target" : "reopening alerts"} enabled to unlock both tests.</small></div>
           <button type="button" data-view-jump="explore" class="setting-action">Find ride</button></div>` : ""}`
     : "";
+  const scheduledProbeWatch = waitWatch || reopenWatch;
+  const scheduledProbe = backendState?.stagingCronProbeAvailable === true && pushOn
+    ? `<div class="setting-row"><div><strong>Scheduled queue test</strong>
+        <small>Arm one labeled alert for the next five-minute staging run. Tests the D1 queue, push delivery and notification checkpoint.</small></div>
+        ${scheduledProbeWatch
+          ? `<button type="button" class="setting-action" data-arm-cron-probe
+              data-kind="${waitWatch ? "wait" : "reopen"}"
+              data-ride-id="${escapeHtml(scheduledProbeWatch.rideId)}">Arm test</button>`
+          : `<button type="button" class="setting-action" data-view-jump="explore">Find ride</button>`}</div>`
+    : "";
   const installRow = install.visible
     ? `<div class="setting-row install-status-row"><div><strong>Install ParkPulse</strong><small>${escapeHtml(install.copy)}</small></div>${install.installed ? `<span class="health-pill good">Installed</span>` : `<button type="button" data-install class="setting-action">${escapeHtml(install.action)}</button>`}</div>`
     : "";
@@ -1103,6 +1113,7 @@ function renderSettings() {
       <div class="setting-row"><div><strong>Push notifications</strong><small>${escapeHtml(pushCopy)}</small></div>${pushAction}</div>
       ${pushOn ? `<div class="setting-row"><div><strong>Test notification</strong><small>Make sure push is actually working on this device.</small></div><button type="button" data-test-push class="setting-action">Send test</button></div>` : ""}
       ${stagingAlertTests}
+      ${scheduledProbe}
       ${installRow}
     </section>
     <div class="settings-section-title">Customization</div>
@@ -1239,6 +1250,8 @@ function bindDynamic() {
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
   $$('[data-simulate-alert]').forEach((button) => button.onclick = () =>
     testStagingRideAlert(button.dataset.simulateAlert, button.dataset.rideId));
+  $$('[data-arm-cron-probe]').forEach((button) => button.onclick = () =>
+    armScheduledStagingTest(button.dataset.kind, button.dataset.rideId));
   document.querySelectorAll('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const diagnosticsDetails = $(".diagnostics-details");
   if (diagnosticsDetails) diagnosticsDetails.ontoggle = () => { diagnosticsExpanded = diagnosticsDetails.open; };
@@ -1681,6 +1694,15 @@ async function testStagingRideAlert(kind, rideId) {
     if (result.delivered) toast("Simulated " + (kind === "wait" ? "wait target" : "reopening") + " alert sent!");
   } catch (error) {
     toast(error.message || "Couldn't send simulated ride alert.");
+  }
+}
+async function armScheduledStagingTest(kind, rideId) {
+  if (backendState?.stagingCronProbeAvailable !== true) return;
+  try {
+    const result = await armStagingCronProbe(kind, rideId);
+    if (result.armed) toast("Scheduled test armed! It will run on the next 5-minute check.");
+  } catch (error) {
+    toast(error.message || "Couldn't arm the scheduled staging test.");
   }
 }
 async function copyDiagnostics() {

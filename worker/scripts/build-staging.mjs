@@ -8,10 +8,13 @@ const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
 const prodConfig = readFileSync(join(projectRoot, "worker/wrangler.toml"), "utf8");
 const template = readFileSync(join(projectRoot, "worker/wrangler.staging.toml.template"), "utf8");
 const catalog = readFileSync(join(projectRoot, "assets/js/catalog.js"), "utf8");
+const sourceVersion = JSON.parse(readFileSync(join(projectRoot, "version.json"), "utf8")).version;
+if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/.test(sourceVersion)) fail("Invalid app version; cannot safely rewrite staging assets.");
 const argIndex = process.argv.indexOf("--database-id");
 const uuid = argIndex < 0 ? "" : String(process.argv[argIndex + 1] || "").trim();
 const enableHistoryCron = process.argv.includes("--enable-history-cron");
 const enableTestPush = process.argv.includes("--enable-test-push");
+const enableLiveProbe = process.argv.includes("--enable-live-probe");
 const previewIndex = process.argv.indexOf("--preview-url");
 const previewUrl = previewIndex < 0 ? "" : String(process.argv[previewIndex + 1] || "").trim();
 function fail(message) { throw new Error("STAGING BUILD BLOCKED: " + message); }
@@ -36,6 +39,7 @@ if (!/^STAGING_ALLOW_PUSH\s*=\s*"false"/m.test(template) ||
   fail("Staging push must be disabled in the committed template.");
 }
 if (!/^STAGING_ENABLE_CRON\s*=\s*"false"/m.test(template)) fail("Cron gate must be disabled.");
+if (!/^STAGING_LIVE_PROBE\s*=\s*"false"/m.test(template)) fail("Live probe must be disabled in committed template.");
 if ((template.match(/^\[triggers\]$/gm) || []).length !== 1 ||
     (template.match(/^crons = \[\]$/gm) || []).length !== 1) {
   fail("Staging must have an explicit empty trigger list by default.");
@@ -45,6 +49,9 @@ if (enableHistoryCron && !template.includes('STAGING_HISTORY_ONLY = "false"')) {
   fail("History-only guard missing from template.");
 }
 if (!/^name\s*=\s*"parkpulse-api"/m.test(prodConfig)) fail("Production Worker identity changed; review before building.");
+if (enableLiveProbe && (!enableTestPush || !enableHistoryCron || !previewUrl)) {
+  fail("Live-probe testing requires staged push, history-only cron and staging preview URL.");
+}
 if (enableTestPush && (!previewUrl || !enableHistoryCron)) {
   fail("Staging push tests require a staging preview origin and history-only cron.");
 }
@@ -105,6 +112,10 @@ if (enableTestPush) {
     fail("Staging push test guard not activated.");
   }
 }
+if (enableLiveProbe) {
+  if (!stagingConfig.includes('STAGING_LIVE_PROBE = "false"')) fail("Live probe must be disabled in staging template.");
+  stagingConfig = stagingConfig.replace('STAGING_LIVE_PROBE = "false"', 'STAGING_LIVE_PROBE = "true"');
+}
 if (previewUrl) {
   const origin = new URL(previewUrl).origin;
   stagingConfig = stagingConfig
@@ -128,7 +139,7 @@ if (previewUrl) {
       const file = join(directory, entry.name);
       if (entry.isDirectory()) { transformSite(file); continue; }
       if (!/\.(?:html|js|json|css|webmanifest)$/.test(entry.name)) continue;
-      let contents = readFileSync(file, "utf8").replaceAll("1.9.5", previewVersion);
+      let contents = readFileSync(file, "utf8").replaceAll(sourceVersion, previewVersion);
       if (entry.name === "config.js") {
         const productionBackend = "https://parkpulse-api.jamesp5297.workers.dev";
         if (!contents.includes(productionBackend)) fail("Preview API config did not contain expected production backend.");
@@ -167,10 +178,12 @@ writeFileSync(join(workerRoot, "wrangler.toml"), stagingConfig);
 console.log("Staging build created (no Cloudflare operations): .parkpulse-staging/worker/");
 console.log("Worker: parkpulse-api-staging | D1: parkpulse-staging | rides: WDW + DLR");
 if (previewUrl) console.log("Preview: " + previewUrl +
-  (enableTestPush ? " (test push enabled; automatic alerts disabled)" : " (alerts disabled)"));
+  (enableLiveProbe ? " (one-device opt-in live probe; general alerts disabled)" :
+    enableTestPush ? " (test push enabled; automatic alerts disabled)" : " (alerts disabled)"));
 console.log(enableHistoryCron
   ? "History-only cron enabled (every 5m); " +
-    (enableTestPush ? "device-only push testing on; live ride alerts off." : "notifications disabled; production unchanged.")
+    (enableLiveProbe ? "one-device live observation opt-in; general alerts off." :
+      enableTestPush ? "device-only push testing on; live ride alerts off." : "notifications disabled; production unchanged.")
   : "Cron disabled; subscription endpoints gated; production source remains unchanged.");
 console.log("Next: cd .parkpulse-staging/worker && npm install --no-save --package-lock=false");
 console.log("      npx wrangler deploy --config ./wrangler.toml --dry-run");

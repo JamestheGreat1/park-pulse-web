@@ -1,5 +1,5 @@
-const CACHE_NAME = "parkpulse-1.9.5";
-const VERSION = "1.9.5";
+const CACHE_NAME = "parkpulse-2.0.0-rc.1";
+const VERSION = "2.0.0-rc.1";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
   ...["app", "api", "data", "catalog", "store", "push", "config", "seasonal"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
   `./assets/css/app.css?v=${VERSION}`,
@@ -18,6 +18,17 @@ self.addEventListener("activate", event => event.waitUntil(
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET" || new URL(event.request.url).origin !== location.origin) return;
   const url = new URL(event.request.url);
+  // The staging PWA and API share an origin. Never let the offline shell
+  // cache retain JSON responses: an old park response can otherwise make
+  // every ride appear stale and hide operating-status dots indefinitely.
+  // Applies equally to public API, health, and VAPID key endpoints.
+  if (url.pathname.startsWith("/api/") ||
+      url.pathname === "/health" ||
+      url.pathname === "/vapid-key" ||
+      url.pathname.startsWith("/subscriptions")) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
   if (url.pathname.endsWith("/version.json")) {
     event.respondWith(fetch(event.request, { cache: "no-store" }));
     return;
@@ -38,7 +49,7 @@ self.addEventListener("fetch", event => {
     return response;
   })());
 });
-self.addEventListener("push", e => { let p={}; try { p=e.data?.json()||{}; } catch { p={body:e.data?.text()||"Ride update"}; } e.waitUntil(self.registration.showNotification(p.title||"ParkPulse", { body:p.body||"One of your watches changed.", icon:"./assets/icons/icon-192.png?v=1.9.5", tag:p.tag||"parkpulse", renotify:Boolean(p.renotify), data:{url:p.url||"./"} })); });
+self.addEventListener("push", e => { let p={}; try { p=e.data?.json()||{}; } catch { p={body:e.data?.text()||"Ride update"}; } e.waitUntil(self.registration.showNotification(p.title||"ParkPulse", { body:p.body||"One of your watches changed.", icon:"./assets/icons/icon-192.png?v=2.0.0-rc.1", tag:p.tag||"parkpulse", renotify:Boolean(p.renotify), data:{url:p.url||"./"} })); });
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   const target = new URL(event.notification.data?.url || "./", self.location.href).href;

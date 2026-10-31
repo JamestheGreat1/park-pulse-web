@@ -262,6 +262,39 @@ test('service worker precaches all modules and never caches HTTP failures', asyn
   assert.equal((await pending).status, 503);
   assert.equal(writes.length, 0);
 });
+test('service worker bypasses cached same-origin park JSON and health endpoints', async () => {
+  const source=fs.readFileSync(new URL('../service-worker.js',import.meta.url),'utf8');
+  const handlers={}, cacheHits=[], writes=[], network=[];
+  const context=vm.createContext({
+    URL,Response,Request,
+    location:{origin:'https://parkpulse-api-staging.example'},
+    self:{addEventListener:(type,listener)=>{handlers[type]=listener}},
+    caches:{open:async()=>({
+      match:async request=>{cacheHits.push(request.url);return new Response('OLD STALE JSON')},
+      put:async(...args)=>writes.push(args)
+    })},
+    fetch:async(request,options)=>{network.push({url:request.url,cache:options?.cache});
+      return new Response(JSON.stringify({fresh:true}),{status:200,headers:{'Content-Type':'application/json'}});}
+  });
+  vm.runInContext(source,context);
+  for(const path of ['/api/park/16','/api/park/17','/api/analytics/status','/health','/vapid-key']){
+    let outcome;
+    const request={method:'GET',url:'https://parkpulse-api-staging.example'+path};
+    handlers.fetch({request,respondWith:promise=>{outcome=promise}});
+    assert(outcome,'SW should explicitly handle the same-origin API '+path);
+    assert.equal((await (await outcome).json()).fresh,true,
+      'Must get live network JSON instead of previously cached '+path);
+  }
+  assert.equal(network.length,5);
+  assert(network.every(item=>item.cache==='no-store'));
+  assert.deepEqual(cacheHits,[],'Dynamic requests must not even inspect stale shell cache');
+  assert.equal(writes.length,0,'Dynamic JSON must never go into offline cache');
+  let staticResult;
+  handlers.fetch({request:{method:'GET',url:'https://parkpulse-api-staging.example/assets/js/data.js?v=2.0.0-rc.1'},
+    respondWith:p=>{staticResult=p}});
+  assert.equal((await (await staticResult).text()),'OLD STALE JSON',
+    'Static shell assets must retain offline cache behavior');
+});
 test('editing a watch keeps its exact expiration unless a new duration is selected', async () => {
   for (const duration of ['keep', '3h']) {
     const existing = { rideId: 'mk:test', parkId: 6, expiresAt: 1234567890, createdAt: 42, reopen: true };
@@ -596,6 +629,14 @@ test('condensed Status keeps four summary rows and expandable diagnostics', () =
   assert.match(settings, /Ride alert engine/);
 });
 
+
+test('Staging-only verification labels use no-wrap layout without changing standard statuses', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  assert.equal((app.match(/class="health-pill good staging-test-label">Staging only<\/span>/g)||[]).length,2);
+  assert.match(css,/\.settings-group \.setting-row \.health-pill\.staging-test-label\s*\{[^}]*white-space:nowrap;[^}]*overflow-wrap:normal;/s);
+  assert.match(css,/\.health-pill,\.setting-value\{[^}]*max-width:52%/);
+});
 
 test('Settings customization bindings survive diagnostics wiring', () => {
   const block = app.slice(app.indexOf('function bindDynamic('), app.indexOf('async function copyText('));
@@ -1208,6 +1249,36 @@ test('Live refresh is scoped to visible resorts and cross-resort watches', () =>
   assert.doesNotMatch(app,/rideData\.refresh\(\)/);
 });
 
+test('Resort changes refresh all selected parks even with cached data', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const start=app.indexOf('  store.addEventListener("change", (e) => {');
+  const end=app.indexOf('  // A shared ride link',start);
+  assert(start>=0 && end>start, 'store change event handler must exist');
+  let listener=null, refreshes=0, fullRenders=0;
+  const context=vm.createContext({
+    store:{addEventListener:(event,callback)=>{assert.equal(event,'change');listener=callback;}},
+    refreshRelevantParks:()=>{refreshes++;},
+    renderRideResults:()=>{},render:()=>{fullRenders++;},
+    nextUpOffset:4,rulesSynced:true
+  });
+  vm.runInContext(app.slice(start,end),context);
+  assert.equal(typeof listener,'function');
+  listener({detail:{reason:'resort'}});
+  assert.equal(refreshes,1,'resort switch should fetch even if a park is already cached');
+  assert.equal(fullRenders,1);
+  listener({detail:{reason:'park'}});
+  assert.equal(refreshes,1,'ordinary park selection should not trigger a redundant full-resort fetch');
+  listener({detail:{reason:'rules'}});
+  assert.equal(refreshes,2,'cross-resort watch changes should still refresh');
+  const clickHandler=app.slice(
+    app.indexOf("document.querySelectorAll('[data-resort]').forEach"),
+    app.indexOf("document.querySelectorAll('[data-next-up-another]')")
+  );
+  assert.match(clickHandler,/store\.selectResort\(resortId\)/);
+  assert.doesNotMatch(clickHandler,/rideData\.refresh\(/,
+    'resort click and change-event handlers must not issue duplicate requests');
+});
+
 test('In-flight refresh queues a newly selected resort rather than silently dropping it', async () => {
   const api=fs.readFileSync(new URL('../assets/js/api.js',import.meta.url),'utf8');
   const code=api.slice(api.indexOf('export class RideData'),api.indexOf('export const rideData')).replace('export ','');
@@ -1393,6 +1464,51 @@ test('Liquid dock uses four equal phone slots and four desktop slots', () => {
   assert.doesNotMatch(selection,/activeView\s*=\s*"explore"/);
 });
 
+
+test('Frosted and Liquid Glass snap their backdrop tint on tab changes', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  const section=app.slice(app.indexOf('function selectView(name) {'),app.indexOf('function sortedRides('));
+  assert(section.startsWith('function selectView(name) {'));
+  assert.match(css, /:root\.glass-color-snap:is\(\[data-preview-surface="liquid"\],\[data-preview-surface="neutral"\]\) \.settings-group/);
+  for(const surface of ['liquid','neutral']){
+    const classes=new Set(),frames=[];
+    const root={
+      dataset:{previewSurface:surface},
+      classList:{add:value=>classes.add(value),remove:value=>classes.delete(value)}
+    };
+    const views={
+      explore:{childElementCount:1,offsetWidth:300,classList:{toggle(){}}},
+      settings:{childElementCount:1,offsetWidth:300,classList:{toggle(){}}}
+    };
+    const links=['explore','settings'].map(name=>({
+      dataset:{viewTarget:name},classList:{toggle(){}},
+      setAttribute(){},removeAttribute(){}
+    }));
+    const ctx=vm.createContext({
+      views,document:{documentElement:root,querySelectorAll:()=>links},
+      store:{update(){}},requestAnimationFrame:callback=>frames.push(callback),
+      window:{scrollTo(){}},Object,render(){throw new Error('Should reuse existing view nodes');}
+    });
+    vm.runInContext(section,ctx);
+    vm.runInContext('selectView("settings")',ctx);
+    assert(classes.has('glass-color-snap'),surface+' must snap before painting the new page');
+    assert.equal(frames.length,1,surface+' must schedule snap cleanup');
+    frames.shift()();
+    assert(!classes.has('glass-color-snap'),surface+' must restore transitions next frame');
+    vm.runInContext('selectView("explore")',ctx);
+    assert(classes.has('glass-color-snap'),surface+' must also snap on return navigation');
+  }
+});
+
+test('Both glass styles disable the page-level fade that repaints WebKit blur layers', () => {
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  // The base fade animates opacity/transform over 200ms. That puts frosted
+  // backdrop-filter descendants in a temporary compositing group.
+  assert.match(css,/\.view-panel\{display:none;animation:fade \.2s ease\}/);
+  assert.match(css,/:root:is\(\[data-preview-surface="liquid"\],\[data-preview-surface="neutral"\]\) \.view-panel\.active\{\s*animation:none!important;\s*\}/);
+  assert.match(css,/:root:is\(\[data-preview-surface="liquid"\],\[data-preview-surface="neutral"\]\) \.view-panel\{\s*transform:none;\s*\}/);
+});
 
 test('2.0 mobile header clears translucent iOS safe area without changing desktop layout', () => {
   const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');

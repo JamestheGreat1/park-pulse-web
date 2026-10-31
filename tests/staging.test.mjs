@@ -108,7 +108,7 @@ test("staging scheduled handler never falls through to production alerts", async
 
 test("history-only sampler writes samples without alerts, checkpoints or historical backfill", async () => {
   const source = read("worker/src/index.js");
-  const sample = source.slice(source.indexOf("async function runStagingHistoryOnly(env) {"),source.indexOf("// One-shot staging scheduled integration drill."));
+  const sample = source.slice(source.indexOf("async function runStagingHistoryOnly(env) {"),source.indexOf("// Opt-in staging verification of REAL provider snapshots."));
   assert.match(sample,/await fetchCurrentRideSnapshot\(env\)/);
   assert.match(sample,/await writeCurrentRideSnapshot\(env, rides\)/);
   assert.doesNotMatch(sample,/runRideWatch|sendPush|enqueueRideAlerts|refreshRideBaselines/);
@@ -119,6 +119,7 @@ test("history-only sampler writes samples without alerts, checkpoints or histori
     fetchCurrentRideSnapshot: async () => {fetched++;return {rides:[{id:"dl:test"}]};},
     writeCurrentRideSnapshot: async (_, rows) => {written++;assert.equal(rows.length,1);},
     stagingPushTestReady: () => false,
+    stagingLiveProbeReady: () => false,
   });
   vm.runInContext(sample,ctx);
   const run = vm.runInContext("runStagingHistoryOnly",ctx);
@@ -129,6 +130,139 @@ test("history-only sampler writes samples without alerts, checkpoints or histori
   assert.equal(written,1);
 });
 
+
+test("live observation requires explicit staging push+cron and cannot enable global alerts", () => {
+  const generator=read("worker/scripts/build-staging.mjs");
+  const template=read("worker/wrangler.staging.toml.template");
+  const source=read("worker/src/index.js");
+  assert.match(template,/^STAGING_LIVE_PROBE = "false"$/m);
+  assert.match(generator,/--enable-live-probe/);
+  assert.match(generator,/if \(enableLiveProbe && \(!enableTestPush \|\| !enableHistoryCron \|\| !previewUrl\)\)/);
+  const cmd=new URL("../worker/scripts/build-staging.mjs",import.meta.url);
+  const uuid="937420cb-3ce0-49e5-9cca-5d7529f191b8";
+  const {spawnSync}=requireNodeChildProcess();
+  const bad=spawnSync(process.execPath,[cmd.pathname,"--database-id",uuid,"--enable-live-probe"],
+    {encoding:"utf8"});
+  assert.notEqual(bad.status,0);
+  assert.match(bad.stderr,/Live-probe testing requires staged push/);
+  const good=spawnSync(process.execPath,[cmd.pathname,"--database-id",uuid,
+    "--enable-history-cron","--enable-test-push",
+    "--preview-url","https://parkpulse-api-staging.jamesp5297.workers.dev",
+    "--enable-live-probe"],{encoding:"utf8"});
+  assert.equal(good.status,0,good.stderr);
+  const config=read(".parkpulse-staging/worker/wrangler.toml");
+  assert.match(config,/^name = "parkpulse-api-staging"$/m);
+  assert.match(config,/^STAGING_MODE = "true"$/m);
+  assert.match(config,/^STAGING_PUSH_TEST_ONLY = "true"$/m);
+  assert.match(config,/^STAGING_HISTORY_ONLY = "true"$/m);
+  assert.match(config,/^STAGING_LIVE_PROBE = "true"$/m);
+  assert.match(config,/^crons = \["\*\/5 \* \* \* \*"\]$/m);
+  assert.match(source,/if \(stagingLiveProbeReady\(env\)\) await runArmedStagingLiveProbe\(env, rides\)/);
+  const ready=source.slice(source.indexOf("function stagingLiveProbeReady(env) {"),
+    source.indexOf("const PARKS = new Map(["));
+  assert.match(ready,/env\.STAGING_LIVE_PROBE === "true"/);
+  assert.match(ready,/stagingPushTestReady\(env\)/);
+  assert.doesNotMatch(ready,/runRideWatch/);
+});
+
+function requireNodeChildProcess() {
+  // Preserve the ESM suite's use of spawnSync without importing a second runtime.
+  return {spawnSync};
+}
+
+test("real-feed observer only sends on two fresh natural samples to one opted-in endpoint", async () => {
+  const source=read("worker/src/index.js");
+  const from=source.indexOf("// Opt-in staging verification of REAL provider snapshots.");
+  const to=source.indexOf("// One-shot staging scheduled integration drill.",from);
+  assert(from>=0&&to>from);
+  const vm=await import("node:vm");
+  const now=Date.now();
+  const rideId="dl:indiana-jones",endpoint="https://push.example/owner";
+  const rule={rideId,parkId:16,threshold:35,reopen:true};
+  const row={endpoint,p256dh:"p256dh",auth:"auth",watch_ids:JSON.stringify([rule])};
+  const active=(value,time,isOpen=true)=>({id:rideId,parkId:16,name:"Indiana Jones Adventure",
+    isOpen,waitTime:value,lastUpdated:new Date(time).toISOString(),
+    sourceStale:false,sourceMissing:false});
+  const companions=()=>[1,2,3,4].map(id=>({id:"dl:test-"+id,parkId:16,isOpen:true,
+    sourceMissing:false,sourceStale:false}));
+  let raw={status:"armed",endpoint,rideId,kind:"wait",expiresAt:now+3600000,observations:0,previous:null};
+  const state={payload:JSON.stringify(raw)};
+  const queued=[],sent=[];
+  let pending=false;
+  const env={STAGING_MODE:"true",STAGING_LIVE_PROBE:"true",APP_URL:"https://stage.example/"};
+  const db={
+    prepare(sql) {
+      if(sql.includes("SELECT payload FROM worker_state"))return{bind:()=>({first:async()=>state})};
+      if(sql.includes("SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions"))return{
+        bind:()=>({first:async()=>row})};
+      if(sql.includes("UPDATE worker_state SET"))return{bind:(when,payload,key,old)=>({run:async()=>{
+        if(state.payload!==old)return{meta:{changes:0}};
+        state.payload=payload;return{meta:{changes:1}};
+      }})};
+      if(sql.includes("SELECT COUNT(*) AS n FROM pending_ride_alerts"))return{
+        bind:()=>({first:async()=>({n:pending?1:0})})};
+      throw Error("Unexpected SQL "+sql);
+    }
+  };
+  env.DB=db;
+  const ctx=vm.createContext({
+    Date,Number,String,JSON,Map,Array,Boolean,encodeURIComponent,console,
+    LIVE_FRESHNESS_MS:900000,
+    stagingLiveProbeReady:()=>true,
+    normalizeRules:x=>x,
+    ruleMatchesRide:(r,ride)=>r.rideId===ride.id,
+    parkTimezone:()=>"America/Los_Angeles",
+    zoneParts:()=>({hour:16}),
+    PARKS:new Map([[16,{name:"Disneyland Park"}]]),
+    notificationRideName:r=>r.name,
+    safeTag:id=>id.replace(/[^a-z0-9_-]+/gi,"-"),
+    ensureNotificationSchema:async()=>{},
+    enqueueRideAlerts:async(_,items)=>{
+      assert.equal(items.length,1);queued.push(items[0]);pending=true;return 1;},
+    processPendingRideAlerts:async(_,options)=>{
+      assert.equal(options.only.endpoint,endpoint);
+      assert.equal(options.only.rideId,rideId);
+      assert.equal(options.only.kind,raw.kind);
+      assert.equal(options.subscriptions.length,1);
+      assert.equal(options.subscriptions[0].endpoint,endpoint);
+      sent.push(options.rides[0]);pending=false;
+      return{delivered:1,failed:0,pending:0,retried:0,discarded:0};},
+    cooldownActive:async()=>false,sendPush:async()=>true
+  });
+  const evaluator=source.slice(source.indexOf("function evaluateRideTransitionAlert("),
+    source.indexOf("async function runRideWatch(env) {"));
+  vm.runInContext(evaluator+"\n"+source.slice(from,to),ctx);
+  const run=vm.runInContext("runArmedStagingLiveProbe",ctx);
+  // Below-target on the first sample is never a crossing; source state is real.
+  await run(env,[active(30,now-60000),...companions()]);
+  assert.equal(JSON.parse(state.payload).status,"monitoring");
+  assert.equal(queued.length,0);
+  // A source sample older than 15min must not qualify.
+  await run(env,[active(50,now-30*60000),...companions()]);
+  assert.equal(queued.length,0);
+  assert.equal(JSON.parse(state.payload).previous,null);
+  // First fresh sample seeds the observer; second fresh source update crosses.
+  await run(env,[active(50,now-60000),...companions()]);
+  assert.equal(queued.length,0);
+  await run(env,[active(30,now-1000),...companions()]);
+  assert.equal(queued.length,1);
+  assert.equal(sent.length,1);
+  assert.match(queued[0].payload.title,/^STAGING LIVE · /);
+  assert.match(queued[0].payload.body,/^Observed provider change/);
+  assert.equal(queued[0].payload.url,"https://stage.example/?ride=dl%3Aindiana-jones");
+  assert.equal(JSON.parse(state.payload).status,"delivered");
+  await run(env,[active(30,now-500),...companions()]);
+  assert.equal(queued.length,1,"terminal delivery must never send a duplicate");
+  // A natural reopening is independent from a threshold crossing.
+  raw={...raw,kind:"reopen",status:"armed",previous:null,observations:0};
+  state.payload=JSON.stringify(raw);
+  await run(env,[active(null,now-60000,false),...companions()]);
+  assert.equal(queued.length,1);
+  await run(env,[active(15,now-1000,true),...companions()]);
+  assert.equal(queued.length,2);
+  assert.equal(sent.length,2);
+  assert.equal(queued[1].kind,"reopen");
+});
 
 test("staging preview hosts enabled DLR PWA assets from same Worker origin", () => {
   const before = read("assets/js/catalog.js");
@@ -161,7 +295,10 @@ test("staging preview hosts enabled DLR PWA assets from same Worker origin", () 
   assert.match(push,/export function pushSupported\(\)\{return Boolean\(false && /);
   assert.match(version.version,/^2\.0\.0-preview\.\d+$/);
   assert(sw.includes(version.version));
-  assert(!sw.includes('CACHE_NAME = "parkpulse-1.9.5"'));
+  const releaseVersion = JSON.parse(read("version.json")).version;
+  assert(!sw.includes('CACHE_NAME = "parkpulse-' + releaseVersion + '"'));
+  assert(!app.includes('?v=' + releaseVersion));
+  assert(index.includes(version.version));
   assert.equal(read("assets/js/catalog.js"), before);
 });
 

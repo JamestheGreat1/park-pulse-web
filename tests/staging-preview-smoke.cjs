@@ -60,6 +60,61 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.locator('[data-ride-id="dca:guardians"] [data-open-ride]').first().click();
     assert.match(await page.locator('#sheetTitle').textContent(),/Guardians/);
     await page.locator('[data-close-sheet]').click();
+    // Actual computed styles: both glass modes must show the new page without
+    // the inherited 200ms fade/transform on its backdrop-filter descendants.
+    for(const surface of ['neutral','liquid']){
+      await page.evaluate(surface=>{
+        document.documentElement.dataset.previewSurface=surface;
+      },surface);
+      await page.locator('#nav-resorts').click();
+      await page.locator('#nav-explore').click();
+      const paint=await page.evaluate(()=>{
+        const view=document.querySelector('#view-explore');
+        const computed=getComputedStyle(view);
+        return {animationName:computed.animationName,transform:computed.transform,
+          active:view.classList.contains('active')};
+      });
+      assert(paint.active,surface+' Explore panel did not activate');
+      assert.equal(paint.animationName,'none',surface+' page fade forces glass recoloring to lag');
+      assert.equal(paint.transform,'none',surface+' page transform forces extra glass compositing');
+    }
+    // Staging-only labels must remain on one line on small iPhones, even
+    // alongside longer explanations in the push settings row.
+    await page.locator('#nav-settings').click();
+    await page.evaluate(()=>{
+      const group=document.querySelector('#view-settings .settings-group');
+      const row=document.createElement('div');
+      row.className='setting-row';
+      row.id='staging-pill-fixture';
+      row.innerHTML='<div><strong>Real ride-change verification</strong><small>One device only. Observe live source updates every five minutes for up to 12 hours; no pretend wait times.</small></div><span class="health-pill good staging-test-label">Staging only</span>';
+      group.append(row);
+    });
+    for(const width of [320,360,390,430]){
+      await page.setViewportSize({width,height:800});
+      for(const surface of ['neutral','liquid']){
+        const status=await page.evaluate(surface=>{
+          document.documentElement.dataset.previewSurface=surface;
+          const row=document.querySelector('#staging-pill-fixture');
+          const badge=row.querySelector('.staging-test-label');
+          const label=badge.getBoundingClientRect();
+          const shell=row.getBoundingClientRect();
+          const style=getComputedStyle(badge);
+          return {whiteSpace:style.whiteSpace,wrap:style.overflowWrap,
+            badgeLeft:label.left,badgeRight:label.right,badgeWidth:label.width,
+            rowRight:shell.right,scrollWidth:badge.scrollWidth,clientWidth:badge.clientWidth,
+            labelHeight:label.height,lineHeight:parseFloat(style.lineHeight)||15};
+        },surface);
+        assert.equal(status.whiteSpace,'nowrap',surface+' stage label wraps at '+width);
+        assert(status.scrollWidth<=status.clientWidth+1,
+          surface+' staged label text is clipped at '+width+': '+JSON.stringify(status));
+        assert(status.badgeRight<=status.rowRight+1,
+          surface+' staged label overflows settings panel at '+width+': '+JSON.stringify(status));
+        assert(status.labelHeight<=status.lineHeight*1.5,
+          surface+' staged label spans multiple lines at '+width+': '+JSON.stringify(status));
+      }
+    }
+    await page.evaluate(()=>document.querySelector('#staging-pill-fixture')?.remove());
+    await page.locator('#nav-explore').click();
     // iOS translucent status-bar glass can soften content at the very top.
     // Keep the whole header (wordmark + refresh) below the safe-area margin,
     // without changing desktop spacing or overflowing on narrow devices.
@@ -140,6 +195,19 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.notEqual(selectedStyle.selectedBorder,selectedStyle.otherBorder);
     assert.equal(selectedStyle.selectedMark,'4px');
     assert.notEqual(selectedStyle.selectedBadge,'rgba(0, 0, 0, 0)');
+    // Both destinations already have cached rides. Switching resorts must
+    // still fetch EVERY park in the destination, not just its first park.
+    const verifyResortRefetch = async (resortId, parkIds) => {
+      const counts = new Map(parkIds.map(id => [id, apiParks.filter(parkId => parkId === id).length]));
+      await page.locator('[data-resort="' + resortId + '"]').click();
+      for(let attempt=0; attempt<75; attempt++){
+        if(parkIds.every(id=>apiParks.filter(parkId=>parkId===id).length>counts.get(id)))return;
+        await new Promise(resolve=>setTimeout(resolve,40));
+      }
+      assert.fail('Resort switch failed to refetch all parks in ' + resortId);
+    };
+    await verifyResortRefetch('wdw',[5,6,7,8]);
+    await verifyResortRefetch('dlr',[16,17]);
     assert(apiParks.includes(16)&&apiParks.includes(17));
     // Default preview must keep its push controls intentionally disabled.
     const previewPush = await page.evaluate(async()=>{

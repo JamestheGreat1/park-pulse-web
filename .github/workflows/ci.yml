@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '24'
       - name: Run Worker and UI regression tests
-        run: node --test tests/regressions.test.mjs tests/alert-queue.test.mjs tests/staging.test.mjs
+        run: node --test tests/regressions.test.mjs tests/alert-queue.test.mjs tests/staging.test.mjs tests/release-candidate.test.mjs
 
   browser:
     name: PWA browser and offline smoke test

@@ -24,6 +24,7 @@ STAGING_ALLOW_PUSH = "false"
 STAGING_PUSH_TEST_ONLY = "false"
 STAGING_ENABLE_CRON = "false"
 STAGING_HISTORY_ONLY = "false"
+STAGING_LIVE_PROBE = "false"
 
 [[d1_databases]]
 binding = "DB"

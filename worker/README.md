@@ -218,6 +218,35 @@ The staging-only baseline endpoint now resolves ThemeParks attraction UUIDs from
 
 After redeploying the staging Worker with `--enable-history-cron` and `--preview-url`, run one manual baseline batch and inspect the mapping counts and zero failures before restarting the paced backfill runner.
 
+### Opt-in verification of natural live wait/reopening alerts (2.0 RC)
+
+**Release-blocking real-world check; different from the synthetic scheduled probe.** A separate, explicit staging build flag enables ONE registered staging device to arm a single real-feed observation for a watched attraction. The history-only cron remains unchanged for everyone else: no global live alert scheduler, no production notification checkpoints, no hourly maintenance, no production D1 or credentials.
+
+From the root of the `release/2.0.0-rc1` branch, keep the **existing staging UUID and VAPID keypair**:
+
+```bash
+cd /workspaces/park-pulse-web
+git fetch origin && git switch release/2.0.0-rc1 && git pull --ff-only
+node worker/scripts/build-staging.mjs --database-id 937420cb-3ce0-49e5-9cca-5d7529f191b8 --enable-history-cron --preview-url https://parkpulse-api-staging.jamesp5297.workers.dev --enable-test-push --enable-live-probe
+node worker/scripts/setup-staging-push.mjs --check
+cd .parkpulse-staging/worker
+npx wrangler deploy --config ./wrangler.toml --dry-run
+npx wrangler deploy --config ./wrangler.toml
+```
+
+**Never use** `--enable-live-probe` with production or a default staging build. The generator refuses it without isolated staging preview, staging history cron and test-only push. Verify `/health` returns `stagingLiveProbeAvailable: true`, `stagingHistoryOnly: true`, `stagingPushTestOnly: true`.
+
+On the **installed staging PWA**, enable notifications and save an attraction watch. Prefer a target slightly below its current posted standby wait (e.g. currently 50, target 40), or choose an attraction currently down and enable reopening alerts. Under **Settings → Real ride-change verification**, tap **Observe** for one kind, then **Check** to see status. At most one global observation can be armed at once; it monitors only the requesting device/ride/kind, up to 12 hours. Notifications are clearly prefixed `STAGING LIVE`. No artificial ride states or fake wait values are used. The five-minute history-only cron provides real source snapshots, and the same production transition evaluator + D1 durable queue queues one matching event, with processing restricted to that exact endpoint/ride/kind. The delivery protocol is at-least-once, so a rare duplicate is possible if Web Push accepts but the final D1 cooldown write fails. Fresh source timestamps and park-operating checks guard against cached updates and morning openings.
+
+A successful **wait** observation and a separate successful **reopen** observation must each be confirmed with the device push, matching deep link and queue/log status; synthetic tests do not count. If a ride does not naturally change, the observer reports `expired` after 12 hours, **not a pass**. Wait for a valid natural transition, or use another watched ride and rearm once the prior observation finishes. A pending delivery may retry for up to 20 minutes, but stale sources cannot initiate a new alert. For diagnostics, inspect only the probe status and counts in staging D1, **not subscription keys or endpoints**:
+
+```bash
+cd /workspaces/park-pulse-web/.parkpulse-staging/worker
+npx wrangler d1 execute parkpulse-staging --remote --config ./wrangler.toml --command "SELECT json_extract(payload,'$.status') AS status, json_extract(payload,'$.kind') AS kind, json_extract(payload,'$.rideId') AS ride, json_extract(payload,'$.observations') AS observations, datetime(updated_at/1000,'unixepoch') AS checked_utc FROM worker_state WHERE state_key='staging-live-probe';"
+```
+
+If you need to disable live observation, regenerate **without** `--enable-live-probe` but retain the existing `--enable-history-cron`, `--enable-test-push`, and `--preview-url` flags, then redeploy the staging-only Worker. This restores the prior history/push-test behavior without modifying production.
+
 ### Staging-only push delivery (manual device tests, no live ride notifications)
 
 The ordinary staging build keeps push disabled. For an opt-in, isolated iOS/desktop Web Push smoke test, add `--enable-test-push` to the **staging generator**, alongside the existing `--enable-history-cron --preview-url` flags. It only changes the ignored `.parkpulse-staging` copy: `STAGING_ALLOW_PUSH = "true"`, `STAGING_PUSH_TEST_ONLY = "true"`. It leaves automatic alert jobs disabled. Production remains unchanged.

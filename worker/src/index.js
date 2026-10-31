@@ -22,6 +22,13 @@ function stagingPushTestReady(env) {
     Boolean(env.VAPID_SUBJECT && env.VAPID_SERVER_PUBLIC_KEY && env.VAPID_SERVER_PRIVATE_KEY);
 }
 
+function stagingLiveProbeReady(env) {
+  return stagingPushTestReady(env) &&
+    env.STAGING_LIVE_PROBE === "true" &&
+    env.STAGING_ENABLE_CRON === "true" &&
+    env.STAGING_HISTORY_ONLY === "true";
+}
+
 const PARKS = new Map([
   [5, {
     rides: [
@@ -130,6 +137,7 @@ export default {
           stagingPushTestOnly: stagingPushTestReady(env),
           stagingCronProbeAvailable: stagingPushTestReady(env) &&
             env.STAGING_ENABLE_CRON === "true" && env.STAGING_HISTORY_ONLY === "true",
+          stagingLiveProbeAvailable: stagingLiveProbeReady(env),
           stagingHistoryOnly: env.STAGING_MODE === "true" && env.STAGING_ENABLE_CRON === "true" && env.STAGING_HISTORY_ONLY === "true",
           stagingFrontendPreview: env.STAGING_MODE === "true" && Boolean(env.ASSETS),
           primaryDataSource: "ThemeParks.wiki",
@@ -351,6 +359,102 @@ export default {
         return json({ ok: true, armed: true, kind, rideId,
           message: "One staging test is armed for the next five-minute collection",
           expiresAt: new Date(armed.expiresAt).toISOString()
+        }, 200, { ...cors, "Cache-Control": "no-store" });
+      }
+
+      // An explicitly enabled staging-only observer waits for a REAL feed
+      // transition for exactly one registered staging device and one ride.
+      if (request.method === "POST" && url.pathname === "/subscriptions/live-probe") {
+        if (!stagingLiveProbeReady(env)) {
+          return json({ error: "Live observation is disabled", code: "LIVE_PROBE_DISABLED" }, 403, cors);
+        }
+        const body = await request.json().catch(() => ({}));
+        const subscription = validateSubscription(body?.subscription);
+        const rideId = String(body?.rideId || "");
+        const kind = body?.kind;
+        if (!subscription || !["wait", "reopen"].includes(kind) ||
+            !/^[a-z0-9-]+:[a-z0-9-]+$/i.test(rideId) || body?.confirm !== true) {
+          return json({ error: "Confirm a watched ride and one live alert type",
+            code: "INVALID_LIVE_PROBE" }, 400, cors);
+        }
+        await ensureNotificationSchema(env);
+        const row = await env.DB.prepare(
+          "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+        ).bind(subscription.endpoint).first();
+        if (!row || row.p256dh !== subscription.p256dh || row.auth !== subscription.auth) {
+          return json({ error: "Your staging subscription is not registered",
+            code: "NOT_REGISTERED" }, 403, cors);
+        }
+        let saved = [];
+        try { saved = JSON.parse(row.watch_ids || "[]"); } catch {}
+        const rule = normalizeRules(saved).find(item => item.rideId === rideId);
+        if (!catalogRideByKey(rideId) || !rule ||
+            (rule.expiresAt != null && Number(rule.expiresAt) <= Date.now()) ||
+            (kind === "wait" && rule.threshold == null) ||
+            (kind === "reopen" && !rule.reopen)) {
+          return json({ error: "Save a matching, unexpired staging watch first",
+            code: "TEST_WATCH_REQUIRED" }, 400, cors);
+        }
+        const key = "staging-live-probe";
+        const now = Date.now();
+        const previous = await env.DB.prepare(
+          "SELECT updated_at,payload FROM worker_state WHERE state_key=?"
+        ).bind(key).first();
+        let prior = {};
+        try { prior = JSON.parse(previous?.payload || "{}"); } catch {}
+        if (["armed","monitoring","retry"].includes(prior.status) &&
+            Number(prior.expiresAt || 0) > now) {
+          return json({ error: "Another live staging observation is already active",
+            code: "PROBE_ACTIVE" }, 409, cors);
+        }
+        if (Number(previous?.updated_at || 0) > now - 120000) {
+          return json({ error: "Try again in two minutes", code: "TEST_COOLDOWN" }, 429, cors);
+        }
+        const armed = {
+          status: "armed", endpoint: subscription.endpoint, rideId, kind,
+          armedAt: now, expiresAt: now + 12 * 60 * 60000, observations: 0,
+          previous: null
+        };
+        const written = await env.DB.prepare(
+          `INSERT INTO worker_state(state_key,updated_at,payload) VALUES(?,?,?)
+           ON CONFLICT(state_key) DO UPDATE SET
+             updated_at=excluded.updated_at,payload=excluded.payload
+           WHERE worker_state.payload=?`
+        ).bind(key, now, JSON.stringify(armed), previous?.payload || "").run();
+        if (Number(written?.meta?.changes || 0) !== 1) {
+          return json({ error: "Another live observation was just armed",
+            code: "PROBE_ACTIVE" }, 409, cors);
+        }
+        return json({ ok: true, armed: true, rideId, kind,
+          expiresAt: new Date(armed.expiresAt).toISOString(),
+          message: "Staging will observe real live data every five minutes; no simulated transition."
+        }, 200, { ...cors, "Cache-Control": "no-store" });
+      }
+
+      // Device-scoped readback. Never leak the monitored subscription endpoint.
+      if (request.method === "POST" && url.pathname === "/subscriptions/live-probe/status") {
+        if (!stagingLiveProbeReady(env)) return json({ error: "Not found" }, 404, cors);
+        const body = await request.json().catch(() => ({}));
+        const subscription = validateSubscription(body?.subscription);
+        if (!subscription) return json({ error: "Invalid staging subscription" }, 400, cors);
+        const row = await env.DB.prepare(
+          "SELECT endpoint,p256dh,auth FROM subscriptions WHERE endpoint=?"
+        ).bind(subscription.endpoint).first();
+        if (!row || row.p256dh !== subscription.p256dh || row.auth !== subscription.auth) {
+          return json({ error: "Not registered" }, 403, cors);
+        }
+        const record = await env.DB.prepare(
+          "SELECT payload FROM worker_state WHERE state_key='staging-live-probe'"
+        ).first();
+        let probe = {};
+        try { probe = JSON.parse(record?.payload || "{}"); } catch {}
+        if (!record || probe.endpoint !== subscription.endpoint) {
+          return json({ ok: true, status: "idle" }, 200, { ...cors, "Cache-Control": "no-store" });
+        }
+        return json({ ok: true, status: probe.status, kind: probe.kind,
+          rideId: probe.rideId, observations: probe.observations || 0,
+          lastObserved: probe.lastObserved || null, expiresAt: new Date(probe.expiresAt).toISOString(),
+          delivery: probe.delivery || null
         }, 200, { ...cors, "Cache-Control": "no-store" });
       }
 
@@ -1477,6 +1581,119 @@ async function runStagingHistoryOnly(env) {
   // An explicit, one-shot staging-only request may now exercise the real
   // durable queue and checkpoint. Ordinary history collection does not.
   if (stagingPushTestReady(env)) await runArmedStagingCronProbe(env);
+  if (stagingLiveProbeReady(env)) await runArmedStagingLiveProbe(env, rides);
+}
+
+// Opt-in staging verification of REAL provider snapshots. Ordinary staging
+// cron collection still never runs runRideWatch or the global alert pipeline.
+// The one-device probe has a separate worker_state checkpoint, and its queue
+// runner is restricted to that same endpoint, attraction and alert kind.
+async function runArmedStagingLiveProbe(env, rides) {
+  if (!stagingLiveProbeReady(env)) return;
+  const key = "staging-live-probe";
+  const record = await env.DB.prepare(
+    "SELECT payload FROM worker_state WHERE state_key=?"
+  ).bind(key).first();
+  if (!record) return;
+  let probe;
+  try { probe = JSON.parse(record.payload); } catch { return; }
+  if (!["armed", "monitoring", "retry"].includes(probe.status)) return;
+
+  const now = Date.now();
+  const save = async (next) => {
+    const changed = await env.DB.prepare(
+      "UPDATE worker_state SET updated_at=?,payload=? WHERE state_key=? AND payload=?"
+    ).bind(Date.now(), JSON.stringify(next), key, record.payload).run();
+    return Number(changed?.meta?.changes || 0) === 1;
+  };
+  if (now >= Number(probe.expiresAt || 0)) {
+    await save({ ...probe, status: "expired", completedAt: now });
+    return;
+  }
+  const row = await env.DB.prepare(
+    "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+  ).bind(probe.endpoint).first();
+  let saved = [];
+  try { saved = JSON.parse(row?.watch_ids || "[]"); } catch {}
+  const rules = normalizeRules(saved);
+  const rule = rules.find(item => item.rideId === probe.rideId);
+  if (!row || !rule || (rule.expiresAt != null && rule.expiresAt <= now) ||
+      (probe.kind === "wait" && rule.threshold == null) ||
+      (probe.kind === "reopen" && !rule.reopen)) {
+    await save({ ...probe, status: "cancelled-watch-changed", completedAt: now });
+    return;
+  }
+
+  const ride = rides.find(item => item.id === probe.rideId);
+  const sourceTime = Date.parse(ride?.lastUpdated || "");
+  const fresh = ride && !ride.sourceStale && !ride.sourceMissing &&
+    Number.isFinite(sourceTime) && sourceTime <= now + 120000 &&
+    now - sourceTime <= LIVE_FRESHNESS_MS;
+  const parkRides = rides.filter(item => item.parkId === ride?.parkId);
+  const openCount = parkRides.filter(item => item.isOpen && !item.sourceMissing && !item.sourceStale).length;
+  const previous = probe.previous;
+  const observation = fresh ? {
+    isOpen: ride.isOpen, waitTime: ride.waitTime, sourceUpdatedAt: sourceTime,
+    updatedAt: now, parkOpenCount: openCount
+  } : null;
+  const progress = { ...probe, status: "monitoring",
+    observations: Number(probe.observations || 0) + 1,
+    lastObserved: new Date(now).toISOString(), previous: observation };
+
+  // Real transitions need two fresh, distinct upstream observations in the
+  // same operating period. Never manufacture a before/after state.
+  if (probe.status !== "retry" && observation && previous &&
+      Number(previous.sourceUpdatedAt) < sourceTime &&
+      now - Number(previous.updatedAt || 0) <= LIVE_FRESHNESS_MS) {
+    const hour = zoneParts(new Date(now), parkTimezone(ride.parkId)).hour;
+    const activity = {
+      operationalBefore: previous.parkOpenCount >= 3,
+      operationalNow: openCount >= 3,
+      openingRamp: hour < 11 && openCount - previous.parkOpenCount >= 3
+    };
+    const alert = evaluateRideTransitionAlert(
+      ride, previous, rule, activity, now, env.APP_URL
+    );
+    if (alert?.kind === probe.kind && ruleMatchesRide(rule, ride)) {
+      await ensureNotificationSchema(env);
+      await enqueueRideAlerts(env, [{
+        endpoint: row.endpoint, rideId: ride.id, kind: alert.kind,
+        threshold: alert.threshold,
+        payload: {
+          ...alert.payload, title: `STAGING LIVE · ${alert.payload.title}`,
+          body: `Observed provider change · ${alert.payload.body}`,
+          tag: `staging-live-${safeTag(ride.id)}-${alert.kind}`
+        }
+      }], now);
+      progress.status = "retry";
+      progress.triggeredAt = new Date(now).toISOString();
+    }
+  }
+
+  if (progress.status === "retry" || probe.status === "retry") {
+    // A queued delivery can be retried without inventing another crossing.
+    await ensureNotificationSchema(env);
+    const deliveries = await processPendingRideAlerts(env, {
+      rides: ride ? [fresh ? ride : { ...ride, sourceStale: true }] : [],
+      subscriptions: [{ ...row, rules }],
+      matchesRule: ruleMatchesRide,
+      isCoolingDown: (endpoint, rideId, kind) => cooldownActive(env, endpoint, rideId, kind),
+      send: sendPush,
+      only: { endpoint: row.endpoint, rideId: probe.rideId, kind: probe.kind },
+      now
+    });
+    progress.delivery = deliveries;
+    const pending = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM pending_ride_alerts WHERE endpoint=? AND ride_key=? AND kind=? AND expires_at>?"
+    ).bind(row.endpoint, probe.rideId, probe.kind, now).first();
+    progress.status = deliveries.delivered > 0 ? "delivered" :
+      Number(pending?.n || 0) > 0 ? "retry" : "not-delivered";
+    if (progress.status !== "retry") progress.completedAt = Date.now();
+  }
+  if (await save(progress)) {
+    console.log("Staging live observation", progress.status, probe.kind,
+      progress.observations, JSON.stringify(progress.delivery || {}));
+  }
 }
 
 // One-shot staging scheduled integration drill. All synthetic states are

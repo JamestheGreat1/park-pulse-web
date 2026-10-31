@@ -12,7 +12,7 @@ const fetchJson = async (path) => {
   if (!response.ok) throw new Error(path + " HTTP " + response.status);
   return response.json();
 };
-const health = await fetchJson("/health");
+let health = await fetchJson("/health");
 console.log("Production Worker:", JSON.stringify({
   version: health.version, staging: health.staging, ok: health.ok,
   vapidConfigured: health.vapidConfigured, status: health.notificationEngine?.status,
@@ -40,6 +40,19 @@ for (const [parkId, expected] of parks) {
   if (data.parkPulseFormat !== 2 || Number(data.parkId) !== parkId ||
       rides.length !== expected || !data.generatedAt) {
     throw new Error("Invalid park payload for park " + parkId);
+  }
+}
+// A Worker deployment can precede its next five-minute cron. Give the
+// real scheduler a bounded opportunity to advance, without writing anything
+// or synthesizing ride/notification state.
+for (let attempt = 0; Number(health.notificationEngine?.checkpointRides) !== 101 && attempt < 12; attempt++) {
+  console.log("Awaiting scheduled checkpoint: " + health.notificationEngine?.checkpointRides +
+    "/101 (" + (attempt + 1) + "/12)");
+  await new Promise(resolve => setTimeout(resolve, 20000));
+  health = await fetchJson("/health");
+  if (health.version !== "2.0.0" || health.staging !== false ||
+      health.notificationEngine?.status !== "running") {
+    throw new Error("Production Worker became unhealthy during checkpoint verification");
   }
 }
 if (Number(health.notificationEngine.checkpointRides) !== 101) {

@@ -29,7 +29,7 @@ if (!/^name\s*=\s*"parkpulse-api"/m.test(prodConfig)) fail("Production Worker id
 let generatedCatalog = catalog;
 let changes = 0;
 for (const pattern of [
-  /(\b id:\s*"dlr",[^\n]*\benabled:\s*)false/,
+  /(\{ id:\s*"dlr",[^\n]*\benabled:\s*)false/,
   /(\{ id:\s*16,[^\n]*\benabled:\s*)false/,
   /(\{ id:\s*17,[^\n]*\benabled:\s*)false/
 ]) {

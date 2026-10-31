@@ -8,6 +8,8 @@ const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
 const prodConfig = readFileSync(join(projectRoot, "worker/wrangler.toml"), "utf8");
 const template = readFileSync(join(projectRoot, "worker/wrangler.staging.toml.template"), "utf8");
 const catalog = readFileSync(join(projectRoot, "assets/js/catalog.js"), "utf8");
+const sourceVersion = JSON.parse(readFileSync(join(projectRoot, "version.json"), "utf8")).version;
+if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/.test(sourceVersion)) fail("Invalid app version; cannot safely rewrite staging assets.");
 const argIndex = process.argv.indexOf("--database-id");
 const uuid = argIndex < 0 ? "" : String(process.argv[argIndex + 1] || "").trim();
 const enableHistoryCron = process.argv.includes("--enable-history-cron");
@@ -128,7 +130,7 @@ if (previewUrl) {
       const file = join(directory, entry.name);
       if (entry.isDirectory()) { transformSite(file); continue; }
       if (!/\.(?:html|js|json|css|webmanifest)$/.test(entry.name)) continue;
-      let contents = readFileSync(file, "utf8").replaceAll("1.9.5", previewVersion);
+      let contents = readFileSync(file, "utf8").replaceAll(sourceVersion, previewVersion);
       if (entry.name === "config.js") {
         const productionBackend = "https://parkpulse-api.jamesp5297.workers.dev";
         if (!contents.includes(productionBackend)) fail("Preview API config did not contain expected production backend.");

@@ -1264,11 +1264,11 @@ function bindDynamic() {
   $$('[data-test-push]').forEach((b) => b.onclick = testNotification);
   $$('[data-simulate-alert]').forEach((button) => button.onclick = () =>
     testStagingRideAlert(button.dataset.simulateAlert, button.dataset.rideId));
-  $('[data-arm-cron-probe]').forEach((button) => button.onclick = () =>
+  $$('[data-arm-cron-probe]').forEach((button) => button.onclick = () =>
     armScheduledStagingTest(button.dataset.kind, button.dataset.rideId));
-  $('[data-arm-live-probe]').forEach((button) => button.onclick = () =>
+  $$('[data-arm-live-probe]').forEach((button) => button.onclick = () =>
     armRealStagingObservation(button.dataset.kind, button.dataset.rideId));
-  $('[data-check-live-probe]').forEach((button) => button.onclick = checkRealStagingObservation);
+  $$('[data-check-live-probe]').forEach((button) => button.onclick = checkRealStagingObservation);
   document.querySelectorAll('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const diagnosticsDetails = $(".diagnostics-details");
   if (diagnosticsDetails) diagnosticsDetails.ontoggle = () => { diagnosticsExpanded = diagnosticsDetails.open; };

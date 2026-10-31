@@ -106,12 +106,20 @@ export default {
     }
 
     try {
+      // Stage-only safety rail: no browser can register a live push
+      // subscription until staging-specific VAPID keys and a test origin exist.
+      if (env.STAGING_MODE === "true" && env.STAGING_ALLOW_PUSH !== "true" &&
+          url.pathname.startsWith("/subscriptions")) {
+        return json({ error: "Push is disabled in staging", code: "STAGING_PUSH_DISABLED" }, 403, cors);
+      }
       if (request.method === "GET" && url.pathname === "/health") {
         const notificationEngine = await getNotificationHealth(env);
         return json({
           ok: true,
           service: "parkpulse-api",
           version: VERSION,
+          staging: env.STAGING_MODE === "true",
+          pushRegistrationEnabled: env.STAGING_MODE !== "true" || env.STAGING_ALLOW_PUSH === "true",
           primaryDataSource: "ThemeParks.wiki",
           fallbackDataSource: "Queue-Times",
           themeParksApiKeyConfigured: Boolean(env.THEMEPARKS_API_KEY),
@@ -317,6 +325,11 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
+    // Defense-in-depth even if a cron is accidentally attached in Cloudflare.
+    if (env.STAGING_MODE === "true" && env.STAGING_ENABLE_CRON !== "true") {
+      console.log("Staging cron disabled — no writes or push deliveries");
+      return;
+    }
     // Separate invocations: maintenance cannot consume the alert job's CPU budget.
     if (controller.cron === "17 * * * *") ctx.waitUntil(runScheduledMaintenance(env));
     else ctx.waitUntil(runRideWatch(env));

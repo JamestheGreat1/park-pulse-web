@@ -51,3 +51,13 @@ A source outage may reduce fresh samples; it is not a capacity strategy. Never s
 ## User action boundary
 
 No Worker deployment is required for Phases 1–4. **The user will need to deploy the staging Worker and later the production Worker from their authorized Cloudflare/Wrangler environment.** Provide exact commands only once the staging database ID, Worker config and account plan are known and verified. Never run default `wrangler deploy` against production during development.
+
+## Staging artifact generator (prepared in Phase 5)
+
+Run `node worker/scripts/build-staging.mjs --database-id UUID` at the repository root after `npx wrangler d1 create parkpulse-staging`. The generator copies Worker files and **enables DLR only in the generated catalog** inside ignored `.parkpulse-staging/`. It rejects a UUID equal to the production D1 binding, validates the distinct Worker/database names, and keeps cron triggers off. The script never contacts Cloudflare.
+
+The generated configuration intentionally permits only GET/read endpoints and protected manual refresh initially. It blocks subscription routes and ignores accidental cron invocations; subscription tests require explicit staging switches and new VAPID keys. A placeholder `.invalid` URL ensures staging notification links cannot route to the live PWA.
+
+Cloudflare documentation: `wrangler d1 create` returns the database binding ID, and `wrangler d1 execute ... --remote --file` applies SQL remotely. Deploying from `.parkpulse-staging/worker` must include `--config ./wrangler.toml` on every command; do not run the regular production deploy command for staging.
+
+**Do not paste credentials or subscription endpoints into ChatGPT or GitHub.** For first live testing, send back only the staging Worker URL and redacted `/health` output.

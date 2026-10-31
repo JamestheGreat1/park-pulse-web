@@ -96,3 +96,39 @@ npx wrangler deploy
 Confirm the deployed Worker is `1.7.5`. The `/health` JSON includes `notificationEngine.delivery` with the previous run's `queued`, `delivered`, `retried`, `failed`, `discarded`, and `pending` counts. `pending` is a snapshot from that run, not a continuously updated queue length. A successful `/subscriptions/test` is useful for checking a device but does not exercise the transition queue.
 
 For troubleshooting, inspect `npx wrangler tail --format pretty` after the next scheduled alert run. Keep the existing five-minute and hourly cron triggers enabled.
+
+## ParkPulse 2.0 staging (development branch only)
+
+**Do not run the production `npm run deploy` or plain `npx wrangler deploy` while working on the DLR staging build.** Phase 5 generates an entirely separate Worker source/configuration under `.parkpulse-staging/` at the repository root. The committed `assets/js/catalog.js` keeps Disneyland disabled; **only a generated copy is enabled**. The staging Worker is named `parkpulse-api-staging` and must use a different D1 database called `parkpulse-staging`.
+
+From the repo root, while on `feature/multi-resort-dlr`, authenticate Wrangler as needed:
+
+```bash
+cd worker
+npm install
+npx wrangler whoami
+npx wrangler d1 create parkpulse-staging
+cd ..
+```
+
+Copy the returned D1 **database UUID** (not the production UUID). Generate staging artifacts with:
+
+```bash
+node worker/scripts/build-staging.mjs --database-id YOUR_NEW_STAGING_D1_UUID
+cd .parkpulse-staging/worker
+npm install --no-save --package-lock=false
+npx wrangler deploy --config ./wrangler.toml --dry-run
+```
+
+The generator rejects the production database UUID, a malformed UUID, a non-staging worker name, and cron triggers. Before a live **staging-only** deploy, create the staging database schema (this does **not** touch production):
+
+```bash
+npx wrangler d1 execute parkpulse-staging --remote --file=./schema.sql --config ./wrangler.toml
+npx wrangler deploy --config ./wrangler.toml
+```
+
+The deployment prints the staging URL, typically `https://parkpulse-api-staging.<your-subdomain>.workers.dev`. In a terminal, check `/health`, `/api/park/16`, and `/api/park/17`. Expect `staging: true` in health, six usable parks, and `pushRegistrationEnabled: false`. The initial deploy has **no scheduled triggers**, no private VAPID credentials, no connection to the live PWA, and no production D1 data. It only supports read-only live-ride API checks until you deliberately configure a staging-specific manual refresh token. Never copy production subscriptions.
+
+Only once API testing passes should we enable manual data writes, staging test notifications, hourly history backfill, or scheduled sampling. Those require a separate explicit step and Cloudflare CPU/D1 measurements. The current staging `APP_URL` points at the reserved invalid domain on purpose so no push link can send users to production.
+
+See `docs/parkpulse-2-staging-readiness.md` for the validation gates and expected D1 usage.

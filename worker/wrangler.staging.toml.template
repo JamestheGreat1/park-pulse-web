@@ -1,0 +1,22 @@
+# ParkPulse 2.0 — staging Worker ONLY. Generated locally from this template.
+# Never use the production database ID or re-enable cron before validation.
+name = "parkpulse-api-staging"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+preview_urls = false
+
+[vars]
+APP_URL = "https://parkpulse-staging.invalid/"
+APP_ORIGIN = "https://parkpulse-staging.invalid"
+VAPID_SUBJECT = "https://parkpulse-staging.invalid/"
+STAGING_MODE = "true"
+STAGING_ALLOW_PUSH = "false"
+STAGING_ENABLE_CRON = "false"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "parkpulse-staging"
+database_id = "__STAGING_D1_ID__"
+
+# No cron triggers. Scheduled processing is explicitly disabled in the Worker
+# as a defense in depth, even if triggers are attached inadvertently.

@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '24'
       - name: Run Worker and UI regression tests
-        run: node --test tests/regressions.test.mjs tests/alert-queue.test.mjs
+        run: node --test tests/regressions.test.mjs tests/alert-queue.test.mjs tests/staging.test.mjs
 
   browser:
     name: PWA browser and offline smoke test
@@ -58,6 +58,14 @@ jobs:
       - name: Dry-run Cloudflare Worker bundling
         working-directory: worker
         run: npx wrangler deploy --dry-run --outdir ./dry-run
+      - name: Generate isolated staging Worker build (fake test UUID; no Cloudflare access)
+        run: node worker/scripts/build-staging.mjs --database-id 11111111-1111-4111-8111-111111111111
+      - name: Install staging Worker dependencies
+        working-directory: .parkpulse-staging/worker
+        run: npm install --no-save --package-lock=false
+      - name: Dry-run the generated staging Worker bundle
+        working-directory: .parkpulse-staging/worker
+        run: npx wrangler deploy --config ./wrangler.toml --dry-run --outdir ./dry-run
 
   source-audit:
     name: Read-only Disneyland provider coverage audit

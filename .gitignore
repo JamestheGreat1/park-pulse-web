@@ -1,2 +1,7 @@
 worker/node_modules/
 .parkpulse-vapid-keys.json
+
+# Local-only generated staging Worker and copied catalog. Never commit secrets/IDs.
+.parkpulse-staging/
+worker/.dev.vars*
+worker/.env*

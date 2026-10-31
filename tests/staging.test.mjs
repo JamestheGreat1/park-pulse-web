@@ -104,7 +104,7 @@ test("staging scheduled handler never falls through to production alerts", async
 
 test("history-only sampler writes samples without alerts, checkpoints or historical backfill", async () => {
   const source = read("worker/src/index.js");
-  const sample = source.slice(source.indexOf("async function runStagingHistoryOnly(env) {"),source.indexOf("async function runManualRefresh(env) {"));
+  const sample = source.slice(source.indexOf("async function runStagingHistoryOnly(env) {"),source.indexOf("async function runStagingBaselineBatch(env) {"));
   assert.match(sample,/await fetchCurrentRideSnapshot\(env\)/);
   assert.match(sample,/await writeCurrentRideSnapshot\(env, rides\)/);
   assert.doesNotMatch(sample,/runRideWatch|sendPush|enqueueRideAlerts|refreshRideBaselines/);

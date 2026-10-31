@@ -275,6 +275,106 @@ export default {
         return json({ ok: true, watched: rules.length }, 200, cors);
       }
 
+      // Simulated watch transitions use the SAME evaluator and push sender as
+      // production, but never run the live alert cron or alter ride checkpoints.
+      if (request.method === "POST" && url.pathname === "/subscriptions/test-alert") {
+        if (env.STAGING_MODE !== "true") return json({ error: "Not found" }, 404, cors);
+        if (!stagingPushTestReady(env)) {
+          return json({ error: "Staging push testing is disabled", code: "STAGING_PUSH_DISABLED" },
+            403, cors);
+        }
+        const body = await request.json().catch(() => ({}));
+        const subscription = validateSubscription(body?.subscription);
+        const kind = body?.kind;
+        const rideKey = String(body?.rideId || "");
+        if (!subscription || !["wait", "reopen"].includes(kind) ||
+            !/^[a-z0-9-]+:[a-z0-9-]+$/i.test(rideKey)) {
+          return json({ error: "Invalid staged alert request", code: "INVALID_TEST" }, 400, cors);
+        }
+        const row = await env.DB.prepare(
+          "SELECT endpoint,p256dh,auth,watch_ids FROM subscriptions WHERE endpoint=?"
+        ).bind(subscription.endpoint).first();
+        if (!row || row.p256dh !== subscription.p256dh || row.auth !== subscription.auth) {
+          return json({ error: "Register on this staging app first", code: "NOT_REGISTERED" }, 403, cors);
+        }
+        let rawRules = [];
+        try { rawRules = JSON.parse(row.watch_ids || "[]"); } catch {}
+        const rule = normalizeRules(rawRules).find((candidate) => candidate.rideId === rideKey);
+        const found = catalogRideByKey(rideKey);
+        if (!rule || !found || (kind === "wait" && rule.threshold == null) ||
+            (kind === "reopen" && !rule.reopen)) {
+          return json({ error: "Watch the selected attraction with this alert enabled first",
+            code: "TEST_WATCH_REQUIRED" }, 400, cors);
+        }
+        const now = Date.now();
+        const testKind = "staging:simulated-alert";
+        const cooldown = await env.DB.prepare(
+          "SELECT last_sent FROM notification_log_v2 WHERE endpoint=? AND ride_key=? AND kind=?"
+        ).bind(subscription.endpoint, testKind, testKind).first();
+        if (cooldown && now - Number(cooldown.last_sent) < 60000) {
+          return json({ error: "Test sent recently — try again in a minute",
+            code: "TEST_COOLDOWN" }, 429, cors);
+        }
+
+        // These values exist only in memory for this explicit device test.
+        // They are NOT live wait times and are never saved to ride_history,
+        // notification_ride_state, or the durable production alert queue.
+        const syntheticRide = {
+          id: rideKey,
+          parkId: found.parkId,
+          name: found.ride.name,
+          isOpen: true,
+          waitTime: kind === "wait" ? Number(rule.threshold) : 15,
+          source: "simulation",
+          sourceStale: false,
+          sourceMissing: false
+        };
+        const before = {
+          isOpen: kind === "wait",
+          waitTime: kind === "wait" ? Number(rule.threshold) + 15 : null,
+          updatedAt: now - 60 * 1000
+        };
+        const activity = { operationalNow: true, operationalBefore: true, openingRamp: false };
+        const alert = evaluateRideTransitionAlert(
+          syntheticRide, before, rule, activity, now, env.APP_URL
+        );
+        if (!alert || alert.kind !== kind) {
+          return json({ error: "Simulated transition failed validation",
+            code: "TEST_TRANSITION_INVALID" }, 422, cors);
+        }
+        const payload = {
+          ...alert.payload,
+          title: `TEST · ${alert.payload.title}`,
+          body: `Simulation only · ${alert.payload.body}`,
+          tag: `staging-test-${safeTag(rideKey)}-${kind}`
+        };
+
+        try {
+          const delivered = await sendPush(subscription, payload, env);
+          if (!delivered) return json({
+            error: "Subscription expired", code: "SUBSCRIPTION_EXPIRED"
+          }, 410, cors);
+          await env.DB.prepare(
+            `INSERT INTO notification_log_v2(endpoint,ride_key,kind,last_sent)
+             VALUES(?,?,?,?)
+             ON CONFLICT(endpoint,ride_key,kind) DO UPDATE SET last_sent=excluded.last_sent`
+          ).bind(subscription.endpoint, testKind, testKind, Date.now()).run();
+          return json({
+            ok: true, delivered: true, simulated: true, kind, rideId: rideKey,
+            // Do not return live timings; they were synthetic test inputs.
+            opensRide: true
+          }, 200, { ...cors, "Cache-Control": "no-store" });
+        } catch (error) {
+          console.warn("Staging simulated alert failed", error?.pushStatus || error?.code || "send-failed");
+          return json({
+            error: "Simulated alert delivery failed",
+            code: error?.code === "PUSH_CONFIG_MISSING" ? "PUSH_CONFIG_MISSING" : "PUSH_SEND_FAILED",
+            pushStatus: Number(error?.pushStatus) || null
+          }, error?.code === "PUSH_CONFIG_MISSING" ? 503 : 502,
+          { ...cors, "Cache-Control": "no-store" });
+        }
+      }
+
       if (request.method === "POST" && url.pathname === "/subscriptions/test") {
         const body = await request.json().catch(() => ({}));
         const subscription = validateSubscription(body?.subscription);
@@ -1445,6 +1545,51 @@ async function runManualRefresh(env) {
   };
 }
 
+// Shared transition evaluator. Production uses observed snapshots; staging
+// can feed explicitly labeled synthetic transitions without touching checkpoints.
+function evaluateRideTransitionAlert(ride, before, rule, activity, now, appUrl) {
+  if (!before || !rule || !activity || ride.sourceStale || ride.sourceMissing) return null;
+  const beforeFresh = now - Number(before.updatedAt || 0) <= LIVE_FRESHNESS_MS;
+  const reopened = beforeFresh && !before.isOpen && ride.isOpen &&
+    activity.operationalBefore && activity.operationalNow && !activity.openingRamp;
+  const name = notificationRideName(ride);
+  const parkName = PARKS.get(ride.parkId)?.name;
+  if (!parkName) return null;
+
+  if (reopened && rule.reopen) {
+    return {
+      kind: "reopen",
+      threshold: null,
+      payload: {
+        title: ride.waitTime > 0 ? `${name} reopened • ${ride.waitTime} min` : `${name} reopened`,
+        body: parkName,
+        url: `${appUrl || "/"}?ride=${encodeURIComponent(ride.id)}`,
+        tag: `ride-${safeTag(ride.id)}-reopen`,
+        renotify: true
+      }
+    };
+  }
+  if (rule.threshold != null && beforeFresh && before.isOpen && ride.isOpen &&
+      before.waitTime != null && ride.waitTime != null &&
+      Number.isFinite(Number(before.waitTime)) &&
+      Number.isFinite(Number(ride.waitTime)) &&
+      Number(before.waitTime) > rule.threshold &&
+      Number(ride.waitTime) <= rule.threshold) {
+    return {
+      kind: "wait",
+      threshold: rule.threshold,
+      payload: {
+        title: `${name} • ${ride.waitTime} min`,
+        body: `Target ≤${rule.threshold} • ${parkName}`,
+        url: `${appUrl || "/"}?ride=${encodeURIComponent(ride.id)}`,
+        tag: `ride-${safeTag(ride.id)}-wait`,
+        renotify: true
+      }
+    };
+  }
+  return null;
+}
+
 async function runRideWatch(env) {
   console.log("Alert job: start");
   await ensureNotificationSchema(env);
@@ -1508,16 +1653,7 @@ async function runRideWatch(env) {
   for (const ride of current) {
     const before = prior.get(ride.id);
     if (before) {
-      const beforeFresh = now - Number(before.updatedAt || 0) <= LIVE_FRESHNESS_MS;
-      const { operationalNow, operationalBefore, openingRamp } = parkActivity.get(ride.parkId);
-      const reopened =
-        beforeFresh &&
-        !before.isOpen &&
-        ride.isOpen &&
-        operationalBefore &&
-        operationalNow &&
-        !openingRamp;
-
+      const activity = parkActivity.get(ride.parkId);
       const candidates = [
         ...(watchersByRideKey.get(String(ride.id)) || []),
         ...(legacyWatchersByPark.get(Number(ride.parkId)) || [])
@@ -1530,52 +1666,14 @@ async function runRideWatch(env) {
         const rule = watcher.rules.find((candidate) => ruleMatchesRide(candidate, ride));
         if (!rule) continue;
 
-        let payload = null;
-        let kind = null;
-
-        const pushRideName = notificationRideName(ride);
-        const pushParkName = PARKS.get(ride.parkId).name;
-
-        if (reopened && rule.reopen) {
-          kind = "reopen";
-          payload = {
-            title: ride.waitTime > 0
-              ? `${pushRideName} reopened • ${ride.waitTime} min`
-              : `${pushRideName} reopened`,
-            body: pushParkName,
-            url: `${env.APP_URL || "/"}?ride=${encodeURIComponent(ride.id)}`,
-            tag: `ride-${safeTag(ride.id)}-reopen`,
-            renotify: true
-          };
-        } else if (
-          rule.threshold != null &&
-          beforeFresh &&
-          before.isOpen &&
-          ride.isOpen &&
-          before.waitTime != null &&
-          ride.waitTime != null &&
-          Number.isFinite(Number(before.waitTime)) &&
-          Number.isFinite(Number(ride.waitTime)) &&
-          Number(before.waitTime) > rule.threshold &&
-          Number(ride.waitTime) <= rule.threshold
-        ) {
-          kind = "wait";
-          payload = {
-            title: `${pushRideName} • ${ride.waitTime} min`,
-            body: `Target ≤${rule.threshold} • ${pushParkName}`,
-            url: `${env.APP_URL || "/"}?ride=${encodeURIComponent(ride.id)}`,
-            tag: `ride-${safeTag(ride.id)}-wait`,
-            renotify: true
-          };
-        }
-
-        if (payload && kind && !ride.sourceStale && !ride.sourceMissing) {
+        const alert = evaluateRideTransitionAlert(
+          ride, before, rule, activity, now, env.APP_URL
+        );
+        if (alert) {
           alertsToQueue.push({
             endpoint: watcher.endpoint,
             rideId: ride.id,
-            kind,
-            payload,
-            threshold: kind === "wait" ? rule.threshold : null
+            ...alert
           });
         }
       }

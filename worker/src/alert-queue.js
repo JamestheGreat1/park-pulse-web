@@ -86,18 +86,25 @@ export async function processPendingRideAlerts(env, {
   isCoolingDown,
   send,
   refreshPayload = (pending) => JSON.parse(pending.payload),
+  only = null,
   now = Date.now()
 }) {
   const summary = { delivered: 0, retried: 0, failed: 0, discarded: 0, pending: 0 };
   const byRide = new Map(rides.map((ride) => [String(ride.id), ride]));
   const byEndpoint = new Map(subscriptions.map((sub) => [sub.endpoint, sub]));
+  // Normal production runs process the full queue. A staging-only live
+  // observer can explicitly scope the same durable sender to one opted-in
+  // endpoint and ride, without touching unrelated staging test subscribers.
   const rows = (await env.DB.prepare(
     `SELECT endpoint,ride_key,kind,payload,threshold,created_at,expires_at,attempts,next_attempt_at
        FROM pending_ride_alerts
       WHERE next_attempt_at <= ? AND expires_at > ?
         AND (lease_until IS NULL OR lease_until <= ?)
+        ${only ? "AND endpoint=? AND ride_key=? AND kind=?" : ""}
       ORDER BY next_attempt_at ASC, created_at ASC LIMIT ?`
-  ).bind(now, now, now, RETRY_BATCH_LIMIT).all()).results || [];
+  ).bind(...(only
+    ? [now, now, now, only.endpoint, only.rideId, only.kind, RETRY_BATCH_LIMIT]
+    : [now, now, now, RETRY_BATCH_LIMIT])).all()).results || [];
 
   for (const pending of rows) {
     const claimed = await env.DB.prepare(

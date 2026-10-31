@@ -1208,6 +1208,36 @@ test('Live refresh is scoped to visible resorts and cross-resort watches', () =>
   assert.doesNotMatch(app,/rideData\.refresh\(\)/);
 });
 
+test('Resort changes refresh all selected parks even with cached data', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const start=app.indexOf('  store.addEventListener("change", (e) => {');
+  const end=app.indexOf('  // A shared ride link',start);
+  assert(start>=0 && end>start, 'store change event handler must exist');
+  let listener=null, refreshes=0, fullRenders=0;
+  const context=vm.createContext({
+    store:{addEventListener:(event,callback)=>{assert.equal(event,'change');listener=callback;}},
+    refreshRelevantParks:()=>{refreshes++;},
+    renderRideResults:()=>{},render:()=>{fullRenders++;},
+    nextUpOffset:4,rulesSynced:true
+  });
+  vm.runInContext(app.slice(start,end),context);
+  assert.equal(typeof listener,'function');
+  listener({detail:{reason:'resort'}});
+  assert.equal(refreshes,1,'resort switch should fetch even if a park is already cached');
+  assert.equal(fullRenders,1);
+  listener({detail:{reason:'park'}});
+  assert.equal(refreshes,1,'ordinary park selection should not trigger a redundant full-resort fetch');
+  listener({detail:{reason:'rules'}});
+  assert.equal(refreshes,2,'cross-resort watch changes should still refresh');
+  const clickHandler=app.slice(
+    app.indexOf("document.querySelectorAll('[data-resort]').forEach"),
+    app.indexOf("document.querySelectorAll('[data-next-up-another]')")
+  );
+  assert.match(clickHandler,/store\.selectResort\(resortId\)/);
+  assert.doesNotMatch(clickHandler,/rideData\.refresh\(/,
+    'resort click and change-event handlers must not issue duplicate requests');
+});
+
 test('In-flight refresh queues a newly selected resort rather than silently dropping it', async () => {
   const api=fs.readFileSync(new URL('../assets/js/api.js',import.meta.url),'utf8');
   const code=api.slice(api.indexOf('export class RideData'),api.indexOf('export const rideData')).replace('export ','');

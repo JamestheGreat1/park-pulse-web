@@ -24,7 +24,7 @@
 - [x] Checked-in production schema/Worker configuration match `main`; remote tables, key columns and the Time Travel bookmark were confirmed. A private production SQL export completed successfully on 2026-10-31 (64 MB, restrictive file permissions); secure a copy outside Codespaces and refresh the recovery point on release day. See [production D1 audit](parkpulse-2-production-d1-audit.md).
 - [ ] Recheck monthly account-wide D1, Worker and subrequest headroom with both staging and production running; staging numbers alone do not include full live-alert costs. Decide when to reduce/stop staging after launch.
 - [ ] Run acceptance on iPhone standalone PWA and desktop: both resorts, all six park selectors, remembered resorts, history, local vs. park time/DST, shared links, favorites/watches, offline cache, light/dark and Liquid/Frosted Glass.
-- [ ] Final-prep branch `release/2.0.0-final-prep` now enables the three Disneyland flags and uses stable 2.0.0 asset/Worker versions; staging generator/tests and release notes adapted. **CI review and production/staging isolation checks must pass before this release gate is satisfied.** No merge or deploy.
+- [x] Final-prep branch `release/2.0.0-final-prep` enables the three Disneyland flags, uses stable 2.0.0 asset/Worker versions, and keeps staging D1/Worker identity isolated. Final-prep CI **4/4 green** (run 41180627897). The branch is a **draft PR targeting the RC**, not `main`; no merge/deploy has occurred. Final iPhone/desktop acceptance and owner release signoff are separate, open gates.
 - [ ] Obtain explicit signoff before merge and production rollout.
 
 ## Future release sequence — only AFTER all gates pass
@@ -40,7 +40,7 @@
 
 - Staging's 101 baselines do **not** automatically populate production D1. California's production comparisons may initially show honest insufficient-data states while history warms; do not manufacture historical trends.
 - Staging presently runs in history-only mode; its notification-engine `waiting` status is not the same as a broken production engine.
-- `worker/scripts/build-staging.mjs` currently requires the three committed DLR source flags to remain disabled. It must be adjusted deliberately at the final enablement step, together with tests.
+- The RC staging generator requires the committed DLR flags to be disabled; **final-prep** now validates the three already-enabled DLR flags without altering the source and keeps the isolated staging Worker/D1 safety gates. Do not generate a production Worker using the staging template.
 - This release adds **no** trip planner, user accounts, or new paid features. Keep the existing four-tab UI and the low-noise ParkPulse design.
 
 **Release rule:** no merge to `main`, production D1 write, production Worker deploy or public PWA publish until the above gates are explicitly accepted.

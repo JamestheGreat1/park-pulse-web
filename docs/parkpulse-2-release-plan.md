@@ -27,6 +27,34 @@
 - [x] Final-prep branch `release/2.0.0-final-prep` enables the three Disneyland flags, uses stable 2.0.0 asset/Worker versions, and keeps staging D1/Worker identity isolated. Final-prep CI **4/4 green** (run 41180627897). The branch is a **draft PR targeting the RC**, not `main`; no merge/deploy has occurred. Final iPhone/desktop acceptance and owner release signoff are separate, open gates.
 - [ ] Obtain explicit signoff before merge and production rollout.
 
+## Natural alert acceptance and monitored-rollout decision (2026-10-31)
+
+The scheduler's five-minute path, the shared wait/reopen evaluator, durable D1 queue/retry handling, cross-resort ride keys and device push delivery have dedicated automated checks or controlled scheduled staging evidence. The iPhone received the explicitly labeled scheduled simulation. **No captured natural source transition has yet produced a verified `STAGING LIVE` device delivery.** The opt-in observer showing `monitoring` is not a delivery pass, and the private device provider endpoints cannot be inspected from the repository.
+
+**Release decision path:** The owner may explicitly approve a monitored rollout with this remaining real-world uncertainty, provided the production health preflight below is green, staging data continues to update, a secure production D1 copy exists outside Codespaces, and first-launch monitoring/rollback ownership is arranged. Do not silently mark the original natural-alert checkbox as passed; it stays unverified until an actual event is observed. A `stale` or `unavailable` notification engine, failed cron, missing VAPID configuration, abnormal CPU/D1 metrics or stale live feed is a **no-go**, not an accepted risk.
+
+### Read-only production Worker notification preflight
+
+```bash
+curl -fsS https://parkpulse-api.jamesp5297.workers.dev/health | jq '{
+  ok, version, staging, vapidConfigured, themeParksApiKeyConfigured,
+  notificationEngine: {
+    ready: .notificationEngine.ready,
+    status: .notificationEngine.status,
+    lastCheck: .notificationEngine.lastCheck,
+    checkpointRides: .notificationEngine.checkpointRides,
+    cadenceMinutes: .notificationEngine.cadenceMinutes,
+    delivery: .notificationEngine.delivery
+  }
+}'
+```
+
+Expected **before rollout**: `ok: true`, `staging: false`, `vapidConfigured: true`, `notificationEngine.ready: true`, `status: "running"`, a recent `lastCheck`, and approximately **47** checkpoint rides for current WDW production. Any deviation must be investigated before launch. Health-only JSON contains no subscription endpoints or secrets. Also check the current production scheduled Worker log/Cloudflare dashboard for failures and confirm both WDW parks and DLR are receiving fresh data on staging.
+
+After deploying the **production Worker first** but before switching the public PWA: repeat this command and verify the checkpoint count rises to approximately **101** after a normal five-minute scheduled run, while old WDW rides/subscriptions stay intact. Do not promise immediate California baselines; 30-day analytics must accumulate honestly.
+
+First-live-traffic watch: record Worker cron outcomes/CPU, `notificationEngine.delivery` error/pending counts, cross-resort watched attraction links, D1 reads/writes and whether legitimate real transitions result in a push. If a real source transition is observed but delivery fails, pause the launch and investigate/rollback. **A successful send isn't proven solely by `ready`** — it proves cron/checkpoint health.
+
 ## Future release sequence — only AFTER all gates pass
 
 1. Freeze release commit and keep its GitHub SHA, the pre-release production SHA, an export of production D1, and exact production Worker deployment configuration. Confirm backups are readable; preserve production push secrets.

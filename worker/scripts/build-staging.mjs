@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Build a staging-only copy. Does not authenticate or deploy anything.
-import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,6 +11,8 @@ const catalog = readFileSync(join(projectRoot, "assets/js/catalog.js"), "utf8");
 const argIndex = process.argv.indexOf("--database-id");
 const uuid = argIndex < 0 ? "" : String(process.argv[argIndex + 1] || "").trim();
 const enableHistoryCron = process.argv.includes("--enable-history-cron");
+const previewIndex = process.argv.indexOf("--preview-url");
+const previewUrl = previewIndex < 0 ? "" : String(process.argv[previewIndex + 1] || "").trim();
 function fail(message) { throw new Error("STAGING BUILD BLOCKED: " + message); }
 
 const uuidPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -32,6 +34,16 @@ if (enableHistoryCron && !template.includes('STAGING_HISTORY_ONLY = "false"')) {
   fail("History-only guard missing from template.");
 }
 if (!/^name\s*=\s*"parkpulse-api"/m.test(prodConfig)) fail("Production Worker identity changed; review before building.");
+if (previewUrl) {
+  let parsed;
+  try { parsed = new URL(previewUrl); } catch { fail("Preview URL must be a full HTTPS workers.dev URL."); }
+  if (parsed.protocol !== "https:" ||
+      !/^parkpulse-api-staging\.[a-z0-9-]+\.workers\.dev$/i.test(parsed.hostname) ||
+      parsed.pathname !== "/" || parsed.search || parsed.hash ||
+      parsed.username || parsed.password) {
+    fail("Preview URL must be the staging Worker workers.dev origin only.");
+  }
+}
 
 let generatedCatalog = catalog;
 let changes = 0;
@@ -69,10 +81,58 @@ if (enableHistoryCron) {
     fail("History-only schedule was not activated.");
   }
 }
+if (previewUrl) {
+  const origin = new URL(previewUrl).origin;
+  stagingConfig = stagingConfig
+    .replaceAll("https://parkpulse-staging.invalid/", origin + "/")
+    .replaceAll("https://parkpulse-staging.invalid", origin);
+  stagingConfig += String.fromCharCode(10) + '[assets]' + String.fromCharCode(10)
+    + 'directory = "../site"' + String.fromCharCode(10)
+    + 'binding = "ASSETS"' + String.fromCharCode(10)
+    + 'run_worker_first = ["/api/*", "/health", "/vapid-key", "/subscriptions*"]'
+    + String.fromCharCode(10);
+  const siteRoot = join(stageRoot, "site");
+  mkdirSync(join(siteRoot, "assets"), { recursive: true });
+  for (const name of ["index.html", "manifest.webmanifest", "service-worker.js", "version.json"]) {
+    cpSync(join(projectRoot, name), join(siteRoot, name), { force: true });
+  }
+  cpSync(join(projectRoot, "assets"), join(siteRoot, "assets"), { recursive: true, force: true });
+  writeFileSync(join(siteRoot, "assets/js/catalog.js"), generatedCatalog);
+  const previewVersion = "2.0.0-preview." + Date.now();
+  function transformSite(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const file = join(directory, entry.name);
+      if (entry.isDirectory()) { transformSite(file); continue; }
+      if (!/\.(?:html|js|json|css|webmanifest)$/.test(entry.name)) continue;
+      let contents = readFileSync(file, "utf8").replaceAll("1.9.5", previewVersion);
+      if (entry.name === "config.js") {
+        const productionBackend = "https://parkpulse-api.jamesp5297.workers.dev";
+        if (!contents.includes(productionBackend)) fail("Preview API config did not contain expected production backend.");
+        contents = contents.replace(productionBackend, origin);
+      }
+      if (entry.name === "app.js") {
+        contents = contents.replace('new URL("https://app.useparkpulse.com/")', 'new URL("' + origin + '/")');
+      }
+      if (entry.name === "index.html") {
+        contents = contents
+          .replace("<title>ParkPulse</title>", '<title>ParkPulse 2.0 — Staging Preview</title>')
+          .replace("<head>", '<head>\n  <meta name="robots" content="noindex,nofollow">')
+          .replace('<span class="brand-kicker">Ride watcher</span>',
+            '<span class="brand-kicker">2.0 Staging Preview · Alerts disabled</span>');
+      }
+      if (entry.name === "version.json") {
+        contents = JSON.stringify({ version: previewVersion, channel: "preview", released: new Date().toISOString().slice(0, 10) }, null, 2);
+      }
+      writeFileSync(file, contents);
+    }
+  }
+  transformSite(siteRoot);
+}
 if (stagingConfig.includes(productionUUID)) fail("Generated config references production D1.");
 writeFileSync(join(workerRoot, "wrangler.toml"), stagingConfig);
 console.log("Staging build created (no Cloudflare operations): .parkpulse-staging/worker/");
 console.log("Worker: parkpulse-api-staging | D1: parkpulse-staging | rides: WDW + DLR");
+if (previewUrl) console.log("Preview: " + previewUrl + " (same-origin staging API; alerts disabled)");
 console.log(enableHistoryCron
   ? "History-only cron enabled (every 5m); notifications disabled; production unchanged."
   : "Cron disabled; subscription endpoints gated; production source remains unchanged.");

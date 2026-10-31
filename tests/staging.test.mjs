@@ -137,6 +137,7 @@ test("staging preview hosts enabled DLR PWA assets from same Worker origin", () 
   const catalog = read(".parkpulse-staging/site/assets/js/catalog.js");
   const appConfig = read(".parkpulse-staging/site/assets/js/config.js");
   const app = read(".parkpulse-staging/site/assets/js/app.js");
+  const push = read(".parkpulse-staging/site/assets/js/push.js");
   const sw = read(".parkpulse-staging/site/service-worker.js");
   const version = JSON.parse(read(".parkpulse-staging/site/version.json"));
   assert.match(config, /^\[assets\]$/m);
@@ -152,6 +153,7 @@ test("staging preview hosts enabled DLR PWA assets from same Worker origin", () 
   assert.match(appConfig, /WORKER_BASE: "https:\/\/parkpulse-api-staging\.jamesp5297\.workers\.dev"/);
   assert.doesNotMatch(appConfig,/WORKER_BASE: "https:\/\/parkpulse-api\.jamesp5297/);
   assert.match(app,/new URL\("https:\/\/parkpulse-api-staging\.jamesp5297\.workers\.dev\/"\)/);
+  assert.match(push,/export function pushSupported\(\)\{return Boolean\(false && /);
   assert.match(version.version,/^2\.0\.0-preview\.\d+$/);
   assert(sw.includes(version.version));
   assert(!sw.includes('CACHE_NAME = "parkpulse-1.9.5"'));

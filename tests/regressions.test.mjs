@@ -15,7 +15,7 @@ const resortForPark = id => RESORTS.find(resort => resort.id === PARKS.find(park
 `).replaceAll('export ', '');
 }
 function section(start, end) { return worker.slice(worker.indexOf(start), worker.indexOf(end)); }
-const watcher = section('async function runRideWatch(', 'function catalogRideByKey(');
+const watcher = section('function evaluateRideTransitionAlert(', 'function catalogRideByKey(');
 async function evaluate(beforeWait, currentWait) {
   const ride = { id: 'mk:test', parkId: 6, isOpen: true, waitTime: currentWait };
   const sent = [];

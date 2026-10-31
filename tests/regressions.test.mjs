@@ -1424,6 +1424,42 @@ test('Liquid dock uses four equal phone slots and four desktop slots', () => {
 });
 
 
+test('Frosted and Liquid Glass snap their backdrop tint on tab changes', () => {
+  const app=fs.readFileSync(new URL('../assets/js/app.js',import.meta.url),'utf8');
+  const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  const section=app.slice(app.indexOf('function selectView(name) {'),app.indexOf('function sortedRides('));
+  assert(section.startsWith('function selectView(name) {'));
+  assert.match(css, /:root\.glass-color-snap:is\(\[data-preview-surface="liquid"\],\[data-preview-surface="neutral"\]\) \.settings-group/);
+  for(const surface of ['liquid','neutral']){
+    const classes=new Set(),frames=[];
+    const root={
+      dataset:{previewSurface:surface},
+      classList:{add:value=>classes.add(value),remove:value=>classes.delete(value)}
+    };
+    const views={
+      explore:{childElementCount:1,offsetWidth:300,classList:{toggle(){}}},
+      settings:{childElementCount:1,offsetWidth:300,classList:{toggle(){}}}
+    };
+    const links=['explore','settings'].map(name=>({
+      dataset:{viewTarget:name},classList:{toggle(){}},
+      setAttribute(){},removeAttribute(){}
+    }));
+    const ctx=vm.createContext({
+      views,document:{documentElement:root,querySelectorAll:()=>links},
+      store:{update(){}},requestAnimationFrame:callback=>frames.push(callback),
+      window:{scrollTo(){}},Object,render(){throw new Error('Should reuse existing view nodes');}
+    });
+    vm.runInContext(section,ctx);
+    vm.runInContext('selectView("settings")',ctx);
+    assert(classes.has('glass-color-snap'),surface+' must snap before painting the new page');
+    assert.equal(frames.length,1,surface+' must schedule snap cleanup');
+    frames.shift()();
+    assert(!classes.has('glass-color-snap'),surface+' must restore transitions next frame');
+    vm.runInContext('selectView("explore")',ctx);
+    assert(classes.has('glass-color-snap'),surface+' must also snap on return navigation');
+  }
+});
+
 test('2.0 mobile header clears translucent iOS safe area without changing desktop layout', () => {
   const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
   assert.equal((css.match(/padding-top:calc\(env\(safe-area-inset-top,0px\) \+ 30px\)/g)||[]).length,2);

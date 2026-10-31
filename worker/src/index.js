@@ -322,7 +322,7 @@ export default {
         const syntheticRide = {
           id: rideKey,
           parkId: found.parkId,
-          name: found.ride.name,
+          name: found.name,
           isOpen: true,
           waitTime: kind === "wait" ? Number(rule.threshold) : 15,
           source: "simulation",

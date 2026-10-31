@@ -4,6 +4,16 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const worker = fs.readFileSync(new URL('../worker/src/index.js', import.meta.url), 'utf8');
 const VERSION = JSON.parse(fs.readFileSync(new URL('../version.json', import.meta.url), 'utf8')).version;
+function legacyStoreHarnessCode() {
+  // Historical VM tests evaluate the store without the ESM module loader.
+  // Provide the currently enabled WDW catalog so migration logic executes.
+  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8');
+  return code.replace(/^import .*;\n/, `const PARKS = [{id:6,resortId:"wdw"},{id:5,resortId:"wdw"},{id:7,resortId:"wdw"},{id:8,resortId:"wdw"}];
+const RESORTS = [{id:"wdw",enabled:true}];
+const parksForResort = id => PARKS.filter(park => park.resortId === id);
+const resortForPark = id => RESORTS.find(resort => resort.id === PARKS.find(park => park.id === Number(id))?.resortId);
+`).replaceAll('export ', '');
+}
 function section(start, end) { return worker.slice(worker.indexOf(start), worker.indexOf(end)); }
 const watcher = section('async function runRideWatch(', 'function catalogRideByKey(');
 async function evaluate(beforeWait, currentWait) {
@@ -418,7 +428,7 @@ test('favorites persist independently of notification watches', () => {
   const context = vm.createContext({ EventTarget, Event, structuredClone, Date, Number, JSON,
     CustomEvent: class extends Event { constructor(name, opts) { super(name); this.detail = opts.detail; } },
     window: {}, localStorage: { getItem: k => saved.get(k), setItem: (k,v) => saved.set(k,v) } });
-  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  const code = legacyStoreHarnessCode();
   vm.runInContext(code + ';store.toggleFavorite("mk:test");', context);
   const state = JSON.parse(saved.values().next().value);
   assert.deepEqual(state.favorites, ['mk:test']);
@@ -565,7 +575,7 @@ test('removed For Me sort migrates back to Best Now', () => {
     window: { PARKPULSE_CONFIG: {} },
     localStorage: { getItem: k => saved.get(k) || null, setItem: (k,v) => saved.set(k,v) }
   });
-  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  const code = legacyStoreHarnessCode();
   vm.runInContext(code, context);
   assert.equal(vm.runInContext('store.snapshot.sort', context), 'recommended');
 });
@@ -605,7 +615,7 @@ test('legacy Must-do state is discarded', () => {
     window: { PARKPULSE_CONFIG: {} },
     localStorage: { getItem: k => saved.get(k) || null, setItem: (k,v) => saved.set(k,v) }
   });
-  const code = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8').replaceAll('export ', '');
+  const code = legacyStoreHarnessCode();
   vm.runInContext(code, context);
   const snapshot = vm.runInContext('store.snapshot', context);
   assert.equal(snapshot.mustDo, undefined);

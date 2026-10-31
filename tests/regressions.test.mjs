@@ -1357,13 +1357,20 @@ test('Every frontend shared-catalog import is re-exported through data.js', () =
 });
 
 
-test('Settings tab uses a complete, symmetric gear SVG rather than the distorted legacy path', () => {
+test('Settings tab uses a fully closed, symmetric outline gear across glass modes', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const settings = html.match(/<button id="nav-settings"[\s\S]*?<\/button>/)?.[0];
   assert(settings, 'Settings tab exists');
-  assert.match(settings, /<svg viewBox="0 0 24 24" aria-hidden="true">/);
-  assert.match(settings, /<circle cx="12" cy="12" r="3"\/>/);
-  assert.match(settings, /M9\.671 4\.136a2\.34/);
-  assert.doesNotMatch(settings, /M12 15\.5A3\.5 3\.5/);
+  assert.match(settings, /<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">/);
+  const d = settings.match(/<path d="([^"]+)"\/>/)?.[1];
+  assert(d && /^M[\d.\s]+(?:L[\d.\s]+)+Z$/.test(d), 'gear path is explicitly closed');
+  const points = [...d.matchAll(/(?:M|L)([\d.]+)\s+([\d.]+)/g)].map(match => [+match[1], +match[2]]);
+  assert.equal(points.length, 40, '8 identical five-point teeth');
+  for (let i=0; i<20; i++) {
+    assert(Math.abs(points[i][0] + points[i+20][0] - 24) < 0.02, 'opposite X coordinates are symmetrical');
+    assert(Math.abs(points[i][1] + points[i+20][1] - 24) < 0.02, 'opposite Y coordinates are symmetrical');
+  }
+  assert.match(settings, /<circle cx="12" cy="12" r="2.85"\/>/);
+  assert.doesNotMatch(settings, /M12 15\.5A3\.5 3\.5|M9\.671 4\.136/);
   assert.match(settings, /<span>Settings<\/span>/);
 });

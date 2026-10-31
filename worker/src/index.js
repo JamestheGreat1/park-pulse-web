@@ -1804,12 +1804,16 @@ async function runArmedStagingCronProbe(env) {
     JSON.stringify(delivery || {}));
 }
 
-// Resolve ThemeParks IDs from the park's stable entity catalog, not from the
-// live-data provider. Queue-Times IDs are NOT interchangeable with these UUIDs.
-// This map is staging-only, refreshed daily and never affects live wait selection.
+// Resolve official ThemeParks UUIDs independently of the selected live feed.
+// Queue-Times numeric IDs MUST NEVER be used for ThemeParks history calls.
+// Separate daily cache keys keep staging and production fully isolated.
 async function stagingThemeParksRideIds(env) {
   if (env.STAGING_MODE !== "true") throw new Error("Staging-only ride ID resolution");
-  const cacheKey = "staging-themeparks-ride-ids";
+  return themeParksRideIds(env);
+}
+async function themeParksRideIds(env) {
+  const cacheKey = env.STAGING_MODE === "true"
+    ? "staging-themeparks-ride-ids" : "production-themeparks-ride-ids";
   const now = Date.now();
   const cached = await env.DB.prepare(
     "SELECT updated_at,payload FROM worker_state WHERE state_key=?"
@@ -2470,7 +2474,38 @@ async function refreshRideBaselines(env, currentRides, batchSize = BASELINE_BATC
   const meta = new Map(metaRows.map((row) => [String(row.ride_key), row]));
   const now = Date.now();
 
-  const candidates = currentRides
+  // Historical analytics use ThemeParks.wiki's authenticated history API,
+  // regardless of which provider won the *live* wait freshness comparison.
+  // Never send a Queue-Times numeric ride ID to a ThemeParks history endpoint.
+  const uuid = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i;
+  let historyRides = currentRides.map((ride) => {
+    if (ride.source === "themeparks.wiki" || ride.sourceStale) return ride;
+    const savedId = String(meta.get(String(ride.id))?.source_id || "");
+    return uuid.test(savedId)
+      ? { ...ride, source: "themeparks.wiki", sourceId: savedId }
+      : ride;
+  });
+  // Lookup is necessary only for fresh, unmapped rides. Once mapped, the
+  // durable baseline metadata and daily directory cache avoid repeat calls.
+  if (historyRides.some((ride) =>
+    ride.source !== "themeparks.wiki" && !ride.sourceStale)) {
+    try {
+      const ids = await themeParksRideIds(env);
+      historyRides = historyRides.map((ride) => {
+        if (ride.source === "themeparks.wiki" || ride.sourceStale) return ride;
+        const id = String(ids.get(String(ride.id)) || "");
+        return uuid.test(id)
+          ? { ...ride, source: "themeparks.wiki", sourceId: id }
+          : ride;
+      });
+    } catch (error) {
+      // Never disrupt live data refresh or the hourly scheduler because the
+      // optional history directory is unavailable. Retry on a future run.
+      console.warn("Baseline UUID directory unavailable", error?.message || error);
+    }
+  }
+
+  const candidates = historyRides
     .filter((ride) => ride.source === "themeparks.wiki" && ride.sourceId && !ride.sourceStale)
     .filter((ride) => {
       const row = meta.get(String(ride.id));

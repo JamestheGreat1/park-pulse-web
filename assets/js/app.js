@@ -1004,7 +1004,7 @@ function renderSettings() {
   const stagingAlertTests = stagedPush && pushOn
     ? `<div class="setting-row"><div><strong>Simulated ride alerts</strong>
           <small>Test the real alert rules with pretend transitions. Live ride data won't change.</small>
-        </div><span class="health-pill good">Staging only</span></div>
+        </div><span class="health-pill good staging-test-label">Staging only</span></div>
         ${waitWatch ? `<div class="setting-row"><div><strong>Wait target test</strong>
           <small>Simulate a drop below your target for ${escapeHtml(waitWatch.rideName)}.</small></div>
           <button type="button" data-simulate-alert="wait" data-ride-id="${escapeHtml(waitWatch.rideId)}"
@@ -1030,7 +1030,7 @@ function renderSettings() {
   const liveProbe = backendState?.stagingLiveProbeAvailable === true && pushOn
     ? `<div class="setting-row"><div><strong>Real ride-change verification</strong>
         <small>One device only. Observe live source updates every five minutes for up to 12 hours; no pretend wait times. Stops after the first qualifying real change; provider retries may occur.</small></div>
-        <span class="health-pill good">Staging only</span></div>
+        <span class="health-pill good staging-test-label">Staging only</span></div>
       ${waitWatch ? `<div class="setting-row"><div><strong>Real wait-drop test</strong><small>Watch ${escapeHtml(waitWatch.rideName)} cross your saved target.</small></div>
         <button type="button" class="setting-action" data-arm-live-probe data-kind="wait" data-ride-id="${escapeHtml(waitWatch.rideId)}">Observe</button></div>` : ""}
       ${reopenWatch ? `<div class="setting-row"><div><strong>Real reopening test</strong><small>Watch ${escapeHtml(reopenWatch.rideName)} reopen naturally.</small></div>

@@ -7,6 +7,7 @@
 - Aligned Frosted and Liquid page transitions: both now skip the 200ms whole-page fade/transform that can make backdrop-filter tint settle late in iOS WebKit. The one-frame repaint remains; glass styling and layout are unchanged. Added computed-style browser coverage for both materials.
 - Aligned frontend, service-worker cache/import references and candidate Worker identity with `2.0.0-rc.1`.
 - Updated isolated staging preview generator to use the current app version rather than a hard-coded 1.9.5 reference; added RC safety checks in CI.
+- Added an explicitly gated, one-device staging observer for **natural** live wait-threshold crossings and reopenings, with 12-hour expiry, upstream freshness/operating checks, scoped durable queue/retries, device-authenticated progress checks and tests. General staging alert automation remains off. Live device delivery is **not yet validated**.
 - **Not yet shipped:** Disneyland/DCA source flags remain off; production Worker, D1 and PWA are unchanged. Natural live alert validation, final production migration/rollback audit and final `2.0.0` version/flag changes remain release gates (see [release plan](docs/parkpulse-2-release-plan.md)).
 
 # Changelog

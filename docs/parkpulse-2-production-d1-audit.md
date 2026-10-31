@@ -77,8 +77,9 @@ Reference: [Cloudflare Time Travel](https://developers.cloudflare.com/d1/referen
 ## Release gate
 
 - [x] Compared checked-in production schema and Wrangler config against the RC.
-- [ ] Read-only inspection of actual remote production tables and columns.
-- [ ] Recorded production Time Travel bookmark and verified backup/export approach.
+- [x] Read-only inspection of actual remote production tables and critical columns: 11 expected app tables (plus Cloudflare-managed `_cf_KV`), critical `subscriptions`, `notification_ride_state`, and `pending_ride_alerts` columns match the declared schema (user screenshots on 2026-10-31).
+- [x] Confirmed production Time Travel returns a current bookmark on Wrangler 4.136.3. **A fresh predeployment bookmark should still be saved privately at release time.**
+- [x] Read-only counts verified on 2026-10-31: 8 subscriptions, 419,662 history samples, 2,924 baseline rows, 47 notification ride checkpoints, 0 pending alerts. This is evidence of retained state, not a backup.
 - [ ] Final private production SQL export for independent recovery (before rollout).
 - [ ] Verified normal five-minute + hourly production Worker schedules, D1 costs and source freshness.
 - [ ] Confirmed real *natural* wait/reopening push delivery on iPhone, beyond the synthetic queue test.

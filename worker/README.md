@@ -252,6 +252,19 @@ The protected simulation uses the **same transition evaluator** as production al
 
 This explicitly **does not exercise the five-minute live alert cron** (which remains disabled in staging) or its durable queue. Unit tests cover the shared transition conditions and queue retry behavior separately. Before production release, run a controlled live-alert/checkpoint integration test, verify CPU costs, and check cross-resort watch persistence.
 
+### Persistent staging Cron logs
+
+The staging Wrangler template explicitly enables Workers Observability, invocation logs,
+and full (`head_sampling_rate = 1`) logging to make each five-minute history-only
+scheduled execution inspectable. Cloudflare Workers Logs require explicit deployment
+of the Wrangler configuration, even if the dashboard's Observability page has been
+opened or manually enabled. After rebuilding the staging copy and redeploying, new
+`scheduled` invocations and `Staging history-only sample complete` console messages
+should appear under the staging Worker's **Observability → Events** view. Earlier logs
+cannot be recovered retroactively. If logs still fail to appear, confirm the current
+Worker version and use `npx wrangler tail parkpulse-api-staging --format pretty`;
+do not enable the production alert scheduler for log troubleshooting.
+
 ### One-shot scheduled queue / checkpoint drill (staging only)
 
 A successful device push and the two instant simulated alerts do **not** test the scheduled D1 queue. To verify the next step without enabling live-alert automation, use the installed staging PWA's **Settings → Scheduled queue test → Arm test**.

@@ -2,15 +2,15 @@
 
 **Less refreshing. More riding.**
 
-ParkPulse is the Disney theme-park wait-time app I wanted while actually in the parks. The 2.0 release candidate adds Disneyland Resort alongside Walt Disney World.
+ParkPulse is the Disney theme-park wait-time app I wanted while actually in the parks. Version 2.0 adds Disneyland Resort alongside Walt Disney World.
 
 Open it, see what looks good right now, save the rides you care about, and let ParkPulse keep an eye on the rest. The whole point is to spend less time staring at wait times and more time actually doing stuff.
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Release candidate 2.0.0-rc.1 (not live; production remains 1.9.5)**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · 2.0.0 release preparation (not deployed; production remains 1.9.5)**
 
-**Release status:** This branch is for review only. Disneyland stays disabled in committed source until the final production signoff. See [ParkPulse 2.0 release gates](docs/parkpulse-2-release-plan.md).
+**Release status:** This is an unpublished final-preparation branch. The Disneyland resort and parks are enabled in this review source, but production stays unchanged until explicit signoff. See [ParkPulse 2.0 release gates](docs/parkpulse-2-release-plan.md).
 
 ## What ParkPulse does
 

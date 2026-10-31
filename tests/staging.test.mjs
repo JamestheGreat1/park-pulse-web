@@ -15,6 +15,10 @@ const productionId = production.match(/^database_id\s*=\s*"([^"]+)"/m)?.[1];
 test("staging template has different Worker/database identities and no cron or production URLs", () => {
   assert.equal(productionId?.length, 36);
   assert.match(template, /^name = "parkpulse-api-staging"/m);
+  assert.match(template, /^\[observability\]$/m);
+  assert.match(template, /^\[observability.logs\]$/m);
+  assert.match(template, /^invocation_logs = true$/m);
+  assert.match(template, /^head_sampling_rate = 1$/m);
   assert.match(template, /^database_name = "parkpulse-staging"/m);
   assert.match(template, /^database_id = "__STAGING_D1_ID__"/m);
   assert.match(template, /^\[triggers\]$/m);

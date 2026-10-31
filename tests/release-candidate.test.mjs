@@ -7,8 +7,8 @@ const release = JSON.parse(source("version.json"));
 const version = release.version;
 
 test("candidate version and cache references stay synchronized", () => {
-  assert.equal(version, "2.0.0-rc.1");
-  assert.equal(release.channel, "release-candidate");
+  assert.equal(version, "2.0.0");
+  assert.equal(release.channel, "release-prep");
   const index = source("index.html");
   const app = source("assets/js/app.js");
   const sw = source("service-worker.js");
@@ -29,11 +29,11 @@ test("candidate version and cache references stay synchronized", () => {
   }
 });
 
-test("release candidate cannot silently enable Disneyland or touch production config", () => {
+test("stable release prepares all six parks without changing production deployment targets", () => {
   const catalog = source("assets/js/catalog.js");
   for (const identity of ['id: "dlr"', "id: 16,", "id: 17,"]) {
     const line = catalog.split("\n").find((row) => row.includes(identity));
-    assert(line && line.includes("enabled: false"), identity + " must remain gated");
+    assert(line && line.includes("enabled: true"), identity + " must be enabled only in final prep branch");
   }
   const config = source("worker/wrangler.toml");
   assert.match(config, /^name = "parkpulse-api"$/m);

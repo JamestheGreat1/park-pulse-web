@@ -65,10 +65,10 @@ Tables defined in `worker/schema.sql`: `subscriptions`, `ride_state` (legacy, re
    ```bash
    cd /workspaces/park-pulse-web/worker
    umask 077
-   npx wrangler d1 export parkpulse --remote --config ./wrangler.toml --output=./parkpulse-private-pre-2.0.sql
+   npx wrangler d1 export parkpulse --remote --config ./wrangler.toml --output="$HOME/parkpulse-private-pre-2.0.sql"
    ```
 
-   This file contains subscription endpoints, key material, and live service data. Treat it as **highly sensitive**, keep it out of Git and screenshots, and store it securely outside any shared repo. Verify file size and that the SQL contains schema/data. Exports can temporarily affect D1 query availability.
+   This file contains subscription endpoints, key material, and live service data. Treat it as **highly sensitive**, keep it outside the Git checkout and out of screenshots, and store it securely outside any shared repo. Verify file size and that the SQL contains schema/data. Exports can temporarily affect D1 query availability.
 3. **Never use** `d1 time-travel restore` as an automatic rollback for a failed PWA/Worker deploy. It overwrites the current DB in place and would discard new watches/history after the restore point. Roll back the Worker and PWA first; evaluate any database repair separately.
 4. Confirm that existing installed watches and historic WDW wait samples remain present after deployment. Only then enable public DLR, keeping staged users/keys isolated.
 

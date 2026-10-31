@@ -251,3 +251,19 @@ In the **installed staging PWA**, watch an attraction and enable its wait target
 The protected simulation uses the **same transition evaluator** as production alert detection, but synthetic before/after values are confined to Worker request memory. It never changes `ride_history`, `ride_state_v2`, `notification_ride_state`, or production alert schedule. Only the subscription registered with matching `endpoint`, `p256dh` and `auth` in **staging D1** may receive the test. One simulated notification per minute per subscription. It records only a staging test cooldown entry in `notification_log_v2`.
 
 This explicitly **does not exercise the five-minute live alert cron** (which remains disabled in staging) or its durable queue. Unit tests cover the shared transition conditions and queue retry behavior separately. Before production release, run a controlled live-alert/checkpoint integration test, verify CPU costs, and check cross-resort watch persistence.
+
+### One-shot scheduled queue / checkpoint drill (staging only)
+
+A successful device push and the two instant simulated alerts do **not** test the scheduled D1 queue. To verify the next step without enabling live-alert automation, use the installed staging PWA's **Settings → Scheduled queue test → Arm test**.
+
+After deploying the current `feature/multi-resort-dlr` staging build (preserve `--enable-history-cron`, `--enable-test-push`, and the same `--preview-url`), watch an attraction with a wait threshold or reopen alert and ensure push is enabled. The arm request requires the same device's registered staging push keys and an existing matching watch. Only one global probe may be armed at a time; duplicate arm calls fail safely. The next **five-minute staging history cron** collects the six parks as before and, if a test is armed, creates one clearly labeled `STAGING CRON TEST` notification using the shared production transition evaluator, the **real durable D1 queue**, the same pending-alert processing/retry logic, and the same notification-checkpoint writer. A notification opens the watched attraction in staging.
+
+The test transition is **synthetic and explicitly labeled**, so no actual wait drop or reopening is implied. Only the isolated staging `notification_ride_state` checkpoint may include a simulated ride. It does not write synthetic ride history, edit the public current wait feed, evaluate unrelated watches, or enable the regular production `runRideWatch` job. This mode stays opt-in, and the scheduler goes back to collecting history only after completion. Temporary Web Push failures stay queued for limited retry attempts on subsequent scheduled runs, until the queued alert expires. Do not confuse this with full ongoing live-alert rollout.
+
+Read-only status after arming (from `.parkpulse-staging/worker`):
+
+```bash
+npx wrangler d1 execute parkpulse-staging --remote --config ./wrangler.toml --command "SELECT json_extract(payload,'$.status') AS status, json_extract(payload,'$.kind') AS kind, json_extract(payload,'$.delivery.delivered') AS delivered, json_extract(payload,'$.delivery.failed') AS failed, datetime(updated_at/1000,'unixepoch') AS updated_utc FROM worker_state WHERE state_key='staging-cron-probe';"
+```
+
+Use `npx wrangler tail parkpulse-api-staging --format pretty` to confirm a `Staging scheduled alert probe delivered` log; check CPU under staging Worker metrics. If the probe fails, inspect the error and queue before rearming. Production Worker and D1 must remain untouched. Full automated **real-live ride transition** alert validation is still a separate final rollout gate.

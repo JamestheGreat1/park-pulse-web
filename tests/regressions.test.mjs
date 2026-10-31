@@ -1233,3 +1233,106 @@ test('In-flight refresh queues a newly selected resort rather than silently drop
   assert.equal(instance.ridesForPark(16)[0].id,'dl:test');
   assert.equal(instance.ridesForPark(6)[0].id,'mk:test');
 });
+
+
+test('Six-park Worker polling uses at most two concurrent requests in catalog order', async () => {
+  const block=section('async function fetchCurrentRideSnapshot(', 'async function runManualRefresh(');
+  const input=[5,6,7,8,16,17];
+  const parks=new Map(input.map(id=>[id,{name:String(id)}]));
+  let active=0,peak=0;
+  const fetched=[];
+  const context=vm.createContext({
+    Map,Promise,PARKS:parks,
+    fetchFreshParkRides:async id=>{
+      active++;peak=Math.max(peak,active);fetched.push(id);
+      await new Promise(resolve=>setImmediate(resolve));
+      active--;
+      return {rides:[{id:'ride-'+id,parkId:id}],primaryAvailable:true,fallbackUsed:id===17};
+    }
+  });
+  vm.runInContext(block,context);
+  const result=await vm.runInContext('fetchCurrentRideSnapshot({})',context);
+  assert.equal(peak,2);
+  assert.deepEqual(fetched,input);
+  assert.deepEqual(Array.from(result.rides,ride=>ride.parkId),input);
+  assert.equal(result.primaryParks,6);
+  assert.equal(result.fallbackParks,1);
+});
+
+test('Cross-resort alerts keep WDW and Disneyland Space Mountains separate', async () => {
+  const now=Date.now();
+  const rides=[
+    {id:'mk:space-mountain',parkId:6,name:'Space Mountain',isOpen:true,waitTime:20,updatedAt:now},
+    {id:'dl:space-mountain',parkId:16,name:'Space Mountain',isOpen:true,waitTime:25,updatedAt:now}
+  ];
+  const subs=[
+    {endpoint:'wdw',watch_ids:JSON.stringify([{rideId:'mk:space-mountain',parkId:6,threshold:30,reopen:false}])},
+    {endpoint:'dlr',watch_ids:JSON.stringify([{rideId:'dl:space-mountain',parkId:16,threshold:30,reopen:false}])},
+    {endpoint:'other',watch_ids:JSON.stringify([{rideId:'epcot:spaceship-earth',parkId:5,threshold:30,reopen:false}])}
+  ];
+  const queued=[];
+  const grouped=items=>{
+    const result=new Map();
+    for(const ride of items){
+      if(!result.has(ride.parkId))result.set(ride.parkId,[]);
+      result.get(ride.parkId).push(ride);
+    }
+    return result;
+  };
+  const env={DB:{prepare:()=>({all:async()=>({results:subs}),bind:()=>({run:async()=>({})})})}};
+  const ctx=vm.createContext({
+    Date,Number,String,JSON,console,Map,Set,
+    env,LIVE_FRESHNESS_MS:15*60*1000,
+    PARKS:new Map([
+      [6,{name:'Magic Kingdom',rides:[{key:'mk:space-mountain'}]}],
+      [16,{name:'Disneyland Park',rides:[{key:'dl:space-mountain'}]}]
+    ]),
+    parkTimezone:id=>id===16?'America/Los_Angeles':'America/New_York',
+    zoneParts:()=>({hour:13}),
+    readPriorRideState:async()=>rides.map(ride=>({...ride,waitTime:65})),
+    fetchCurrentRideSnapshot:async()=>({rides}),
+    groupByPark:grouped,
+    ensureNotificationSchema:async()=>{},
+    normalizeRules:rules=>rules,
+    ruleMatchesRide:(rule,ride)=>String(rule.rideId)===String(ride.id),
+    notificationRideName:ride=>ride.name,
+    safeTag:id=>String(id).replace(':','-'),
+    enqueueRideAlerts:async(_,alerts)=>{queued.push(...alerts);return alerts.length;},
+    processPendingRideAlerts:async()=>({delivered:2,pending:0,retried:0,failed:0,discarded:0}),
+    writeCurrentRideSnapshot:async()=>{}
+  });
+  vm.runInContext(watcher,ctx);
+  await vm.runInContext('runRideWatch(env)',ctx);
+  assert.equal(queued.length,2);
+  assert.deepEqual(queued.map(alert=>alert.endpoint).sort(),['dlr','wdw']);
+  const dlr=queued.find(alert=>alert.endpoint==='dlr');
+  const wdw=queued.find(alert=>alert.endpoint==='wdw');
+  assert.equal(dlr.rideId,'dl:space-mountain');
+  assert.match(dlr.payload.body,/Disneyland Park/);
+  assert.match(dlr.payload.url,/ride=dl%3Aspace-mountain/);
+  assert.equal(wdw.rideId,'mk:space-mountain');
+  assert.match(wdw.payload.body,/Magic Kingdom/);
+  assert.match(wdw.payload.url,/ride=mk%3Aspace-mountain/);
+});
+
+test('Ride history returns its own park timezone and park-day bounds', async () => {
+  const now=Date.parse('2026-07-04T20:00:00Z');
+  const history=section('async function getRideHistory(','async function getRideInsights(');
+  const starts=[];
+  const ctx=vm.createContext({
+    Date,Number,String,Promise,
+    catalogRideByKey:key=>({parkId:key.startsWith('dl:')?16:6}),
+    parkTimezone:id=>id===16?'America/Los_Angeles':'America/New_York',
+    parkDayStartMs:(date,zone)=>zone==='America/Los_Angeles'
+      ? Date.parse('2026-07-04T10:00:00Z') : Date.parse('2026-07-04T07:00:00Z'),
+    env:{DB:{prepare:()=>({bind(...args){starts.push(args);return{all:async()=>({results:[]})}}})}}
+  });
+  vm.runInContext(history,ctx);
+  const california=await vm.runInContext("getRideHistory(env,'dl:space-mountain','today',"+now+")",ctx);
+  const florida=await vm.runInContext("getRideHistory(env,'mk:space-mountain','today',"+now+")",ctx);
+  assert.equal(california.timezone,'America/Los_Angeles');
+  assert.equal(california.startAt,'2026-07-04T10:00:00.000Z');
+  assert.equal(florida.startAt,'2026-07-04T07:00:00.000Z');
+  assert.equal(starts[0][0],'dl:space-mountain');
+  assert.equal(starts[0][1],Date.parse('2026-07-04T10:00:00Z'));
+});

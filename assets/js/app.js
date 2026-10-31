@@ -797,8 +797,11 @@ function selectView(name) {
   if (!target.childElementCount) render();
 
   const root = document.documentElement;
-  const liquid = root.dataset.previewSurface === "liquid";
-  if (liquid) root.classList.add("glass-color-snap");
+  // Frosted and Liquid both use backdrop-filter layers. Force their glass
+  // compositing to snap with the tab switch instead of tinting one frame later.
+  const glassSurface = root.dataset.previewSurface;
+  const snapGlass = glassSurface === "liquid" || glassSurface === "neutral";
+  if (snapGlass) root.classList.add("glass-color-snap");
 
   for (const [key, el] of Object.entries(views)) el.classList.toggle("active", key === name);
   document.querySelectorAll(".nav-item").forEach((button) => {
@@ -808,7 +811,7 @@ function selectView(name) {
     else button.removeAttribute("aria-current");
   });
 
-  if (liquid) {
+  if (snapGlass) {
     void target.offsetWidth;
     requestAnimationFrame(() => root.classList.remove("glass-color-snap"));
   }

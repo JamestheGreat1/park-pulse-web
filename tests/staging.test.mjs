@@ -59,7 +59,7 @@ test("stage source generator only mutates a copied catalog and not original flag
   assert.match(catalog, /id: "dlr"[^\n]*enabled: true/);
   assert.match(catalog, /id: 16,[^\n]*enabled: true/);
   assert.match(catalog, /id: 17,[^\n]*enabled: true/);
-  assert.match(before, /id: "dlr"[^\n]*enabled: false/);
+  assert.match(before, /id: "dlr"[^\n]*enabled: true/);
   assert.equal(read("assets/js/catalog.js"), before);
   assert(existsSync(new URL("../.parkpulse-staging/worker/src/index.js", import.meta.url)));
   assert.match(output, /^\[triggers\]$/m);

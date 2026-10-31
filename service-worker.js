@@ -18,6 +18,17 @@ self.addEventListener("activate", event => event.waitUntil(
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET" || new URL(event.request.url).origin !== location.origin) return;
   const url = new URL(event.request.url);
+  // The staging PWA and API share an origin. Never let the offline shell
+  // cache retain JSON responses: an old park response can otherwise make
+  // every ride appear stale and hide operating-status dots indefinitely.
+  // Applies equally to public API, health, and VAPID key endpoints.
+  if (url.pathname.startsWith("/api/") ||
+      url.pathname === "/health" ||
+      url.pathname === "/vapid-key" ||
+      url.pathname.startsWith("/subscriptions")) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
   if (url.pathname.endsWith("/version.json")) {
     event.respondWith(fetch(event.request, { cache: "no-store" }));
     return;

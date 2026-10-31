@@ -1257,8 +1257,78 @@ async function runStagingHistoryOnly(env) {
   console.log("Staging history-only sample complete", rides.length);
 }
 
-// Protected, staging-only historical backfill. Reuse D1's fresh ride/source
-// identifiers: do not re-poll six parks or touch notification checkpoints.
+// Resolve ThemeParks IDs from the park's stable entity catalog, not from the
+// live-data provider. Queue-Times IDs are NOT interchangeable with these UUIDs.
+// This map is staging-only, refreshed daily and never affects live wait selection.
+async function stagingThemeParksRideIds(env) {
+  if (env.STAGING_MODE !== "true") throw new Error("Staging-only ride ID resolution");
+  const cacheKey = "staging-themeparks-ride-ids";
+  const now = Date.now();
+  const cached = await env.DB.prepare(
+    "SELECT updated_at,payload FROM worker_state WHERE state_key=?"
+  ).bind(cacheKey).first();
+
+  if (cached && now - Number(cached.updated_at || 0) < 24 * 60 * 60 * 1000) {
+    let saved = null;
+    try { saved = JSON.parse(cached.payload || "{}"); } catch {}
+    if (saved?.ids && typeof saved.ids === "object" && !Array.isArray(saved.ids)) {
+      const valid = Object.entries(saved.ids).filter(([key, id]) =>
+        /^[a-z0-9-]+:[a-z0-9-]+$/i.test(key) &&
+        /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id));
+      if (valid.length >= 1) return new Map(valid);
+    }
+  }
+
+  const ids = new Map();
+  const uuid = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i;
+  for (const [parkId, park] of PARKS.entries()) {
+    const response = await fetch(
+      `https://api.themeparks.wiki/v1/entity/${encodeURIComponent(park.themeParksId)}/children`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": `ParkPulse/${VERSION}`,
+          ...(env.THEMEPARKS_API_KEY ? { "x-api-key": env.THEMEPARKS_API_KEY } : {})
+        },
+        cf: { cacheEverything: true, cacheTtl: 3600 }
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`ThemeParks attraction directory unavailable (park ${parkId}, HTTP ${response.status})`);
+    }
+    const payload = await response.json();
+    if (!Array.isArray(payload?.children)) {
+      throw new Error(`ThemeParks attraction directory returned invalid data (park ${parkId})`);
+    }
+
+    const best = new Map();
+    for (const item of payload.children) {
+      if (String(item?.entityType || "").toUpperCase() !== "ATTRACTION" ||
+          !uuid.test(String(item?.id || "")) || isSingleRiderName(item?.name)) continue;
+      const matched = findCatalogRide(park, item.name);
+      if (!matched) continue;
+      const score = normalizeName(item.name) === normalizeName(matched.name) ? 2 : 1;
+      const previous = best.get(matched.key);
+      if (!previous || score > previous.score) {
+        best.set(matched.key, { score, id: String(item.id) });
+      }
+    }
+    for (const [rideKey, entry] of best) ids.set(rideKey, entry.id);
+  }
+  if (!ids.size) {
+    throw new Error("ThemeParks ride ID directory matched no tracked attractions");
+  }
+  await env.DB.prepare(
+    `INSERT INTO worker_state(state_key,updated_at,payload)
+     VALUES(?,?,?)
+     ON CONFLICT(state_key) DO UPDATE SET
+       updated_at=excluded.updated_at,payload=excluded.payload`
+  ).bind(cacheKey, now, JSON.stringify({ ids: Object.fromEntries(ids) })).run();
+  return ids;
+}
+
+// Protected, staging-only historical backfill. The public live feed may use
+// Queue-Times, but the history endpoint only ever gets a ThemeParks entity UUID.
 async function runStagingBaselineBatch(env) {
   if (env.STAGING_MODE !== "true") throw new Error("Staging-only backfill");
   if (!env.THEMEPARKS_API_KEY) {
@@ -1268,17 +1338,23 @@ async function runStagingBaselineBatch(env) {
     "SELECT ride_key,park_id,source_id,name,source,updated_at FROM ride_state_v2"
   ).all()).results || [];
   const now = Date.now();
-  const rides = rows
-    .filter((row) => PARKS.has(Number(row.park_id)) &&
-      now - Number(row.updated_at || 0) <= HISTORY_HEALTH_WINDOW_MS)
-    .map((row) => ({
+  const freshRows = rows.filter((row) => PARKS.has(Number(row.park_id)) &&
+    now - Number(row.updated_at || 0) <= HISTORY_HEALTH_WINDOW_MS);
+  const idMap = freshRows.some((row) => row.source !== "themeparks.wiki")
+    ? await stagingThemeParksRideIds(env)
+    : new Map();
+  const rides = freshRows.map((row) => {
+    const directId = row.source === "themeparks.wiki" ? row.source_id : null;
+    const sourceId = idMap.get(String(row.ride_key)) || directId;
+    return {
       id: String(row.ride_key),
       parkId: Number(row.park_id),
-      sourceId: row.source_id || null,
+      sourceId: sourceId || null,
       name: String(row.name || row.ride_key),
-      source: String(row.source || "unknown"),
-      sourceStale: false
-    }));
+      source: sourceId ? "themeparks.wiki" : "unavailable",
+      sourceStale: !sourceId
+    };
+  });
   const baseline = await refreshRideBaselines(env, rides, 4);
   const analytics = await getAnalyticsStatus(env);
   return {
@@ -1286,6 +1362,8 @@ async function runStagingBaselineBatch(env) {
     staging: true,
     polledParks: 0,
     eligibleRides: rides.length,
+    mappedRides: rides.filter((ride) => ride.sourceId).length,
+    unmappedRides: rides.filter((ride) => !ride.sourceId).length,
     baseline,
     analytics: {
       totalRides: analytics.totalRides,

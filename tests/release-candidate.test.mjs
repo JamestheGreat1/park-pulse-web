@@ -18,8 +18,11 @@ test("candidate version and cache references stay synchronized", () => {
   assert(app.includes('const APP_VERSION = "' + version + '"'));
   assert(sw.includes('const VERSION = "' + version + '"'));
   assert(sw.includes('CACHE_NAME = "parkpulse-' + version + '"'));
-  assert(worker.includes('const VERSION = "' + version + '"'));
-  assert.equal(JSON.parse(source("worker/package.json")).version, version);
+  // Worker-only maintenance patches deliberately do not change the PWA
+  // service-worker cache, install prompt, or public frontend version.
+  const backendVersion = JSON.parse(source("worker/package.json")).version;
+  assert.equal(backendVersion, "2.0.1");
+  assert(worker.includes('const VERSION = "' + backendVersion + '"'));
   for (const path of ["assets/js/app.js", "assets/js/api.js", "assets/js/data.js",
                       "assets/js/store.js", "assets/js/push.js"]) {
     const code = source(path);

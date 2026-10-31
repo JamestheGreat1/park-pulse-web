@@ -1232,8 +1232,7 @@ function bindDynamic() {
     const newCard = [...document.querySelectorAll('[data-resort]')]
       .find((card) => card.dataset.resort === resortId);
     if (newCard) newCard.focus({ preventScroll: true });
-    const parkId = store.snapshot.selectedParkId;
-    if (!rideData.ridesForPark(parkId).length) rideData.refresh({ parkId });
+    // The resort-change event refreshes every park, even when cached waits exist.
   });
   document.querySelectorAll('[data-next-up-another]').forEach((b) => b.onclick = cycleNextUp);
   bindRideCards(views.explore);
@@ -1899,6 +1898,10 @@ setupSheetDismissGesture();
       if (e.detail.reason === "rules") void refreshRelevantParks();
     }
     if (e.detail.reason === "park") nextUpOffset = 0;
+    // Refresh the complete destination on every resort switch, not only
+    // the first park on its first visit. RideData queues requests if a
+    // different resort is already being fetched.
+    if (e.detail.reason === "resort") void refreshRelevantParks();
     if (e.detail.reason === "search") renderRideResults();
     else if (e.detail.reason !== "view") render();
   });

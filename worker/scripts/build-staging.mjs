@@ -39,6 +39,7 @@ if (!/^STAGING_ALLOW_PUSH\s*=\s*"false"/m.test(template) ||
   fail("Staging push must be disabled in the committed template.");
 }
 if (!/^STAGING_ENABLE_CRON\s*=\s*"false"/m.test(template)) fail("Cron gate must be disabled.");
+if (!/^STAGING_LIVE_PROBE\s*=\s*"false"/m.test(template)) fail("Live probe must be disabled in committed template.");
 if ((template.match(/^\[triggers\]$/gm) || []).length !== 1 ||
     (template.match(/^crons = \[\]$/gm) || []).length !== 1) {
   fail("Staging must have an explicit empty trigger list by default.");

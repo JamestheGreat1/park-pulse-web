@@ -40,6 +40,11 @@ await Promise.all(sources.map(async ([id,url])=>{
       }))));
     }else if(id==="queue-times"){
       const all=[...(data.rides||[]),...(data.lands||[]).flatMap(l=>l.rides||[])];
+      const landRides=(data.lands||[]).flatMap(l=>(l.rides||[]).map(ride=>({...ride,container:"lands:"+l.name})));
+      const topRides=(data.rides||[]).map(ride=>({...ride,container:"top-level"}));
+      console.log(id,"Land ingestion order",JSON.stringify([...landRides,...topRides].filter(x=>/living.with.the.land|glimmering/i.test(x.name||"")).map(x=>({
+        name:x.name,container:x.container,last_updated:x.last_updated,id:x.id
+      }))));
       console.log(id,"count",all.length,"relevant",JSON.stringify(all.filter(x=>/living.with.the.land|glimmering|soarin|nemo/i.test(x.name||"")).map(x=>({
         name:x.name,id:x.id,is_open:x.is_open,wait_time:x.wait_time,last_updated:x.last_updated,
         ageMinutes:x.last_updated?Math.round((now-Date.parse(x.last_updated))/60000):null

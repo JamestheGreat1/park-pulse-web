@@ -18,13 +18,16 @@ test("2.1 approved dashboard and style remain exactly in sync with the hosted pr
   const shared = [
     "parkOperatingState", "closedParkReason", "parkFeatureMarkup",
     "crowdPresentation", "dashboardMetrics", "dashboardMetricsMarkup",
-    "dashboardConditionMarkup", "dashboardWatchesMarkup",
+    "dashboardConditionMarkup",
     "renderExplore", "renderParkHours", "renderRideDataUpdate",
   ];
   for (const name of shared) {
     assert.equal(functionBody(app, name), functionBody(preview, name),
       "Dashboard drift between release candidate and accepted preview: " + name);
   }
+  // Live watch titles follow the selected provider name after 2.1.0.
+  assert.match(app, /function watchDisplayName\(/);
+  assert.match(app, /watchDisplayName\(rule, ride\)/);
   assert.equal(read("assets/css/app.css"), read("preview-2-1/assets/css/app.css"),
     "Release CSS must match the approved preview before versioning");
 });

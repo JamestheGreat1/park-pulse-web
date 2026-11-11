@@ -562,9 +562,8 @@ function closedParkMarkup(state, schedule, status = parkOperatingState(schedule)
   </section>`;
 }
 function parkFeatureMarkup(state = store.snapshot, schedule = rideData.hoursForPark(state.selectedParkId), status = parkOperatingState(schedule)) {
-  return status?.key === "closed"
-    ? closedParkMarkup(state, schedule, status)
-    : nextUpMarkup(state);
+  if (status?.key === "closed") return closedParkMarkup(state, schedule, status);
+  return state.dashboard.showWorth ? nextUpMarkup(state) : "";
 }
 function recommendationScore(ride, state = store.snapshot) {
   if (!ride || !ride.isOpen || isRideStale(ride) || ride.sourceMissing) return -Infinity;
@@ -623,34 +622,21 @@ function nextUpRide(state = store.snapshot) {
 function nextUpMarkup(state = store.snapshot) {
   const ride = nextUpRide(state);
   if (!ride) return "";
-
   const status = rideStatus(ride);
-  const reason = recommendationReason(ride, state);
   const comparison = rideComparison(ride);
-  const label = comparison?.percentDelta <= -25
-    ? "Great right now"
-    : state.favorites.includes(String(ride.id))
-      ? "Favorite pick"
-      : "ParkPulse pick";
-
-  return `<section class="next-up-card liquid-glass">
-    <div class="next-up-head">
-      <div><span class="eyebrow">${escapeHtml(label)}</span><h3>What should I ride next?</h3><p>${escapeHtml(reason)}</p></div>
+  const reason = recommendationReason(ride, state);
+  return `<section class="dashboard-pick liquid-glass" aria-label="Worth a Look">
+    <div class="dashboard-section-head"><div><span class="eyebrow">✦ Worth a Look</span></div>
+      <button type="button" class="dashboard-text-action" data-next-up-another aria-label="Show another suggested attraction">Another ↻</button>
     </div>
-    <div class="next-up-ride-row">
-      <button class="next-up-ride" type="button" data-open-ride="${ride.id}">
-        <span class="ride-land">${escapeHtml(ride.land)}</span>
-        <strong>${escapeHtml(ride.name)}</strong>
-      </button>
-      <div class="next-up-wait"><b class="${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</b><span>${escapeHtml(status.label)}</span></div>
-    </div>
-    <div class="next-up-actions">
-      <button class="primary-button next-up-primary" type="button" data-open-ride="${ride.id}">View ride</button>
-      <button class="secondary-button" type="button" data-next-up-another>Show another</button>
-    </div>
+    <button class="dashboard-pick-ride" type="button" data-open-ride="${escapeHtml(ride.id)}">
+      <span class="dashboard-pick-copy"><small class="ride-land">${escapeHtml(ride.land)}</small><strong>${escapeHtml(ride.name)}</strong>
+        <small class="${comparison?.percentDelta <= -10 ? "positive" : ""}">${escapeHtml(reason)}</small>
+      </span>
+      <span class="dashboard-pick-wait"><b>${escapeHtml(status.wait)}</b><small>${escapeHtml(status.label)}</small></span>
+    </button>
   </section>`;
 }
-
 function cycleNextUp() {
   nextUpOffset += 1;
   renderExplore();
@@ -898,21 +884,76 @@ function renderRideResults() {
   list.innerHTML = rideListMarkup();
   bindRideCards(list);
 }
+function dashboardMetrics(parkId, schedule, status, crowd) {
+  const fresh = rideData.ridesForPark(parkId).filter((ride) =>
+    !isRideStale(ride) && !ride.sourceMissing && ride.operationalStatus !== "UNKNOWN"
+  );
+  const open = fresh.filter((ride) => ride.isOpen);
+  const waits = open.map((ride) => ride.waitTime)
+    .filter((wait) => wait != null && Number.isFinite(Number(wait)) && Number(wait) >= 0)
+    .map(Number).sort((a, b) => a - b);
+  const middle = Math.floor(waits.length / 2);
+  const medianWait = waits.length
+    ? Math.round(waits.length % 2 ? waits[middle] : (waits[middle - 1] + waits[middle]) / 2)
+    : null;
+  const crowdView = crowdPresentation(crowd);
+  const showCrowd = status.key === "open" && !ticketedEventState(schedule) && crowdView.kind === "level";
+  return {
+    operating: status.key === "closed" || !fresh.length ? null : open.length,
+    known: status.key === "closed" || !fresh.length ? null : fresh.length,
+    medianWait: status.key === "closed" ? null : medianWait,
+    crowdLevel: showCrowd ? Math.round(Number(crowdView.level)) : null,
+    crowdText: showCrowd ? crowdView.label : ""
+  };
+}
+
+function dashboardMetricsMarkup(parkId, schedule, status, crowd, dashboard = store.snapshot.dashboard) {
+  const metrics = dashboardMetrics(parkId, schedule, status, crowd);
+  return `<div class="dashboard-stat" aria-label="${metrics.known == null ? "Operating attractions unavailable" : `${metrics.operating} of ${metrics.known} attractions with fresh status are operating`}">
+      <strong>${metrics.operating == null ? "—" : `${metrics.operating}<span>/${metrics.known}</span>`}</strong><small>Operating</small>
+    </div>
+    <div class="dashboard-stat"><strong>${metrics.medianWait == null ? "—" : `${metrics.medianWait}<span> min</span>`}</strong><small>Median live wait</small></div>
+    ${dashboard.showCrowd ? `<div class="dashboard-stat" aria-label="${metrics.crowdLevel == null ? "Crowd pressure unavailable" : `Crowd pressure ${metrics.crowdLevel} out of 10, ${metrics.crowdText}`}"><strong>${metrics.crowdLevel == null ? "—" : `${metrics.crowdLevel}<span>/10</span>`}</strong><small>Crowd pressure</small></div>` : ""}`;
+}
+
+function dashboardWatchesMarkup(state = store.snapshot) {
+  if (!state.dashboard.showWatches || !state.rules.length) return "";
+  const previews = state.rules.slice(0, 2);
+  return `<section class="dashboard-watches liquid-glass" aria-label="Your active watches">
+    <div class="dashboard-section-head"><div><span class="eyebrow">Your Watches</span><small>${state.rules.length} active ${state.rules.length === 1 ? "watch" : "watches"}</small></div>
+    <button type="button" class="dashboard-text-action" data-view-jump="watching">View all ›</button></div>
+    <div class="dashboard-watch-list">${previews.map((rule) => {
+      const ride = rideData.rideById(rule.rideId);
+      const status = rideStatus(ride);
+      return `<button class="dashboard-watch" type="button" data-open-ride="${escapeHtml(rule.rideId)}">
+        <span><strong>${escapeHtml(rule.rideName)}</strong><small>${escapeHtml(parkName(rule.parkId))}</small></span>
+        <span class="dashboard-watch-status"><b class="${status.stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</b><small>${escapeHtml(status.label)}</small></span>
+      </button>`;
+    }).join("")}</div>
+  </section>`;
+}
 function renderExplore() {
   const state = store.snapshot;
-  const activeCount = state.rules.length;
-  const parkSchedule = rideData.hoursForPark(state.selectedParkId);
-  const parkHours = formatParkHours(parkSchedule, Date.now(), state.useLocalTime);
-  const parkStatus = parkOperatingState(parkSchedule);
-  const ticketedEvents = formatTicketedEvents(parkSchedule, state.useLocalTime);
+  const schedule = rideData.hoursForPark(state.selectedParkId);
+  const status = parkOperatingState(schedule);
   const crowd = rideData.crowdForPark(state.selectedParkId);
   const activeResort = RESORT_BY_ID.get(state.selectedResortId) || RESORTS[0];
+  const dashboard = state.dashboard;
+  const hours = formatParkHours(schedule, Date.now(), state.useLocalTime);
+  const events = formatTicketedEvents(schedule, state.useLocalTime);
+  views.explore.classList.toggle("dashboard-compact", dashboard.density === "compact");
   views.explore.innerHTML = `
-    <section class="hero-card liquid-glass">
-      <div><button class="resort-switch" type="button" data-view-jump="resorts" aria-label="Switch resort; current destination: ${escapeHtml(activeResort.name)}"><span class="eyebrow">${escapeHtml(activeResort.name)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button><h2>Stop refreshing wait times.</h2><p>Pick a wait you’d actually take. ParkPulse will keep an eye on it and buzz you when it gets there.</p></div>
-      <button class="hero-watch" type="button" data-view-jump="watching" aria-label="View ${activeCount} active ${activeCount === 1 ? "watch" : "watches"}"><strong>${activeCount}</strong><span>${activeCount === 1 ? "active watch" : "active watches"}</span></button>
+    <section class="dashboard-overview liquid-glass" aria-label="Park overview">
+      <div class="dashboard-overview-head">
+        <button class="resort-switch" type="button" data-view-jump="resorts" aria-label="Switch resort; current destination: ${escapeHtml(activeResort.name)}"><span class="eyebrow">${escapeHtml(activeResort.name)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+        <span class="park-status-slot">${status.key === "unknown" ? '<span class="overview-unknown">Hours unavailable</span>' : parkStatusPillMarkup(status)}</span>
+      </div>
+      <h2>${escapeHtml(parkName(state.selectedParkId))}</h2>
+      <div class="dashboard-metrics ${dashboard.showCrowd ? "" : "dashboard-two-stats"}">${dashboardMetricsMarkup(state.selectedParkId, schedule, status, crowd, dashboard)}</div>
+      ${dashboard.showHours ? `<span class="park-hours">${escapeHtml(hours)}</span>` : ""}
+      <div class="park-events">${events.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div>
+      <span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span>
     </section>
-    ${firstRunVisible() ? `<section class="first-run-card liquid-glass" aria-label="ParkPulse quick start"><div class="first-run-mark" aria-hidden="true">✦</div><div class="first-run-copy"><span class="eyebrow">Quick start</span><h3>Best Now does the useful part for you.</h3><p>It compares each ride with what’s normal right now. Tap a ride to watch it, then let ParkPulse keep checking. That’s basically it.</p></div><button type="button" class="first-run-dismiss" data-dismiss-first-run>Got it</button></section>` : ""}
     <div class="park-strip" aria-label="Choose a park">
       ${parksForResort(state.selectedResortId).map((p) => {
         const chipStatus = parkOperatingState(rideData.hoursForPark(p.id));
@@ -920,14 +961,15 @@ function renderExplore() {
         return `<button type="button" class="park-chip ${p.id === state.selectedParkId ? "active" : ""}" data-park="${p.id}" aria-pressed="${p.id === state.selectedParkId}" aria-label="${escapeHtml(p.name + statusLabel)}"><span class="park-chip-icon" aria-hidden="true">${p.emoji}</span>${p.short}<span class="park-chip-status ${parkChipStatusClass(chipStatus)}" aria-hidden="true"></span></button>`;
       }).join("")}
     </div>
-    <section class="toolbar liquid-glass">
+    <div class="park-feature-slot" data-park-state="${status.key}">${parkFeatureMarkup(state, schedule, status)}</div>
+    ${dashboardWatchesMarkup(state)}
+    <section class="toolbar liquid-glass" aria-label="Attraction filters">
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="Search rides in ${escapeHtml(parkName(state.selectedParkId))}" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
-      <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open>Open only</button>
+      <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open aria-pressed="${state.openOnly}">Open only</button>
       <button class="filter-button ${state.favoritesOnly ? "active" : ""}" type="button" data-toggle-favorites aria-pressed="${state.favoritesOnly}">Favorites</button>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
-    <div class="park-feature-slot" data-park-state="${parkStatus.key}">${parkFeatureMarkup(state, parkSchedule, parkStatus)}</div>
-    <div class="section-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><div class="park-title-row"><h2>${escapeHtml(parkName(state.selectedParkId))}</h2><span class="park-status-slot">${parkStatusPillMarkup(parkStatus)}</span></div><span class="park-hours">${escapeHtml(parkHours)}</span><div class="park-events">${ticketedEvents.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div><div class="park-crowd-wrap">${crowdMarkup(crowd, parkSchedule)}</div></div><span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span></div>
+    <div class="section-heading dashboard-ride-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>Attractions</h2></div></div>
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }
 function renderResorts() {
@@ -1131,6 +1173,14 @@ function renderSettings() {
       ${liveProbe}
       ${installRow}
     </section>
+    <div class="settings-section-title">Dashboard</div>
+    <section class="settings-group liquid-glass">
+      <label class="setting-row"><div><strong>Layout density</strong><small>Compact shows more rides at a glance.</small></div><select id="dashboardDensitySelect"><option value="compact" ${state.dashboard.density === "compact" ? "selected" : ""}>Compact</option><option value="comfortable" ${state.dashboard.density === "comfortable" ? "selected" : ""}>Comfortable</option></select></label>
+      <label class="setting-row"><div><strong>Worth a Look</strong><small>Show one suggested attraction on Explore.</small></div><span class="setting-switch"><input id="dashboardWorthToggle" type="checkbox" ${state.dashboard.showWorth ? "checked" : ""} aria-label="Show Worth a Look"><span class="switch"></span></span></label>
+      <label class="setting-row"><div><strong>Watch previews</strong><small>Only appears when you have active watches.</small></div><span class="setting-switch"><input id="dashboardWatchesToggle" type="checkbox" ${state.dashboard.showWatches ? "checked" : ""} aria-label="Show active watch previews"><span class="switch"></span></span></label>
+      <label class="setting-row"><div><strong>Park hours</strong><small>Show today's hours on the park overview.</small></div><span class="setting-switch"><input id="dashboardHoursToggle" type="checkbox" ${state.dashboard.showHours ? "checked" : ""} aria-label="Show park hours"><span class="switch"></span></span></label>
+      <label class="setting-row"><div><strong>Crowd pressure</strong><small>Show the estimate when enough reliable data exists.</small></div><span class="setting-switch"><input id="dashboardCrowdToggle" type="checkbox" ${state.dashboard.showCrowd ? "checked" : ""} aria-label="Show crowd pressure"><span class="switch"></span></span></label>
+    </section>
     <div class="settings-section-title">Customization</div>
     <section class="settings-group liquid-glass">
       <label class="setting-row"><div><strong>Appearance</strong><small>Follow your system, or pick light or dark yourself.</small></div><select id="themeSelect"><option value="system" ${state.theme === "system" ? "selected" : ""}>System</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>Dark</option><option value="light" ${state.theme === "light" ? "selected" : ""}>Light</option></select></label>
@@ -1182,7 +1232,9 @@ function renderParkHours() {
   if (hoursEl) hoursEl.textContent = formatParkHours(schedule, Date.now(), store.snapshot.useLocalTime);
 
   const statusSlot = $(".park-status-slot", views.explore);
-  if (statusSlot) statusSlot.innerHTML = parkStatusPillMarkup(status);
+  if (statusSlot) statusSlot.innerHTML = status.key === "unknown" ? '<span class="overview-unknown">Hours unavailable</span>' : parkStatusPillMarkup(status);
+  const metricsSlot = $(".dashboard-metrics", views.explore);
+  if (metricsSlot) metricsSlot.innerHTML = dashboardMetricsMarkup(parkId, schedule, status, rideData.crowdForPark(parkId));
 
   parksForResort(store.snapshot.selectedResortId).forEach((park) => {
     const button = $(`[data-park="${park.id}"]`, views.explore);
@@ -1272,6 +1324,12 @@ function bindDynamic() {
   document.querySelectorAll('[data-copy-diagnostics]').forEach((b) => b.onclick = copyDiagnostics);
   const diagnosticsDetails = $(".diagnostics-details");
   if (diagnosticsDetails) diagnosticsDetails.ontoggle = () => { diagnosticsExpanded = diagnosticsDetails.open; };
+  const density = $("#dashboardDensitySelect");
+  if (density) density.onchange = () => store.update((s) => { s.dashboard.density = density.value; }, "dashboard");
+  for (const [id, key] of [["dashboardWorthToggle", "showWorth"], ["dashboardWatchesToggle", "showWatches"], ["dashboardHoursToggle", "showHours"], ["dashboardCrowdToggle", "showCrowd"]]) {
+    const toggle = $("#" + id);
+    if (toggle) toggle.onchange = () => store.update((s) => { s.dashboard[key] = toggle.checked; }, "dashboard");
+  }
   const theme = $("#themeSelect"); if (theme) theme.onchange = () => store.update((s) => { s.theme = theme.value; }, "theme");
   document.querySelectorAll("button[data-accent-choice]").forEach((button) => {
     button.onclick = () => store.update((s) => { s.accent = button.dataset.accentChoice; }, "accent");

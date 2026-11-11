@@ -1,3 +1,12 @@
+## 2.1.1 — 2026-11-11
+
+- Automatically show verified live variant names for nine stable ride identities across Walt Disney World and Disneyland Resort.
+- Support Jingle Cruise, Haunted Mansion Holiday, "it's a small world" Holiday, Hyperspace Mountain, Space Mountain Ghost Galaxy, Monsters After Dark, Luigi's and Mater's Halloween/Christmas overlays, and rotating Soarin' films.
+- Ride cards, searches, details, shared ride names, watches and notification titles reflect the live source when fresh.
+- On stale or offline data, display canonical attraction names rather than claiming an overlay is currently operating.
+- Preserve permanent ride IDs, historic waits, existing watches, PWA identity and subscriptions. No database migration.
+- Worker patch 2.0.3 implements source-verified naming and extends known provider aliases; it must be deployed separately through authenticated Cloudflare Wrangler.
+
 ## 2.1.0 — 2026-11-11
 
 - Replaced the oversized Explore intro with a compact, park-first dashboard: fresh operating count, representative live median wait, and optional crowd pressure.

@@ -1,6 +1,6 @@
 # ParkPulse 2.1.0 — Release Readiness Audit
 
-Status: **frontend candidate audited; production release NOT approved or deployed**.
+Status: **2.1.0-rc.1 candidate packaged on release branch; production release NOT approved or deployed**.
 Audit date: 2026-11-11. Original draft PR: https://github.com/JamestheGreat1/park-pulse-web/pull/10
 
 ## Verified
@@ -16,9 +16,11 @@ Audit date: 2026-11-11. Original draft PR: https://github.com/JamestheGreat1/par
 
 ## Blocking before 2.1.0 release
 
-- [ ] **Version/cache coordination:** update `version.json`, `index.html` script/style and manifest references, all JS module import query stamps, `assets/js/app.js` APP_VERSION, and `service-worker.js` CACHE_NAME/VERSION/SHELL/notification icon references together. Avoid mixing 2.0 JS with 2.1 CSS or retaining old offline caches.
-- [ ] **Release tests:** adjust the existing release-candidate test that currently asserts version `2.0.0`; ensure every asset and cache reference resolves to the selected 2.1 release candidate version and the old 2.0 caches roll over cleanly.
-- [ ] **Documentation:** update `README.md`, `CHANGELOG.md`, public landing page at `useparkpulse.com` in its separate repository, and user-visible version/release text after candidate approval.
+- [x] **RC version/cache coordination:** All HTML, JS import URLs, manifest icons, app identity and service-worker cache changed together to `2.1.0-rc.1` on the RC branch.
+- [ ] **Stable version/cache coordination:** update `version.json`, `index.html` script/style and manifest references, all JS module import query stamps, `assets/js/app.js` APP_VERSION, and `service-worker.js` CACHE_NAME/VERSION/SHELL/notification icon references together. Avoid mixing 2.0 JS with 2.1 CSS or retaining old offline caches.
+- [ ] **Release tests:** the candidate assertions now expect `2.1.0-rc.1` and `rc`; rerun full CI and validate actual cache update and offline behavior on the isolated installable candidate.
+- [x] **RC documentation:** README and changelog now describe the unreleased candidate without calling it stable.
+- [ ] **Public release documentation:** update the landing site at `useparkpulse.com` and stable version text only after release approval.
 - [ ] **Real iOS standalone push confirmation:** on a subscribed device verify existing watch rules survive update, worker sync stays connected, a test notification is delivered, tapping it opens the right attraction in the PWA, and the notification bell/actions behave correctly. Do not assume the read-only preview proves this.
 - [ ] **Visual/device acceptance:** verify compact and comfortable modes, all six parks, closed/event/unknown hour states, Frosted and Liquid Glass, dark/light modes, iPhone safe areas, and reduced motion on a real device. Existing preview visual approval is strong but is not an installed production-PWA upgrade test.
 - [ ] **Final release gate:** run all CI checks on the versioned candidate, verify production health/alerts/history in read-only mode, prepare rollback, seek explicit owner approval, and only then merge and verify the PWA update.

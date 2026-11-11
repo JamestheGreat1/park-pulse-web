@@ -61,6 +61,25 @@ const {chromium} = require(require.resolve('playwright', {paths:[process.env.COD
       assert(geometry.search.bottom<left.top&&geometry.sort.top>geometry.group.bottom,
         'Controls should be search, centered buttons, then sort at '+width);
       assert(geometry.pageWidth<=width+2,'Unexpected horizontal page overflow at '+width);
+      // Every KPI is the same height, with aligned number and label lines.
+      const stats = await page.evaluate(()=>{
+        return [...document.querySelectorAll('#view-explore .dashboard-metrics > .dashboard-stat')].map(tile=>{
+          const card=tile.getBoundingClientRect();
+          const number=tile.querySelector('.dashboard-stat-value')?.getBoundingClientRect();
+          const label=tile.querySelector('.dashboard-stat-label')?.getBoundingClientRect();
+          const unit=tile.querySelector('.stat-secondary');
+          return {top:card.top,height:card.height,numberTop:number?.top,labelTop:label?.top,
+            unitSize:unit?parseFloat(getComputedStyle(unit).fontSize):null};
+        });
+      });
+      assert.equal(stats.length,3,'Three overview KPIs expected');
+      assert(stats.every(x=>Number.isFinite(x.numberTop)&&Number.isFinite(x.labelTop)),'Shared stat structure missing');
+      const spread=(arr)=>Math.max(...arr)-Math.min(...arr);
+      assert(spread(stats.map(x=>x.height))<1.5,'Stat cards have inconsistent heights at '+width);
+      assert(spread(stats.map(x=>x.numberTop))<1.5,'Stat number baselines differ at '+width);
+      assert(spread(stats.map(x=>x.labelTop))<1.5,'Stat label baselines differ at '+width);
+      assert(stats.slice(0,2).every(x=>x.unitSize>8),'Secondary units are unreadable at '+width);
+
     }
     await page.setViewportSize({width:390,height:844});
     // Color mood follows the chosen park, independent of accent theme.

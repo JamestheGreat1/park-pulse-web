@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import { liveRideDisplayName } from "../worker/src/live-ride-names.js";
 
 const source=fs.readFileSync(new URL("../worker/src/index.js",import.meta.url),"utf8");
 const section=(a,b)=>{
@@ -14,7 +15,7 @@ function harness({themeEntries=[],queueEntries=[]}={}){
   const now=new Date().toISOString();
   const ctx=vm.createContext({
     Date, String, Map, Number, Array, Math, console,
-    VERSION:"2.0.2",LIVE_FRESHNESS_MS:15*60_000,
+    VERSION:"2.0.3",LIVE_FRESHNESS_MS:15*60_000,liveRideDisplayName,
     ENABLED_PARKS:[5,6,7,8].map(id=>({id,resortId:"wdw",name:id===6?"Magic Kingdom":"Park",
       themeParksId:id===6?"mk-uuid":"other"})),
     parkTimezone:()=>"America/New_York",

@@ -63,9 +63,9 @@ export const DISNEYLAND_RIDES = new Map([
       "WEB SLINGERS: A Spider-Man Adventure presented by WEB"
     ]),
     // Cars Land
-    ride("dca:luigis", "Luigi's Rollickin' Roadsters", "Cars Land", ["Luigi's Honkin' Haul-O-Ween"]),
+    ride("dca:luigis", "Luigi's Rollickin' Roadsters", "Cars Land", ["Luigi's Honkin' Haul-O-Ween", "Luigi's Joy to the Whirl"]),
     ride("dca:radiator-springs", "Radiator Springs Racers", "Cars Land"),
-    ride("dca:maters", "Mater's Junkyard Jamboree", "Cars Land", ["Mater's Graveyard JamBOOree"]),
+    ride("dca:maters", "Mater's Junkyard Jamboree", "Cars Land", ["Mater's Graveyard JamBOOree", "Mater's Jingle Jamboree"]),
     // Grizzly Peak
     ride("dca:grizzly", "Grizzly River Run", "Grizzly Peak"),
     ride("dca:soarin", "Soarin' Across America", "Grizzly Peak", [

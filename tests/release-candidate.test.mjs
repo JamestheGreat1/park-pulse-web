@@ -7,7 +7,7 @@ const release = JSON.parse(source("version.json"));
 const version = release.version;
 
 test("candidate version and cache references stay synchronized", () => {
-  assert.equal(version, "2.1.0");
+  assert.equal(version, "2.1.1");
   assert.equal(release.channel, "stable");
   assert.equal(release.released, "2026-11-11");
   const index = source("index.html");
@@ -24,7 +24,7 @@ test("candidate version and cache references stay synchronized", () => {
   // Worker-only maintenance patches deliberately do not change the PWA
   // service-worker cache, install prompt, or public frontend version.
   const backendVersion = JSON.parse(source("worker/package.json")).version;
-  assert.equal(backendVersion, "2.0.2");
+  assert.equal(backendVersion, "2.0.3");
   assert(worker.includes('const VERSION = "' + backendVersion + '"'));
   for (const path of ["assets/js/app.js", "assets/js/api.js", "assets/js/data.js",
                       "assets/js/store.js", "assets/js/push.js"]) {

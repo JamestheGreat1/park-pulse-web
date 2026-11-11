@@ -1,8 +1,8 @@
-import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=2.1.0";
-import { store } from "./store.js?v=2.1.0";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=2.1.0";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe, armStagingLiveProbe, stagingLiveProbeStatus } from "./push.js?v=2.1.0";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=2.1.0";
+import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=2.1.1";
+import { store } from "./store.js?v=2.1.1";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=2.1.1";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe, armStagingLiveProbe, stagingLiveProbeStatus } from "./push.js?v=2.1.1";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=2.1.1";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.1.1";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -611,7 +611,7 @@ function recommendationCandidates(state = store.snapshot) {
     .sort((a, b) =>
       recommendationScore(b, state) - recommendationScore(a, state) ||
       Number(a.waitTime ?? Infinity) - Number(b.waitTime ?? Infinity) ||
-      a.name.localeCompare(b.name)
+      rideDisplayName(a).localeCompare(rideDisplayName(b))
     );
 }
 
@@ -633,7 +633,7 @@ function nextUpMarkup(state = store.snapshot) {
       <button type="button" class="dashboard-text-action" data-next-up-another aria-label="Show another suggested attraction">Another ↻</button>
     </div>
     <button class="dashboard-pick-ride" type="button" data-open-ride="${escapeHtml(ride.id)}">
-      <span class="dashboard-pick-copy"><small class="ride-land">${escapeHtml(ride.land)}</small><strong>${escapeHtml(ride.name)}</strong>
+      <span class="dashboard-pick-copy"><small class="ride-land">${escapeHtml(ride.land)}</small><strong>${escapeHtml(rideDisplayName(ride))}</strong>
         <small class="${comparison?.percentDelta <= -10 ? "positive" : ""}">${escapeHtml(reason)}</small>
       </span>
       <span class="dashboard-pick-wait"><b>${escapeHtml(status.wait)}</b><small>${escapeHtml(status.label)}</small></span>
@@ -807,16 +807,30 @@ function selectView(name) {
 
   window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 }
+// Seasonal names are cosmetic. Stale snapshots do not prove an overlay is active.
+function rideDisplayName(ride) {
+  if (!ride) return "";
+  const name = String(ride.name || ride.rideName || "Attraction");
+  const canonical = String(ride.canonicalName || name);
+  if (ride.sourceMissing || ride.sourceStale ||
+      (ride.lastUpdated && isRideStale(ride)) ||
+      (!ride.lastUpdated && ride.canonicalName)) return canonical;
+  return name;
+}
+function watchDisplayName(rule, ride) {
+  return ride ? rideDisplayName(ride) : String(rule?.canonicalName || rule?.rideName || "Attraction");
+}
+
 function sortedRides(rides, state) {
   const q = state.query.trim().toLowerCase();
   let list = rides.filter((r) =>
-    (!q || `${r.name} ${r.land}`.toLowerCase().includes(q)) &&
+    (!q || `${rideDisplayName(r)} ${r.canonicalName || ""} ${r.land}`.toLowerCase().includes(q)) &&
     (!state.openOnly || (r.isOpen && !isRideStale(r))) &&
     (!state.favoritesOnly || state.favorites.includes(String(r.id)))
   );
   const staleRank = (ride) => isRideStale(ride) ? 1 : 0;
   if (state.sort === "wait") list.sort((a,b) => staleRank(a) - staleRank(b) || (a.isOpen === b.isOpen ? (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) : a.isOpen ? -1 : 1));
-  else if (state.sort === "name") list.sort((a,b) => staleRank(a) - staleRank(b) || a.name.localeCompare(b.name));
+  else if (state.sort === "name") list.sort((a,b) => staleRank(a) - staleRank(b) || rideDisplayName(a).localeCompare(rideDisplayName(b)));
   else list.sort((a,b) => {
     const freshness = staleRank(a) - staleRank(b);
     if (freshness) return freshness;
@@ -828,7 +842,7 @@ function sortedRides(rides, state) {
     const bRatio = rideComparison(b)?.ratio ?? Infinity;
     if (aRatio !== bRatio) return aRatio - bRatio;
 
-    return (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) || a.name.localeCompare(b.name);
+    return (a.waitTime ?? Infinity) - (b.waitTime ?? Infinity) || rideDisplayName(a).localeCompare(rideDisplayName(b));
   });
   return list;
 }
@@ -858,12 +872,12 @@ function rideCard(ride, state = store.snapshot, index = 0) {
     : "";
   return `<article class="ride-card liquid-glass ${rule ? "watching" : ""} ${status.stale ? "stale" : ""}" data-ride-id="${ride.id}">
     <button class="ride-main" type="button" data-open-ride="${ride.id}">
-      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(ride.name)}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${rule ? `<span class="watch-badge">Watching</span>` : ""}${valueBadge ? `<span class="value-badge ${valueBadge.tone}">${escapeHtml(valueBadge.text)}</span>` : ""}</div>${explanation ? `<div class="recommendation-hint"><span aria-hidden="true">✦</span>${escapeHtml(explanation)}</div>` : ""}</div>
+      <div class="ride-copy"><span class="ride-land">${escapeHtml(ride.land)}</span><h3>${escapeHtml(rideDisplayName(ride))}</h3><div class="ride-meta"><span class="updated">${escapeHtml(status.updated)}</span>${rule ? `<span class="watch-badge">Watching</span>` : ""}${valueBadge ? `<span class="value-badge ${valueBadge.tone}">${escapeHtml(valueBadge.text)}</span>` : ""}</div>${explanation ? `<div class="recommendation-hint"><span aria-hidden="true">✦</span>${escapeHtml(explanation)}</div>` : ""}</div>
       <div class="ride-status"><div class="ride-wait-line"><span class="wait ${status.stale ? "stale" : ride.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span>${rideTrendMarkup(ride, status)}</div><span class="status-label">${escapeHtml(status.label)}</span></div>
     </button>
     <div class="ride-actions">
-      <button class="favorite-button ${favorite ? "active" : ""}" type="button" data-favorite="${ride.id}" aria-pressed="${favorite}" aria-label="${favorite ? "Unfavorite" : "Favorite"} ${escapeHtml(ride.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
-      <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(ride.name)}">${iconBell(Boolean(rule))}</button>
+      <button class="favorite-button ${favorite ? "active" : ""}" type="button" data-favorite="${ride.id}" aria-pressed="${favorite}" aria-label="${favorite ? "Unfavorite" : "Favorite"} ${escapeHtml(rideDisplayName(ride))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg></button>
+      <button class="watch-button ${rule ? "active" : ""}" type="button" data-open-ride="${ride.id}" aria-label="${rule ? "Edit alert" : "Watch"} ${escapeHtml(rideDisplayName(ride))}">${iconBell(Boolean(rule))}</button>
     </div>
   </article>`;
 }
@@ -949,7 +963,7 @@ function dashboardWatchesMarkup(state = store.snapshot) {
       const ride = rideData.rideById(rule.rideId);
       const status = rideStatus(ride);
       return `<button class="dashboard-watch" type="button" data-open-ride="${escapeHtml(rule.rideId)}">
-        <span><strong>${escapeHtml(rule.rideName)}</strong><small>${escapeHtml(parkName(rule.parkId))}</small></span>
+        <span><strong>${escapeHtml(watchDisplayName(rule, ride))}</strong><small>${escapeHtml(parkName(rule.parkId))}</small></span>
         <span class="dashboard-watch-status"><b class="${status.stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</b><small>${escapeHtml(status.label)}</small></span>
       </button>`;
     }).join("")}</div>
@@ -1029,7 +1043,7 @@ function renderWatching() {
       const ride = rideData.rideById(rule.rideId);
       const detail = [rule.reopen ? "Reopening" : null, rule.threshold ? `≤ ${rule.threshold} min` : null].filter(Boolean).join(" · ");
       const status = rideStatus(ride);
-      return `<article class="watch-card liquid-glass ${status.stale ? "stale" : ""}"><button class="watch-card-main" type="button" data-open-ride="${rule.rideId}"><span class="ride-land">${escapeHtml(parkName(rule.parkId))}</span><h3>${escapeHtml(rule.rideName)}</h3><p>${escapeHtml(detail || "Status watch")} · ${remaining(rule)}</p></button><div class="watch-live"><span class="wait ${status.stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><button class="delete-watch" type="button" data-delete-watch="${rule.rideId}" aria-label="Stop watching ${escapeHtml(rule.rideName)}">×</button></div></article>`;
+      return `<article class="watch-card liquid-glass ${status.stale ? "stale" : ""}"><button class="watch-card-main" type="button" data-open-ride="${rule.rideId}"><span class="ride-land">${escapeHtml(parkName(rule.parkId))}</span><h3>${escapeHtml(watchDisplayName(rule, ride))}</h3><p>${escapeHtml(detail || "Status watch")} · ${remaining(rule)}</p></button><div class="watch-live"><span class="wait ${status.stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(status.wait)}</span><button class="delete-watch" type="button" data-delete-watch="${rule.rideId}" aria-label="Stop watching ${escapeHtml(watchDisplayName(rule, ride))}">×</button></div></article>`;
     }).join("") : `<div class="empty liquid-glass"><span class="empty-icon">🔔</span><h3>Nothing here yet</h3><p>Pick a ride, set a target, and ParkPulse will keep an eye on it.</p><button type="button" data-view-jump="explore">Find a ride</button></div>`}</div>`;
 }
 async function refreshBackendState() {
@@ -1402,7 +1416,7 @@ async function shareRide(id) {
   const ride = rideData.rideById(id) || store.ruleForRide(id);
   if (!ride) return;
 
-  const name = ride.name || ride.rideName || "this ride";
+  const name = rideDisplayName(ride) || "this ride";
   const url = new URL("https://app.useparkpulse.com/");
   url.searchParams.set("ride", String(id));
   const payload = {
@@ -1466,7 +1480,7 @@ function openRide(id) {
   const model = ride || existing;
   sheet.dataset.rideId = String(id);
   sheetReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(model.name || model.rideName)}</h2></div><div class="sheet-actions"><button class="sheet-action" type="button" data-share-ride="${id}" aria-label="Share ${escapeHtml(model.name || model.rideName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div></div>
+  sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-head"><div><span class="ride-land">${escapeHtml(model.land || parkName(model.parkId))}</span><h2 id="sheetTitle">${escapeHtml(rideDisplayName(model))}</h2></div><div class="sheet-actions"><button class="sheet-action" type="button" data-share-ride="${id}" aria-label="Share ${escapeHtml(rideDisplayName(model))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button><button class="sheet-close" type="button" data-close-sheet aria-label="Close">×</button></div></div>
     <div class="sheet-status"><span class="wait ${rideStatus(ride).stale ? "stale" : ride?.isOpen ? "open" : "closed"}">${escapeHtml(rideStatus(ride).wait)}</span><small>${escapeHtml(rideStatus(ride).label)}</small></div>
     ${sharedRidePwaHint(id)}
     ${ride ? `<div class="sheet-recommendation"><span>ParkPulse context</span><strong>${escapeHtml(recommendationReason(ride, store.snapshot))}</strong></div>` : ""}
@@ -1502,7 +1516,7 @@ function openRide(id) {
     const waitTarget = thresholdEnabled ? threshold : null;
     if (!reopen && !waitTarget) return toast("Choose at least one alert.");
     const duration = $("#durationSelect").value;
-    store.saveRule({ rideId: id, parkId: model.parkId, rideName: model.name || model.rideName, land: model.land || "", reopen, threshold: waitTarget, expiresAt: duration === "keep" ? existing.expiresAt : durationExpiry(duration, model.parkId), createdAt: existing?.createdAt || Date.now() });
+    store.saveRule({ rideId: id, parkId: model.parkId, rideName: rideDisplayName(model), canonicalName: model.canonicalName || rideDisplayName(model), land: model.land || "", reopen, threshold: waitTarget, expiresAt: duration === "keep" ? existing.expiresAt : durationExpiry(duration, model.parkId), createdAt: existing?.createdAt || Date.now() });
     if (!pushOn) toast("Watch saved — turn on notifications if you want it to buzz you.");
     else { if (await safeSync()) toast("Watch saved"); }
     closeSheet();

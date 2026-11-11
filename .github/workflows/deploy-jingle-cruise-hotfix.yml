@@ -1,18 +1,15 @@
-name: Deploy Jingle Cruise Worker hotfix (2.0.2)
+name: Deploy ParkPulse Worker (manual)
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/deploy-jingle-cruise-hotfix.yml
+  workflow_dispatch:
 permissions:
   contents: read
 
-# One-time hotfix deployment: runs when this workflow is first merged to main.
+# Manual deployment: intentionally never triggered by a frontend release or ordinary push.
 # Requires existing Cloudflare deployment credentials in GitHub Actions secrets.
 # Does not modify D1 schema, Worker secrets, PWA files or notification data.
 jobs:
   deploy:
-    name: Deploy Worker 2.0.2 and verify Magic Kingdom feed
+    name: Deploy Worker 2.0.3 and verify Magic Kingdom feed
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: production
@@ -43,7 +40,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --config ./wrangler.toml
-      - name: Verify live Worker and canonical Jingle Cruise key
+      - name: Verify live Worker and curated seasonal names
         run: |
           set -euo pipefail
           curl -fsSL --max-time 25 'https://parkpulse-api.jamesp5297.workers.dev/health' -o /tmp/parkpulse-health.json
@@ -55,8 +52,8 @@ jobs:
             const matches=(park.rides||[]).filter(r=>r.id==="mk:jungle-cruise");
             if(matches.length!==1)throw Error("Expected one canonical Jungle Cruise ride");
             const ride=matches[0];
-            if(ride.rawName==="Jingle Cruise" && ride.sourceMissing===false && ride.sourceStale===false)
-              console.log("PASS: live Jingle Cruise mapped to mk:jungle-cruise");
+            if(ride.rawName==="Jingle Cruise" && ride.name==="Jingle Cruise" && ride.sourceMissing===false && ride.sourceStale===false)
+              console.log("PASS: live Jingle Cruise mapped to mk:jungle-cruise with active name");
             else
               console.log("INFO: canonical ride found; upstream availability/freshness not yet observed",{
                 rawName:ride.rawName,source:ride.source,lastUpdated:ride.lastUpdated,

@@ -1,4 +1,4 @@
-import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=2.1.0";
+import { PARKS, isSingleRiderName, normalizeRideName } from "./data.js?v=2.1.1";
 
 const config = window.PARKPULSE_CONFIG || {};
 export const workerBase = String(config.WORKER_BASE || "").replace(/\/$/, "");
@@ -26,6 +26,8 @@ function normalizedWorkerRide(parkId, ride) {
     id: String(ride.id),
     parkId: Number(parkId),
     name: String(ride.name || "Attraction"),
+    canonicalName: String(ride.canonicalName || ride.name || "Attraction"),
+    activeVariant: Boolean(ride.activeVariant),
     rawName: String(ride.rawName || ride.name || "Attraction"),
     aliases: Array.isArray(ride.aliases) ? ride.aliases.map(String) : [],
     land: String(ride.land || "Other"),

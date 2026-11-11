@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '24'
       - name: Run Worker and UI regression tests
-        run: node --test tests/jingle-cruise.test.mjs tests/regressions.test.mjs tests/dashboard-release-audit.test.mjs tests/alert-queue.test.mjs tests/staging.test.mjs tests/release-candidate.test.mjs
+        run: node --test tests/live-ride-names.test.mjs tests/jingle-cruise.test.mjs tests/regressions.test.mjs tests/dashboard-release-audit.test.mjs tests/alert-queue.test.mjs tests/staging.test.mjs tests/release-candidate.test.mjs
 
   browser:
     name: PWA browser and offline smoke test
@@ -79,6 +79,27 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Exercise real installed-PWA update button and cache migration
         run: node tests/pwa-upgrade-2-to-2_1.cjs
+  pwa-patch-upgrade:
+    name: Installed PWA 2.1.0 -> 2.1.1 update compatibility
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'feature/2.1.1-')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out installed 2.1.0 version at the PR base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .stable-v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned Playwright and Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Verify installed app update, offline cache rollover, and preserved watches
+        run: node tests/pwa-upgrade-2_1-to-2_1_1.cjs
   worker-bundle:
     name: Worker bundling smoke test (no deployment)
     runs-on: ubuntu-latest

@@ -1,4 +1,4 @@
-import { PARKS, RESORTS, parksForResort, resortForPark } from "./catalog.js?v=2.1.0";
+import { PARKS, RESORTS, parksForResort, resortForPark } from "./catalog.js?v=2.1.1";
 
 const KEY = "parkpulse.rideWatcher.v1";
 
@@ -35,6 +35,7 @@ function cleanRule(rule) {
     rideId: String(rule.rideId),
     parkId: Number(rule.parkId),
     rideName: String(rule.rideName || "Attraction"),
+    canonicalName: String(rule.canonicalName || rule.rideName || "Attraction"),
     land: String(rule.land || ""),
     reopen: rule.reopen !== false,
     threshold: rule.threshold == null || rule.threshold === "" ? null : Math.max(5, Math.min(300, Number(rule.threshold))),

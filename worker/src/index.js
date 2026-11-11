@@ -38,7 +38,7 @@ const PARKS = new Map([
       ride("epcot:cosmic-rewind", "Guardians of the Galaxy: Cosmic Rewind", "World Discovery"),
       ride("epcot:mission-space", "Mission: SPACE", "World Discovery"),
       ride("epcot:test-track", "Test Track", "World Discovery", ["Test Track Presented by Chevrolet"]),
-      ride("epcot:living-with-the-land", "Living with the Land", "World Nature"),
+      ride("epcot:living-with-the-land", "Living with the Land", "World Nature", ["Living with the Land - Glimmering Greenhouses", "Living with the Land: Glimmering Greenhouses"]),
       ride("epcot:soarin", "Soarin' Across America", "World Nature", ["Soarin' Around the World"]),
       ride("epcot:nemo", "The Seas with Nemo & Friends", "World Nature"),
       ride("epcot:frozen", "Frozen Ever After", "World Showcase"),

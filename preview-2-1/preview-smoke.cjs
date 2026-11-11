@@ -78,6 +78,54 @@ const {chromium} = require(require.resolve('playwright', {paths:[process.env.COD
     assert.equal(await page.locator('.dashboard-stat').count(),3);
     assert.match(await page.locator('.dashboard-metrics').innerText(),/25/);
     assert.equal(await page.locator('.dashboard-watches').count(),0);
+
+    // Dynamic stat layout: 3-up normally, 2 centered with Crowd disabled,
+    // and 1 centered at the same capped width (future module visibility).
+    const inspectStats=()=>page.evaluate(()=>{
+      const board=document.querySelector('.dashboard-metrics').getBoundingClientRect();
+      const tiles=[...document.querySelectorAll('.dashboard-metrics > .dashboard-stat')].map(e=>{
+        const r=e.getBoundingClientRect();
+        return {left:r.left,right:r.right,width:r.width,top:r.top};
+      });
+      return {board:{left:board.left,right:board.right,width:board.width},tiles,
+        overflow:document.documentElement.scrollWidth};
+    });
+    const verifyCentered=(geometry,width,count)=>{
+      assert.equal(geometry.tiles.length,count,'Unexpected stat count');
+      assert(geometry.overflow<=width+2,'Horizontal overflow at '+width);
+      const first=geometry.tiles[0],last=geometry.tiles[count-1];
+      const center=(first.left+last.right)/2;
+      const boardCenter=(geometry.board.left+geometry.board.right)/2;
+      assert(Math.abs(center-boardCenter)<3,'Stats must be centered: '+JSON.stringify({width,count,geometry}));
+      assert(geometry.tiles.every(tile=>tile.width<=153 && tile.width>60),
+        'Optional tile widths must stay capped and usable: '+JSON.stringify({width,count,geometry}));
+      assert(geometry.tiles.every(tile=>tile.left>=geometry.board.left-1&&tile.right<=geometry.board.right+1),
+        'Tiles must stay inside overview: '+JSON.stringify({width,count,geometry}));
+    };
+    for(const width of [320,390,430,768]){
+      await page.setViewportSize({width,height:850});
+      const g=await inspectStats();
+      assert.equal(g.tiles.length,3);
+      assert(g.tiles.every(tile=>tile.width>60),'Three tiles must be readable: '+width);
+    }
+    await page.locator('#nav-settings').click();
+    await page.locator('#dashboardCrowdToggle').uncheck();
+    await page.locator('#nav-explore').click();
+    for(const width of [320,390,430,768]){
+      await page.setViewportSize({width,height:850});
+      verifyCentered(await inspectStats(),width,2);
+    }
+    await page.evaluate(()=>document.querySelector('.dashboard-metrics .stat-operating').remove());
+    for(const width of [320,390,430,768]){
+      await page.setViewportSize({width,height:850});
+      verifyCentered(await inspectStats(),width,1);
+    }
+    await page.locator('#nav-settings').click();
+    await page.locator('#dashboardCrowdToggle').check();
+    await page.locator('#nav-explore').click();
+    await page.setViewportSize({width:390,height:844});
+    assert.equal(await page.locator('.dashboard-stat').count(),3);
+
     await page.locator('#nav-settings').click();
     assert.match(await page.locator('#view-settings').innerText(),/Push alerts are disabled in the preview/);
     await page.locator('#dashboardHoursToggle').check();

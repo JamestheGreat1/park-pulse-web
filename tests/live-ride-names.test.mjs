@@ -15,7 +15,8 @@ const normalize=s=>String(s||"").replace(/[®™]/g,"").replace(/[’‘]/g,"'")
   .replace(/[–—]/g,"-").replace(/[^a-z0-9]+/gi," ").trim().toLowerCase();
 const mk={key:"mk:jungle-cruise",name:"Jungle Cruise",land:"Adventureland",aliases:["Jingle Cruise"]};
 const epcot={key:"epcot:soarin",name:"Soarin' Across America",land:"World Nature",aliases:["Soarin' Around the World"]};
-const all=[mk,epcot,...disneylandRidesForPark(16),...disneylandRidesForPark(17)];
+const living={key:"epcot:living-with-the-land",name:"Living with the Land",land:"World Nature",aliases:["Living with the Land - Glimmering Greenhouses","Living with the Land: Glimmering Greenhouses"]};
+const all=[mk,epcot,living,...disneylandRidesForPark(16),...disneylandRidesForPark(17)];
 const byKey=new Map(all.map(ride=>[ride.key,ride]));
 
 test("all curated variants are catalog aliases with the same permanent ride ID",()=>{

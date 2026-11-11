@@ -16,8 +16,7 @@ export const LIVE_RIDE_VARIANTS = Object.freeze({
     "Space Mountain Ghost Galaxy"
   ],
   "dca:guardians": [
-    "Guardians of the Galaxy – Monsters After Dark",
-    "Guardians of the Galaxy: Monsters After Dark"
+    "Guardians of the Galaxy – Monsters After Dark"
   ],
   "dca:luigis": [
     "Luigi's Honkin' Haul-O-Ween",

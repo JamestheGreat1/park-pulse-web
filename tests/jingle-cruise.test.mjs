@@ -54,7 +54,8 @@ test("Jingle Cruise and Jungle Cruise share the same permanent watch/history ide
   assert.equal(base?.key,"mk:jungle-cruise");
   assert.equal(holiday?.key,base.key);
   assert.equal(holiday.name,"Jungle Cruise");
-  assert.equal(vm.runInContext("findCatalogRide(PARKS.get(6),'Jingle Cruise Single Rider')",ctx),null);
+  // The ingestion layer rejects single-rider observations before name matching.
+  assert.equal(vm.runInContext("isSingleRiderName('Jingle Cruise Single Rider')",ctx),true);
 });
 
 test("ThemeParks overlay can beat a closed Jungle Cruise base entry in either order",async()=>{

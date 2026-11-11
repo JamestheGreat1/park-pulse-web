@@ -31,7 +31,49 @@ const {chromium} = require(require.resolve('playwright', {paths:[process.env.COD
     await page.waitForSelector('.dashboard-overview',{timeout:12000});
     await page.waitForSelector('.ride-list .ride-card',{timeout:12000});
     assert.match(await page.title(),/2.1.*Preview/);
-    assert.match(await page.locator('.preview-ribbon').innerText(),/DEVELOPMENT PREVIEW/);
+    assert.match(await page.locator('.preview-ribbon').innerText(),/2.1 DEV PREVIEW/);
+    // The preview indicator should not consume an entire hero-sized card.
+    const bannerHeight = await page.locator('.preview-ribbon').evaluate(el=>el.getBoundingClientRect().height);
+    assert(bannerHeight<=48,'Preview status banner is still too tall: '+bannerHeight);
+    for(const width of [320,375,390,430,768]){
+      await page.setViewportSize({width,height:850});
+      const geometry=await page.evaluate(()=>{
+        const toolbar=document.querySelector('#view-explore .toolbar').getBoundingClientRect();
+        const group=document.querySelector('#view-explore .dashboard-filter-row').getBoundingClientRect();
+        const buttons=[...document.querySelectorAll('#view-explore .dashboard-filter-row .filter-button')]
+          .map(el=>el.getBoundingClientRect());
+        const sort=document.querySelector('#sortSelect').getBoundingClientRect();
+        const search=document.querySelector('#rideSearch').getBoundingClientRect();
+        return {toolbar:{left:toolbar.left,right:toolbar.right,top:toolbar.top},
+          group:{left:group.left,right:group.right,top:group.top,bottom:group.bottom},
+          buttons:buttons.map(x=>({left:x.left,right:x.right,width:x.width,height:x.height,top:x.top})),
+          sort:{left:sort.left,right:sort.right,top:sort.top,bottom:sort.bottom},
+          search:{top:search.top,bottom:search.bottom},
+          pageWidth:document.documentElement.scrollWidth
+        };
+      });
+      assert.equal(geometry.buttons.length,2,'Expected exactly two centered filter buttons');
+      const [left,right]=geometry.buttons;
+      assert(Math.abs(left.width-right.width)<1,'Filter buttons must have equal widths: '+JSON.stringify(geometry));
+      const midpoint=(left.left+right.right)/2,toolbarMid=(geometry.toolbar.left+geometry.toolbar.right)/2;
+      assert(Math.abs(midpoint-toolbarMid)<3,'Filter buttons are not centered at '+width+': '+JSON.stringify(geometry));
+      assert(left.height>=38&&right.height>=38,'Filter buttons too small at '+width);
+      assert(geometry.search.bottom<left.top&&geometry.sort.top>geometry.group.bottom,
+        'Controls should be search, centered buttons, then sort at '+width);
+      assert(geometry.pageWidth<=width+2,'Unexpected horizontal page overflow at '+width);
+    }
+    await page.setViewportSize({width:390,height:844});
+    // Color mood follows the chosen park, independent of accent theme.
+    assert.equal(await page.locator('#view-explore').getAttribute('data-park-mood'),'magic');
+    await page.locator('#nav-resorts').click();
+    await page.locator('[data-resort="dlr"]').click();
+    await page.locator('#nav-explore').click();
+    assert.equal(await page.locator('#view-explore').getAttribute('data-park-mood'),'disneyland');
+    await page.locator('[data-park="17"]').click();
+    assert.equal(await page.locator('#view-explore').getAttribute('data-park-mood'),'dca');
+    await page.locator('#nav-resorts').click();
+    await page.locator('[data-resort="wdw"]').click();
+    await page.locator('#nav-explore').click();
     assert.equal(await page.locator('.hero-card').count(),0);
     assert.equal(await page.locator('.dashboard-stat').count(),3);
     assert.match(await page.locator('.dashboard-metrics').innerText(),/25/);

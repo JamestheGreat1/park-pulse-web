@@ -909,11 +909,11 @@ function dashboardMetrics(parkId, schedule, status, crowd) {
 
 function dashboardMetricsMarkup(parkId, schedule, status, crowd, dashboard = store.snapshot.dashboard) {
   const metrics = dashboardMetrics(parkId, schedule, status, crowd);
-  return `<div class="dashboard-stat" aria-label="${metrics.known == null ? "Operating attractions unavailable" : `${metrics.operating} of ${metrics.known} attractions with fresh status are operating`}">
+  return `<div class="dashboard-stat stat-operating" aria-label="${metrics.known == null ? "Operating attractions unavailable" : `${metrics.operating} of ${metrics.known} attractions with fresh status are operating`}">
       <strong>${metrics.operating == null ? "—" : `${metrics.operating}<span>/${metrics.known}</span>`}</strong><small>Operating</small>
     </div>
-    <div class="dashboard-stat"><strong>${metrics.medianWait == null ? "—" : `${metrics.medianWait}<span> min</span>`}</strong><small>Median live wait</small></div>
-    ${dashboard.showCrowd ? `<div class="dashboard-stat" aria-label="${metrics.crowdLevel == null ? "Crowd pressure unavailable" : `Crowd pressure ${metrics.crowdLevel} out of 10, ${metrics.crowdText}`}"><strong>${metrics.crowdLevel == null ? "—" : `${metrics.crowdLevel}<span>/10</span>`}</strong><small>Crowd pressure</small></div>` : ""}`;
+    <div class="dashboard-stat stat-median"><strong>${metrics.medianWait == null ? "—" : `${metrics.medianWait}<span> min</span>`}</strong><small>Median live wait</small></div>
+    ${dashboard.showCrowd ? `<div class="dashboard-stat stat-crowd ${metrics.crowdLevel == null ? "crowd-unavailable" : metrics.crowdLevel >= 8 ? "crowd-busy" : metrics.crowdLevel >= 5 ? "crowd-moderate" : "crowd-light"}" aria-label="${metrics.crowdLevel == null ? "Crowd pressure unavailable" : `Crowd pressure ${metrics.crowdLevel} out of 10, ${metrics.crowdText}`}"><strong>${metrics.crowdLevel == null ? "—" : `${metrics.crowdLevel}<span>/10</span>`}</strong><small>Crowd pressure</small></div>` : ""}`;
 }
 
 function dashboardWatchesMarkup(state = store.snapshot) {
@@ -941,6 +941,9 @@ function renderExplore() {
   const dashboard = state.dashboard;
   const hours = formatParkHours(schedule, Date.now(), state.useLocalTime);
   const events = formatTicketedEvents(schedule, state.useLocalTime);
+  // Park mood is decorative only: it never changes the user's accent setting.
+  const parkMoods = { 5: "epcot", 6: "magic", 7: "studios", 8: "animal", 16: "disneyland", 17: "dca" };
+  views.explore.dataset.parkMood = parkMoods[state.selectedParkId] || "default";
   views.explore.classList.toggle("dashboard-compact", dashboard.density === "compact");
   views.explore.innerHTML = `
     <section class="dashboard-overview liquid-glass" aria-label="Park overview">
@@ -965,8 +968,10 @@ function renderExplore() {
     ${dashboardWatchesMarkup(state)}
     <section class="toolbar liquid-glass" aria-label="Attraction filters">
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="rideSearch" type="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="Search rides in ${escapeHtml(parkName(state.selectedParkId))}" placeholder="Search ${escapeHtml(parkName(state.selectedParkId))}" value="${escapeHtml(state.query)}"></label>
-      <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open aria-pressed="${state.openOnly}">Open only</button>
-      <button class="filter-button ${state.favoritesOnly ? "active" : ""}" type="button" data-toggle-favorites aria-pressed="${state.favoritesOnly}">Favorites</button>
+      <div class="dashboard-filter-row" role="group" aria-label="Quick filters">
+        <button class="filter-button ${state.openOnly ? "active" : ""}" type="button" data-toggle-open aria-pressed="${state.openOnly}">Open only</button>
+        <button class="filter-button ${state.favoritesOnly ? "active" : ""}" type="button" data-toggle-favorites aria-pressed="${state.favoritesOnly}">Favorites</button>
+      </div>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
     <div class="section-heading dashboard-ride-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>Attractions</h2></div></div>

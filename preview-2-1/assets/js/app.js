@@ -540,16 +540,19 @@ function typicalComparisonBadge(ride) {
 }
 
 
+function closedParkReason(status) {
+  return status?.phase === "before-open"
+    ? "Regular operations haven’t started yet."
+    : status?.phase === "closed-today"
+      ? "No regular operating hours are scheduled today."
+      : "Regular operations have ended for today.";
+}
 function closedParkMarkup(state, schedule, status = parkOperatingState(schedule)) {
   const park = PARKS.find((item) => item.id === Number(state.selectedParkId));
   const name = park?.name || parkName(state.selectedParkId);
   const emoji = park?.emoji || "●";
   const hours = formatParkHours(schedule, Date.now(), state.useLocalTime);
-  const reason = status?.phase === "before-open"
-    ? "Regular operations haven’t started yet."
-    : status?.phase === "closed-today"
-      ? "No regular operating hours are scheduled today."
-      : "Regular operations have ended for today.";
+  const reason = closedParkReason(status);
 
   return `<section class="park-closed-card liquid-glass" aria-label="${escapeHtml(name)} is closed">
     <span class="park-closed-icon" aria-hidden="true">${emoji}</span>
@@ -562,7 +565,7 @@ function closedParkMarkup(state, schedule, status = parkOperatingState(schedule)
   </section>`;
 }
 function parkFeatureMarkup(state = store.snapshot, schedule = rideData.hoursForPark(state.selectedParkId), status = parkOperatingState(schedule)) {
-  if (status?.key === "closed") return closedParkMarkup(state, schedule, status);
+  if (status?.key === "closed") return ""; // Closed status is displayed inside the always-visible park overview.
   return state.dashboard.showWorth ? nextUpMarkup(state) : "";
 }
 function recommendationScore(ride, state = store.snapshot) {
@@ -916,6 +919,24 @@ function dashboardMetricsMarkup(parkId, schedule, status, crowd, dashboard = sto
     ${dashboard.showCrowd ? `<div class="dashboard-stat stat-crowd ${metrics.crowdLevel == null ? "crowd-unavailable" : metrics.crowdLevel >= 8 ? "crowd-busy" : metrics.crowdLevel >= 5 ? "crowd-moderate" : "crowd-light"}" aria-label="${metrics.crowdLevel == null ? "Crowd pressure unavailable" : `Crowd pressure ${metrics.crowdLevel} out of 10, ${metrics.crowdText}`}"><strong class="dashboard-stat-value">${metrics.crowdLevel == null ? "—" : `<span class="stat-primary">${metrics.crowdLevel}</span><span class="stat-secondary">/10</span>`}</strong><small class="dashboard-stat-label">Crowd pressure</small></div>` : ""}`;
 }
 
+function dashboardConditionMarkup(state, schedule, status, crowd) {
+  // The overview is always present in 2.1. Closed parks replace empty KPIs
+  // with one compact status message, avoiding a duplicate card below.
+  const hours = formatParkHours(schedule, Date.now(), state.useLocalTime);
+  if (status?.key === "closed") {
+    const park = PARKS.find((item) => item.id === Number(state.selectedParkId));
+    return `<div class="dashboard-closed-summary" role="status" aria-label="${escapeHtml(park?.name || parkName(state.selectedParkId))} is closed">
+      <span class="dashboard-closed-symbol" aria-hidden="true">${escapeHtml(park?.emoji || "●")}</span>
+      <div class="dashboard-closed-copy">
+        <span class="eyebrow">Park status</span>
+        <p>${escapeHtml(closedParkReason(status))}</p>
+        ${hours ? `<span class="dashboard-closed-hours">${escapeHtml(hours)}</span>` : ""}
+      </div>
+    </div>`;
+  }
+  return `<div class="dashboard-metrics ${state.dashboard.showCrowd ? "" : "dashboard-two-stats"}">${dashboardMetricsMarkup(state.selectedParkId, schedule, status, crowd, state.dashboard)}</div>
+    ${state.dashboard.showHours && hours ? `<span class="park-hours">${escapeHtml(hours)}</span>` : ""}`;
+}
 function dashboardWatchesMarkup(state = store.snapshot) {
   if (!state.dashboard.showWatches || !state.rules.length) return "";
   const previews = state.rules.slice(0, 2);
@@ -952,8 +973,7 @@ function renderExplore() {
         <span class="park-status-slot">${status.key === "unknown" ? '<span class="overview-unknown">Hours unavailable</span>' : parkStatusPillMarkup(status)}</span>
       </div>
       <h2>${escapeHtml(parkName(state.selectedParkId))}</h2>
-      <div class="dashboard-metrics ${dashboard.showCrowd ? "" : "dashboard-two-stats"}">${dashboardMetricsMarkup(state.selectedParkId, schedule, status, crowd, dashboard)}</div>
-      ${dashboard.showHours ? `<span class="park-hours">${escapeHtml(hours)}</span>` : ""}
+      <div class="dashboard-condition-slot" data-park-state="${status.key}">${dashboardConditionMarkup(state, schedule, status, crowd)}</div>
       <div class="park-events">${events.map((event) => `<span class="park-event"><b>✦ ${escapeHtml(event.name)}</b><span>${escapeHtml(event.hours)}</span></span>`).join("")}</div>
       <span class="refresh-copy">${rideData.refreshing ? "Refreshing…" : rideData.updatedAt ? `Updated ${relativeTime(rideData.updatedAt)}` : "Loading…"}</span>
     </section>
@@ -1221,13 +1241,13 @@ function renderParkHours() {
   const parkId = store.snapshot.selectedParkId;
   const schedule = rideData.hoursForPark(parkId);
   const status = parkOperatingState(schedule);
-  const hoursEl = $(".park-hours", views.explore);
-  if (hoursEl) hoursEl.textContent = formatParkHours(schedule, Date.now(), store.snapshot.useLocalTime);
-
   const statusSlot = $(".park-status-slot", views.explore);
   if (statusSlot) statusSlot.innerHTML = status.key === "unknown" ? '<span class="overview-unknown">Hours unavailable</span>' : parkStatusPillMarkup(status);
-  const metricsSlot = $(".dashboard-metrics", views.explore);
-  if (metricsSlot) metricsSlot.innerHTML = dashboardMetricsMarkup(parkId, schedule, status, rideData.crowdForPark(parkId));
+  const conditionSlot = $(".dashboard-condition-slot", views.explore);
+  if (conditionSlot) {
+    conditionSlot.dataset.parkState = status.key;
+    conditionSlot.innerHTML = dashboardConditionMarkup(store.snapshot, schedule, status, rideData.crowdForPark(parkId));
+  }
 
   parksForResort(store.snapshot.selectedResortId).forEach((park) => {
     const button = $(`[data-park="${park.id}"]`, views.explore);

@@ -37,8 +37,9 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
       return route.fulfill({json:{ok:true}});
     });
     await page.goto('http://127.0.0.1:8768/',{waitUntil:'domcontentloaded'});
-    await page.waitForSelector('[data-dismiss-first-run]',{timeout:10000});
-    await page.locator('[data-dismiss-first-run]').click();
+    await page.waitForSelector('.dashboard-overview',{timeout:10000});
+    assert.equal(await page.locator('.hero-card').count(),0);
+    assert.equal(await page.locator('.dashboard-watches').count(),0);
     await page.locator('#nav-resorts').click();
     assert.equal(await page.locator('[data-resort="dlr"]').isDisabled(),false);
     await page.locator('[data-resort="dlr"]').click();

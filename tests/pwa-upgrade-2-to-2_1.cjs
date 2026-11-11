@@ -12,7 +12,13 @@ const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_
     assert(fs.existsSync(path.join(v21,file)),'Missing RC: '+file);
   }
   assert.equal(JSON.parse(fs.readFileSync(path.join(v2,'version.json'))).version,'2.0.0');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(v21,'version.json'))).version,'2.1.0-rc.1');
+  const candidateVersion=JSON.parse(fs.readFileSync(path.join(v21,'version.json'))).version;
+  assert(candidateVersion==='2.1.0-rc.1'||candidateVersion==='2.1.0','Unsupported candidate version');
+  // An updated installed PWA must keep exactly the same push handler and scope.
+  const v2Push=fs.readFileSync(path.join(v2,'assets/js/push.js'),'utf8');
+  const v21Push=fs.readFileSync(path.join(v21,'assets/js/push.js'),'utf8');
+  assert.equal(v2Push.replaceAll('2.0.0',candidateVersion),v21Push,
+    'Push subscription code changed unexpectedly during frontend-only update');
   const beforeManifest=JSON.parse(fs.readFileSync(path.join(v2,'manifest.webmanifest')));
   const afterManifest=JSON.parse(fs.readFileSync(path.join(v21,'manifest.webmanifest')));
   for(const key of ['id','scope','start_url','display'])
@@ -98,8 +104,8 @@ const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_
     await page.locator('.dashboard-overview').waitFor({state:'visible',timeout:25000});
     await page.waitForFunction(()=>{
       const script=document.querySelector('script[type="module"]');
-      return script?.getAttribute('src')?.includes('2.1.0-rc.1')&&Boolean(navigator.serviceWorker.controller);
-    },null,{timeout:20000});
+      return script?.getAttribute('src')?.includes(version)&&Boolean(navigator.serviceWorker.controller);
+    },candidateVersion,{timeout:20000});
     const after=await page.evaluate(async()=>{
       const r=await navigator.serviceWorker.getRegistration();
       return {scope:r?.scope,active:r?.active?.scriptURL,controller:navigator.serviceWorker.controller?.scriptURL,
@@ -109,7 +115,7 @@ const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_
     assert.equal(after.scope,BASE,'Scope changed during update');
     assert.equal(after.active,before.active,'Reinstalled worker rather than upgrading existing one');
     assert.equal(after.controller,before.controller,'Controller URL changed');
-    assert(after.caches.includes('parkpulse-2.1.0-rc.1'),'2.1 cache missing');
+    assert(after.caches.includes('parkpulse-'+candidateVersion),'2.1 cache missing');
     assert(!after.caches.includes('parkpulse-2.0.0'),'Stale cache not deleted');
     assert.equal(after.state.selectedParkId,6);
     assert.equal(after.state.selectedResortId,'wdw');

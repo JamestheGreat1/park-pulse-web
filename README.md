@@ -12,7 +12,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 
 ## New in 2.1.1
 
-ParkPulse follows a fresh attraction feed when it reports a **known seasonal or alternate ride name**—such as Jingle Cruise, Haunted Mansion Holiday, Mater's Jingle Jamboree, or Soarin' Over California. Existing watches and historical data stay connected to the same ride; stale data falls back to the regular name. A Worker deployment is required for this improvement to go live.
+ParkPulse follows a fresh attraction feed when it reports a **known seasonal or alternate ride name**—such as Jingle Cruise, Haunted Mansion Holiday, Mater's Jingle Jamboree, Living with the Land – Glimmering Greenhouses, or Soarin' Over California. Existing watches and historical data stay connected to the same ride; stale data falls back to the regular name. A Worker deployment is required for this improvement to go live.
 
 ## What's new in 2.1
 

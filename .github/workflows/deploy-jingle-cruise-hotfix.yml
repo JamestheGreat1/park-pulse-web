@@ -9,7 +9,7 @@ permissions:
 # Does not modify D1 schema, Worker secrets, PWA files or notification data.
 jobs:
   deploy:
-    name: Deploy Worker 2.0.3 and verify Magic Kingdom feed
+    name: Deploy Worker 2.0.4 and verify Magic Kingdom feed
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: production

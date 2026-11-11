@@ -28,14 +28,16 @@ jobs:
               && grep -q '"version": "2.1.0-preview"' /tmp/preview-version.json \
               && curl -fsSL --max-time 12 "${BASE}/preview-2-1/?verify=${GITHUB_RUN_ID}" -o /tmp/preview-index.html \
               && grep -q '2.1 DEV PREVIEW' /tmp/preview-index.html \
-              && grep -q '2.1.0-preview.vg2' /tmp/preview-index.html \
+              && grep -q '2.1.0-preview.vg3' /tmp/preview-index.html \
               && curl -fsSL --max-time 12 "${BASE}/preview-2-1/assets/js/push.js?v=2.1.0-preview" -o /tmp/preview-push.js \
               && grep -q 'deliberately read-only' /tmp/preview-push.js \
-              && curl -fsSL --max-time 12 "${BASE}/preview-2-1/assets/css/app.css?v=2.1.0-preview.vg2" -o /tmp/preview-style.css \
+              && curl -fsSL --max-time 12 "${BASE}/preview-2-1/assets/css/app.css?v=2.1.0-preview.vg3" -o /tmp/preview-style.css \
               && grep -q 'Vibrant Glass' /tmp/preview-style.css \
               && grep -q 'compact refinement: centered fixed-width' /tmp/preview-style.css \
-              && curl -fsSL --max-time 12 "${BASE}/preview-2-1/assets/js/app.js?v=2.1.0-preview.vg2" -o /tmp/preview-app.js \
+              && grep -q 'ParkPulse 2.1 — unified overview details' /tmp/preview-style.css \
+              && curl -fsSL --max-time 12 "${BASE}/preview-2-1/assets/js/app.js?v=2.1.0-preview.vg3" -o /tmp/preview-app.js \
               && grep -q 'dashboard-filter-row' /tmp/preview-app.js \
+              && grep -q 'dashboard-stat-label' /tmp/preview-app.js \
               && curl -fsSL --max-time 12 "${BASE}/version.json?verify=${GITHUB_RUN_ID}" -o /tmp/production-version.json \
               && grep -q '"version": "2.0.0"' /tmp/production-version.json; then
               echo "PASS: public 2.1 preview loads, preview writes are disabled, and stable root is still 2.0.0"

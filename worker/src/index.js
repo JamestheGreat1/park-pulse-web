@@ -3,7 +3,7 @@ import { PARKS as ENABLED_PARKS, parkTimezone } from "../../assets/js/catalog.js
 import { disneylandRidesForPark } from "./disneyland-rides.js";
 import { ensureAlertQueueSchema, enqueueRideAlerts, processPendingRideAlerts, pruneExpiredRideAlerts } from "./alert-queue.js";
 
-const VERSION = "2.0.1";
+const VERSION = "2.0.2";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -47,7 +47,7 @@ const PARKS = new Map([
   }],
   [6, {
     rides: [
-      ride("mk:jungle-cruise", "Jungle Cruise", "Adventureland"),
+      ride("mk:jungle-cruise", "Jungle Cruise", "Adventureland", ["Jingle Cruise"]),
       ride("mk:pirates", "Pirates of the Caribbean", "Adventureland"),
       ride("mk:magic-carpets", "The Magic Carpets of Aladdin", "Adventureland"),
       ride("mk:small-world", "it's a small world", "Fantasyland"),
@@ -963,7 +963,9 @@ async function fetchThemeParksRides(parkId, park, env) {
     });
   }
 
-  return park.resortId === "dlr"
+  // The holiday Jingle Cruise overlay can coexist with the regular entry.
+  // Prefer a fresh operating variant, retaining mk:jungle-cruise for watches/history.
+  return (parkId === 6 || park.resortId === "dlr")
     ? collapseRideVariants(results)
     : [...new Map(results.map((item) => [item.id, item])).values()];
 }
@@ -1018,7 +1020,9 @@ async function fetchQueueTimesRides(parkId, park) {
   }
   for (const item of payload?.rides || []) ingest(item);
 
-  return park.resortId === "dlr"
+  // The holiday Jingle Cruise overlay can coexist with the regular entry.
+  // Prefer a fresh operating variant, retaining mk:jungle-cruise for watches/history.
+  return (parkId === 6 || park.resortId === "dlr")
     ? collapseRideVariants(results)
     : [...new Map(results.map((item) => [item.id, item])).values()];
 }

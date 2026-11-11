@@ -5964,3 +5964,33 @@ body{
   #view-explore .dashboard-closed-symbol{border:1px solid CanvasText}
   #view-explore .dashboard-metrics > .dashboard-stat.stat-operating{box-shadow:none}
 }
+
+
+/* ParkPulse 2.1 — quiet crowd direction microtrend.
+   Reuse the label's reserved second line, rather than adding another badge/card. */
+#view-explore .dashboard-metrics .dashboard-stat-label .dashboard-stat-trend{
+  display:flex;
+  align-items:center;
+  gap:3px;
+  width:max-content;
+  max-width:100%;
+  margin-top:2px;
+  font-size:.94em;
+  font-weight:760;
+  line-height:1.05;
+  white-space:nowrap;
+  letter-spacing:.005em;
+  color:var(--muted);
+}
+#view-explore .dashboard-metrics .dashboard-stat-trend .dashboard-trend-arrow{
+  display:inline-block;
+  font-size:1.05em;
+  font-weight:850;
+  line-height:1;
+}
+#view-explore .dashboard-metrics .dashboard-stat-trend.trend-down{color:var(--good)}
+#view-explore .dashboard-metrics .dashboard-stat-trend.trend-up{color:var(--warn)}
+#view-explore .dashboard-metrics .dashboard-stat-trend.trend-steady{color:var(--muted)}
+@media(forced-colors:active){
+  #view-explore .dashboard-metrics .dashboard-stat-trend{color:CanvasText}
+}

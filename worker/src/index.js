@@ -1,9 +1,10 @@
 import { sendNotification } from "web-push-neo";
 import { PARKS as ENABLED_PARKS, parkTimezone } from "../../assets/js/catalog.js";
 import { disneylandRidesForPark } from "./disneyland-rides.js";
+import { liveRideDisplayName } from "./live-ride-names.js";
 import { ensureAlertQueueSchema, enqueueRideAlerts, processPendingRideAlerts, pruneExpiredRideAlerts } from "./alert-queue.js";
 
-const VERSION = "2.0.2";
+const VERSION = "2.0.3";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -701,6 +702,10 @@ const NOTIFICATION_RIDE_NAMES = new Map([
 ]);
 
 function notificationRideName(ride) {
+  // When the API has confirmed an active ride variant, do not hide it behind
+  // a standard short notification label (notably EPCOT Soarin').
+  if (ride?.activeVariant && !ride?.sourceStale && !ride?.sourceMissing)
+    return String(ride.name || "Attraction");
   return NOTIFICATION_RIDE_NAMES.get(String(ride?.id || "")) || String(ride?.name || "Attraction");
 }
 
@@ -829,7 +834,10 @@ async function fetchFreshParkRides(parkId, park, env) {
 
     if (!chosen) continue;
     if (chosen.source === "queue-times") fallbackUsed = true;
-    rides.push(chosen);
+    // The selected observation is fresh. Show only curated, source-confirmed
+    // variant titles while preserving the permanent ride ID and history key.
+    const name = liveRideDisplayName(catalogRide, chosen, true);
+    rides.push({ ...chosen, name, activeVariant: name !== catalogRide.name });
   }
 
   return {
@@ -1469,11 +1477,17 @@ async function readStaleParkRows(env, parkId) {
 }
 
 function staleRowToRide(row) {
+  const parkId = Number(row.park_id);
+  const catalogRide = PARKS.get(parkId)?.rides?.find(item => item.key === String(row.ride_key));
+  // A stale D1 observation does not prove a holiday overlay is still active.
+  // Keep stale wait/freshness flags, but return the permanent attraction title.
+  const name = String(catalogRide?.name || row.name || "Attraction");
   return {
     id: String(row.ride_key),
-    parkId: Number(row.park_id),
-    name: String(row.name || "Attraction"),
-    rawName: String(row.name || "Attraction"),
+    parkId,
+    name,
+    rawName: name,
+    activeVariant: false,
     land: String(row.land || "Other"),
     isOpen: Boolean(row.is_open),
     operationalStatus: Boolean(row.is_open) ? "OPERATING" : "UNKNOWN",

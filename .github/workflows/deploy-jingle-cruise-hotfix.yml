@@ -1,0 +1,66 @@
+name: Deploy Jingle Cruise Worker hotfix (2.0.2)
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-jingle-cruise-hotfix.yml
+permissions:
+  contents: read
+
+# One-time hotfix deployment: runs when this workflow is first merged to main.
+# Requires existing Cloudflare deployment credentials in GitHub Actions secrets.
+# Does not modify D1 schema, Worker secrets, PWA files or notification data.
+jobs:
+  deploy:
+    name: Deploy Worker 2.0.2 and verify Magic Kingdom feed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require authorized Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "::error::Cannot deploy: set GitHub Actions CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID with authorized Workers edit permissions (or deploy with locally authenticated Wrangler)."
+            exit 1
+          fi
+      - name: Install Worker dependencies
+        working-directory: worker
+        run: npm install --no-save --package-lock=false
+      - name: Confirm deploy bundle
+        working-directory: worker
+        run: npx wrangler deploy --dry-run --outdir ./dry-run
+      - name: Deploy live Worker (no database migrations)
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --config ./wrangler.toml
+      - name: Verify live Worker and canonical Jingle Cruise key
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 25 'https://parkpulse-api.jamesp5297.workers.dev/health' -o /tmp/parkpulse-health.json
+          curl -fsSL --max-time 25 'https://parkpulse-api.jamesp5297.workers.dev/api/park/6' -o /tmp/magic-kingdom.json
+          node -e '
+            const fs=require("node:fs");
+            const health=JSON.parse(fs.readFileSync("/tmp/parkpulse-health.json"));
+            const park=JSON.parse(fs.readFileSync("/tmp/magic-kingdom.json"));
+            const matches=(park.rides||[]).filter(r=>r.id==="mk:jungle-cruise");
+            if(matches.length!==1)throw Error("Expected one canonical Jungle Cruise ride");
+            const ride=matches[0];
+            if(ride.rawName==="Jingle Cruise" && ride.sourceMissing===false && ride.sourceStale===false)
+              console.log("PASS: live Jingle Cruise mapped to mk:jungle-cruise");
+            else
+              console.log("INFO: canonical ride found; upstream availability/freshness not yet observed",{
+                rawName:ride.rawName,source:ride.source,lastUpdated:ride.lastUpdated,
+                sourceMissing:ride.sourceMissing,sourceStale:ride.sourceStale
+              });
+            console.log("PASS: Magic Kingdom Worker API available");
+          '

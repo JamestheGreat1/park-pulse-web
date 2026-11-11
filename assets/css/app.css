@@ -5682,3 +5682,125 @@ body{
   #view-explore .toolbar .dashboard-filter-row .filter-button,
   #view-explore .toolbar #sortSelect{border:1px solid CanvasText!important}
 }
+
+
+/* ParkPulse 2.1 — compact refinement: centered fixed-width optional tiles.
+   Three visible stats retain the normal three-column layout.
+   Two/one stats use a centered, capped-width row (including future visibility options). */
+#view-explore .dashboard-metrics.dashboard-two-stats,
+#view-explore .dashboard-metrics:has(> .dashboard-stat:only-child){
+  display:flex;
+  justify-content:center;
+  align-items:stretch;
+  gap:9px;
+}
+#view-explore .dashboard-metrics.dashboard-two-stats > .dashboard-stat{
+  flex:0 1 152px;
+  max-width:calc((100% - 9px)/2);
+  min-width:0;
+}
+#view-explore .dashboard-metrics:has(> .dashboard-stat:only-child) > .dashboard-stat{
+  flex:0 1 152px;
+  max-width:100%;
+}
+#view-explore .dashboard-filter-row:has(> .filter-button:only-child){
+  display:flex;
+  justify-content:center;
+}
+#view-explore .toolbar .dashboard-filter-row .filter-button:only-child{
+  flex:0 1 150px;
+}
+
+/* Let park identity show through more confidently without changing user accents. */
+#view-explore .dashboard-overview{
+  background:
+    radial-gradient(ellipse at 0% 0%,rgba(var(--park-mood-rgb),.36),transparent 67%),
+    radial-gradient(ellipse at 98% 88%,rgba(var(--park-spark-rgb),.22),transparent 68%),
+    linear-gradient(155deg,rgba(var(--park-mood-rgb),.12),transparent 78%),
+    var(--glass);
+  border-color:rgba(var(--park-mood-rgb),.48);
+}
+#view-explore .stat-operating{
+  background:linear-gradient(135deg,rgba(73,204,149,.29),rgba(73,204,149,.085))!important;
+  border-color:rgba(73,204,149,.35)!important;
+  box-shadow:inset 0 1px rgba(180,255,218,.10),inset 3px 0 rgba(73,204,149,.52);
+}
+#view-explore .stat-median{
+  background:linear-gradient(135deg,rgba(var(--blue-rgb),.29),rgba(var(--blue-rgb),.08))!important;
+  border-color:rgba(var(--blue-rgb),.36)!important;
+  box-shadow:inset 0 1px rgba(220,239,255,.10),inset 3px 0 rgba(var(--blue-rgb),.56);
+}
+#view-explore .stat-crowd.crowd-light{
+  background:linear-gradient(135deg,rgba(62,186,145,.28),rgba(62,186,145,.075))!important;
+  border-color:rgba(62,186,145,.35)!important;
+  box-shadow:inset 3px 0 rgba(62,186,145,.55);
+}
+#view-explore .stat-crowd.crowd-moderate{
+  background:linear-gradient(135deg,rgba(235,191,103,.29),rgba(235,191,103,.08))!important;
+  border-color:rgba(235,191,103,.38)!important;
+  box-shadow:inset 3px 0 rgba(235,191,103,.57);
+}
+#view-explore .stat-crowd.crowd-busy{
+  background:linear-gradient(135deg,rgba(241,135,90,.32),rgba(241,135,90,.09))!important;
+  border-color:rgba(241,135,90,.45)!important;
+  box-shadow:inset 3px 0 rgba(241,135,90,.65);
+}
+#view-explore .stat-crowd.crowd-unavailable{
+  background:rgba(128,144,168,.10)!important;
+  border-color:rgba(128,144,168,.17)!important;
+  box-shadow:none;
+}
+#view-explore .stat-crowd.crowd-unavailable strong{color:var(--muted)}
+
+/* Compact means less scaffolding, not smaller touch targets. Comfortable stays roomy. */
+#view-explore.dashboard-compact .dashboard-overview{
+  padding:14px 16px 11px;
+}
+#view-explore.dashboard-compact .dashboard-overview h2{
+  margin:6px 0 9px;
+  line-height:1.1;
+}
+#view-explore.dashboard-compact .dashboard-stat,
+#view-explore.dashboard-compact .dashboard-stat:first-child{
+  padding:8px 9px 7px;
+  border-radius:12px;
+}
+#view-explore.dashboard-compact .dashboard-stat small{margin-top:3px}
+#view-explore.dashboard-compact .dashboard-overview .refresh-copy{margin-top:6px}
+#view-explore.dashboard-compact .park-strip{padding:6px 1px}
+#view-explore.dashboard-compact .dashboard-pick,
+#view-explore.dashboard-compact .dashboard-watches{
+  padding:10px 12px;
+  margin-bottom:8px;
+  border-radius:18px;
+}
+#view-explore.dashboard-compact .dashboard-section-head{margin-bottom:5px}
+#view-explore.dashboard-compact .dashboard-pick-ride,
+#view-explore.dashboard-compact .dashboard-watch{padding:9px 10px}
+#view-explore.dashboard-compact .toolbar{padding:7px;margin-bottom:10px;gap:6px}
+#view-explore.dashboard-compact .toolbar .search{min-height:42px}
+#view-explore.dashboard-compact .toolbar .dashboard-filter-row{gap:8px}
+#view-explore.dashboard-compact .dashboard-ride-heading{margin-bottom:7px}
+#view-explore.dashboard-compact .ride-list{gap:7px}
+#view-explore.dashboard-compact .ride-main{padding:10px 13px}
+@media(max-width:640px){
+  #view-explore.dashboard-compact .dashboard-overview{padding:13px 13px 10px}
+  #view-explore.dashboard-compact .dashboard-stat,
+  #view-explore.dashboard-compact .dashboard-stat:first-child{padding:8px 7px 7px}
+  #view-explore.dashboard-compact .park-strip{padding:5px 0}
+  #view-explore.dashboard-compact .park-strip .park-chip{min-height:44px;padding:8px 11px}
+  #view-explore.dashboard-compact .dashboard-pick,
+  #view-explore.dashboard-compact .dashboard-watches{padding:9px 11px}
+  #view-explore.dashboard-compact .toolbar{padding:7px}
+  #view-explore.dashboard-compact .toolbar .dashboard-filter-row .filter-button{min-height:44px}
+}
+@media(max-width:360px){
+  #view-explore.dashboard-compact .dashboard-overview{padding:12px 11px 9px}
+  #view-explore.dashboard-compact .dashboard-stat,
+  #view-explore.dashboard-compact .dashboard-stat:first-child{padding:7px 6px}
+  #view-explore.dashboard-compact .dashboard-metrics{gap:5px}
+}
+@media(forced-colors:active){
+  #view-explore .stat-operating,#view-explore .stat-median,
+  #view-explore .stat-crowd{box-shadow:none}
+}

@@ -159,12 +159,12 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
           6:['mk:space-mountain','Space Mountain'],
           7:['dhs:rise','Star Wars: Rise of the Resistance'],
           8:['ak:everest','Expedition Everest'],
-          16:['dl:space-mountain','Space Mountain'],
-          17:['dca:guardians','Guardians of the Galaxy - Mission: BREAKOUT!']
+          16:['dl:space-mountain','Hyperspace Mountain','Space Mountain'],
+          17:['dca:guardians','Guardians of the Galaxy – Monsters After Dark','Guardians of the Galaxy - Mission: BREAKOUT!']
         };
         const entry = names[id];
         return route.fulfill({json:{parkPulseFormat:2,parkId:id,rides:entry?[{
-          id:entry[0],name:entry[1],parkId:id,land:'Test Land',isOpen:true,
+          id:entry[0],name:entry[1],canonicalName:entry[2]||entry[1],activeVariant:Boolean(entry[2]),parkId:id,land:'Test Land',isOpen:true,
           waitTime:30,operationalStatus:'OPERATING',
           source:'themeparks.wiki',lastUpdated:new Date().toISOString()
         }]:[]}});
@@ -179,8 +179,10 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await stagedPage.locator('#nav-explore').click();
     await stagedPage.waitForSelector('[data-ride-id="dl:space-mountain"]',{timeout:10000});
     assert.equal(await stagedPage.locator('#view-explore [data-park]').count(),2);
+    assert.match(await stagedPage.locator('[data-ride-id="dl:space-mountain"] h3').innerText(),/Hyperspace Mountain/);
     await stagedPage.locator('#view-explore [data-park="17"]').click();
     await stagedPage.waitForSelector('[data-ride-id="dca:guardians"]',{timeout:10000});
+    assert.match(await stagedPage.locator('[data-ride-id="dca:guardians"] h3').innerText(),/Monsters After Dark/);
     await stagedPage.locator('#view-explore [data-park="16"]').click();
     await stagedPage.locator('[data-ride-id="dl:space-mountain"] [data-open-ride]').first().click();
     await stagedPage.locator('#durationSelect').selectOption('forever');
@@ -188,7 +190,8 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await stagedPage.locator('#nav-resorts').click();
     await stagedPage.locator('[data-resort="wdw"]').click();
     await stagedPage.locator('#nav-watching').click();
-    assert.match(await stagedPage.locator('.watch-list').innerText(),/Space Mountain/);
+    assert.match(await stagedPage.locator('.watch-list').innerText(),/Hyperspace Mountain/);
+    assert.equal(await stagedPage.evaluate(()=>JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1')).rules[0].canonicalName),'Space Mountain');
     assert.equal(await stagedPage.evaluate(()=>JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1')).rules[0].parkId),16);
     await stagedPage.locator('#nav-resorts').click();
     await stagedPage.locator('[data-resort="dlr"]').click();
@@ -198,7 +201,7 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await stagedPage.goto('http://127.0.0.1:8765/?ride=dl:space-mountain',{waitUntil:'domcontentloaded'});
     await stagedPage.waitForSelector('#rideSheet:not(.hidden)',{timeout:10000});
     assert.equal(await stagedPage.locator('#view-explore [data-park="16"]').getAttribute('aria-pressed'),'true');
-    assert.match(await stagedPage.locator('#sheetTitle').innerText(),/Space Mountain/);
+    assert.match(await stagedPage.locator('#sheetTitle').innerText(),/Hyperspace Mountain/);
     assert(requestedParks.includes(16) && requestedParks.includes(17));
     assert.deepEqual(stagedErrors,[]);
     await stage.close();

@@ -1517,3 +1517,52 @@ test('2.0 mobile header clears translucent iOS safe area without changing deskto
   assert.match(css,/@media \(min-width:1024px\) \{[\s\S]*?\.topbar\{\s*min-height:84px;\s*padding-top:16px;/);
   assert.match(css,/ParkPulse 2\.0: Keep the mobile wordmark/);
 });
+
+
+test('2.1 park overview only counts fresh known statuses and uses a live median', () => {
+  const frontend = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  const start = frontend.indexOf('function dashboardMetrics(');
+  const end = frontend.indexOf('function dashboardMetricsMarkup(', start);
+  assert(start >= 0 && end > start);
+  const rides = [
+    {isOpen:true, waitTime:10, operationalStatus:'OPERATING'},
+    {isOpen:true, waitTime:20, operationalStatus:'OPERATING'},
+    {isOpen:false, waitTime:null, operationalStatus:'DOWN'},
+    {isOpen:true, waitTime:99, operationalStatus:'OPERATING', stale:true},
+    {isOpen:false, sourceMissing:true, operationalStatus:'UNKNOWN'}
+  ];
+  const context = vm.createContext({
+    Number, Math,
+    rideData:{ridesForPark:()=>rides},
+    isRideStale:ride=>Boolean(ride.stale),
+    crowdPresentation:crowd=>crowd || {kind:'none'},
+    ticketedEventState:()=>null
+  });
+  vm.runInContext(frontend.slice(start, end), context);
+  const calculate = vm.runInContext('dashboardMetrics', context);
+  const open = calculate(6, {}, {key:'open'}, {kind:'level',level:4,label:'Light'});
+  assert.equal(open.operating,2);
+  assert.equal(open.known,3);
+  assert.equal(open.medianWait,15);
+  assert.equal(open.crowdLevel,4);
+  assert.equal(calculate(6, {}, {key:'event'}, {kind:'level',level:4}).crowdLevel,null);
+  assert.equal(calculate(6, {}, {key:'closed'}, {kind:'level',level:4}).medianWait,null);
+  rides.splice(0);
+  assert.equal(calculate(6, {}, {key:'open'}, null).operating,null);
+  assert.equal(calculate(6, {}, {key:'open'}, null).medianWait,null);
+});
+
+test('2.1 dashboard is optional and local while ride browsing remains always available', () => {
+  const frontend = fs.readFileSync(new URL('../assets/js/app.js', import.meta.url), 'utf8');
+  const storeCode = fs.readFileSync(new URL('../assets/js/store.js', import.meta.url), 'utf8');
+  assert.match(frontend, /dashboardOverview|dashboard-overview/);
+  assert.match(frontend, /dashboardWatchesMarkup\(state\)/);
+  assert.match(frontend, /dashboardDensitySelect/);
+  assert.match(frontend, /dashboardWorthToggle/);
+  assert.match(frontend, /dashboardCrowdToggle/);
+  assert.match(frontend, /rideListMarkup\(state\)/);
+  assert.doesNotMatch(frontend.slice(frontend.indexOf('function renderExplore('), frontend.indexOf('function renderResorts(')), /hero-card/);
+  assert.match(storeCode, /density: "compact"/);
+  assert.match(storeCode, /showWatches: true/);
+  assert.match(storeCode, /showHours: false/);
+});

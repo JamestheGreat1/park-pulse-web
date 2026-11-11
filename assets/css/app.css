@@ -5884,3 +5884,83 @@ body{
   }
   #view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-label{font-size:.62rem}
 }
+
+
+/* ParkPulse 2.1 — consistent green KPI accent and integrated closed state.
+   Use the same inset left rail as the blue/orange details. */
+#view-explore .dashboard-metrics > .dashboard-stat.stat-operating{
+  box-shadow:inset 4px 0 0 rgba(73,204,149,.78),
+             inset 0 1px 0 rgba(180,255,218,.14);
+}
+#view-explore .dashboard-overview .dashboard-condition-slot{
+  min-width:0;
+}
+#view-explore .dashboard-overview .dashboard-closed-summary{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+  padding:12px 14px;
+  border:1px solid rgba(250,133,144,.28);
+  border-radius:16px;
+  background:
+    linear-gradient(120deg,rgba(218,87,114,.14),rgba(var(--park-mood-rgb),.07)),
+    rgba(25,22,33,.055);
+  box-shadow:inset 3px 0 0 rgba(248,131,144,.64);
+}
+#view-explore .dashboard-closed-symbol{
+  display:grid;
+  place-items:center;
+  flex:0 0 42px;
+  width:42px;height:42px;
+  border:1px solid rgba(248,131,144,.24);
+  border-radius:13px;
+  background:rgba(248,131,144,.10);
+  font-size:1.45rem;
+  line-height:1;
+}
+#view-explore .dashboard-closed-copy{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+#view-explore .dashboard-closed-copy .eyebrow{
+  color:var(--bad);
+  font-size:.68rem;
+  letter-spacing:.13em;
+  line-height:1.15;
+}
+#view-explore .dashboard-closed-copy p{
+  margin:0;
+  color:var(--text);
+  font-size:.88rem;
+  font-weight:650;
+  line-height:1.32;
+  overflow-wrap:anywhere;
+}
+#view-explore .dashboard-closed-hours{
+  display:block;
+  margin-top:1px;
+  color:var(--muted);
+  font-size:.76rem;
+  font-weight:660;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+#view-explore.dashboard-compact .dashboard-closed-summary{padding:10px 12px;gap:10px}
+@media(max-width:640px){
+  #view-explore .dashboard-closed-summary{gap:10px;padding:11px 12px}
+  #view-explore .dashboard-closed-symbol{width:38px;height:38px;flex-basis:38px;font-size:1.3rem}
+  #view-explore .dashboard-closed-copy p{font-size:.83rem}
+  #view-explore .dashboard-closed-hours{font-size:.73rem}
+  #view-explore.dashboard-compact .dashboard-closed-summary{padding:9px 10px}
+}
+@media(max-width:360px){
+  #view-explore .dashboard-closed-symbol{width:34px;height:34px;flex-basis:34px}
+}
+@media(forced-colors:active){
+  #view-explore .dashboard-closed-summary,
+  #view-explore .dashboard-closed-symbol{border:1px solid CanvasText}
+  #view-explore .dashboard-metrics > .dashboard-stat.stat-operating{box-shadow:none}
+}

@@ -9,6 +9,8 @@ const {chromium} = require(require.resolve('playwright', {paths:[process.env.COD
     const page = await context.newPage();
     const requests = [],errors = [];
     let closedTestMode = false;
+    let trendTestMode = false;
+    let trendDirection = null;
     page.on('pageerror', error=>errors.push(error.message));
     await page.route('https://parkpulse-api.jamesp5297.workers.dev/**',async route=>{
       const request = route.request();
@@ -22,8 +24,12 @@ const {chromium} = require(require.resolve('playwright', {paths:[process.env.COD
         return route.fulfill({json:{
         parkPulseFormat:2,parkId:Number(park[1]),
         parkHours:closedTestMode ? {date:localDate,timezone:'America/Los_Angeles',closedToday:true,
-          openingTime:null,closingTime:null,ticketedEvents:[]} : null,
-        crowdLevel:null,
+          openingTime:null,closingTime:null,ticketedEvents:[]} :
+          trendTestMode ? {date:localDate,timezone:'America/Los_Angeles',closedToday:false,
+            openingTime:new Date(Date.now()-3600000).toISOString(),
+            closingTime:new Date(Date.now()+3600000).toISOString(),ticketedEvents:[]} : null,
+        crowdLevel:trendTestMode ? {available:true,level:7,label:'Busy',deltaPercent:17,samples:35,
+          trend:trendDirection ? {direction:trendDirection} : null} : null,
         rides:[
           {id:'mk:preview-one',name:'Preview Mountain',land:'Tomorrowland',isOpen:true,
            waitTime:20,operationalStatus:'OPERATING',source:'themeparks.wiki',lastUpdated:new Date().toISOString()},
@@ -189,6 +195,57 @@ const {chromium} = require(require.resolve('playwright', {paths:[process.env.COD
     await page.waitForSelector('.dashboard-metrics > .dashboard-stat',{timeout:12000});
     assert.equal(await page.locator('.dashboard-closed-summary').count(),0);
     assert.equal(await page.locator('.dashboard-stat').count(),3);
+
+    // The three directions reuse existing crowd trend data. Missing data must be silent.
+    trendTestMode = true;
+    for (const [direction,label,arrow] of [['down','Easing','↘'],['up','Growing','↗'],['steady','Steady','→']]) {
+      trendDirection = direction;
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.locator('.dashboard-stat-trend.trend-'+direction).waitFor({state:'visible',timeout:12000});
+      assert.equal((await page.locator('.dashboard-stat-trend').count()),1);
+      assert.match(await page.locator('.dashboard-stat-trend').innerText(),new RegExp(label));
+      assert.match(await page.locator('.dashboard-stat-trend').innerText(),new RegExp(arrow));
+      assert.match(await page.locator('.stat-crowd').getAttribute('aria-label'),new RegExp(label.toLowerCase()));
+      for(const width of [320,375,390,430]){
+        await page.setViewportSize({width,height:844});
+        const geometry=await page.evaluate(()=>{
+          const stat=document.querySelector('.stat-crowd').getBoundingClientRect();
+          const trend=document.querySelector('.dashboard-stat-trend').getBoundingClientRect();
+          const cards=[...document.querySelectorAll('.dashboard-metrics>.dashboard-stat')].map(el=>el.getBoundingClientRect());
+          return {stat:{left:stat.left,right:stat.right,bottom:stat.bottom},
+            trend:{left:trend.left,right:trend.right,bottom:trend.bottom},
+            heights:cards.map(card=>card.height),pageWidth:document.documentElement.scrollWidth};
+        });
+        assert(geometry.trend.left>=geometry.stat.left-1 && geometry.trend.right<=geometry.stat.right+1,
+          'Crowd microtrend clips horizontally at '+width+': '+JSON.stringify(geometry));
+        assert(geometry.trend.bottom<=geometry.stat.bottom+1,
+          'Crowd microtrend clips vertically at '+width+': '+JSON.stringify(geometry));
+        assert(Math.max(...geometry.heights)-Math.min(...geometry.heights)<1.5,
+          'Three stat card heights should match at '+width);
+        assert(geometry.pageWidth<=width+2,'Unexpected page overflow at '+width);
+      }
+    }
+    await page.setViewportSize({width:390,height:844});
+    // No invented direction from partial or missing provider data.
+    trendDirection = null;
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.querySelector('.stat-crowd')?.textContent?.includes('7'),{timeout:12000});
+    assert.equal(await page.locator('.dashboard-stat-trend').count(),0);
+    // The user's existing crowd visibility preference must hide the trend too.
+    trendDirection = 'down';
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.locator('.dashboard-stat-trend.trend-down').waitFor({state:'visible',timeout:12000});
+    await page.locator('#nav-settings').click();
+    await page.locator('#dashboardCrowdToggle').uncheck();
+    await page.locator('#nav-explore').click();
+    assert.equal(await page.locator('.stat-crowd').count(),0);
+    assert.equal(await page.locator('.dashboard-stat-trend').count(),0);
+    await page.locator('#nav-settings').click();
+    await page.locator('#dashboardCrowdToggle').check();
+    await page.locator('#nav-explore').click();
+    await page.locator('.dashboard-stat-trend.trend-down').waitFor({state:'visible',timeout:12000});
+    trendTestMode = false;
+
     assert.equal(requests.some(request=>!['GET','OPTIONS'].includes(request.method)),false);
     assert.deepEqual(errors,[]);
     console.log('PASS: isolated 2.1 hosted preview loads, persists separate settings/watches and sends no production writes');

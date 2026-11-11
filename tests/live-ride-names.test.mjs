@@ -23,7 +23,7 @@ test("all curated variants are catalog aliases with the same permanent ride ID",
   assert.deepEqual(Object.keys(LIVE_RIDE_VARIANTS).sort(),[
     "dca:guardians","dca:luigis","dca:maters","dca:soarin",
     "dl:haunted-mansion","dl:small-world","dl:space-mountain",
-    "epcot:soarin","mk:jungle-cruise"
+    "epcot:living-with-the-land","epcot:soarin","mk:jungle-cruise"
   ]);
   for(const [id,variants] of Object.entries(LIVE_RIDE_VARIANTS)){
     const catalog=byKey.get(id);

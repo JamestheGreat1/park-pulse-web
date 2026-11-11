@@ -8,14 +8,22 @@ const {chromium} = require(require.resolve('playwright', {paths:[process.env.COD
     const context = await browser.newContext({serviceWorkers:'block'});
     const page = await context.newPage();
     const requests = [],errors = [];
+    let closedTestMode = false;
     page.on('pageerror', error=>errors.push(error.message));
     await page.route('https://parkpulse-api.jamesp5297.workers.dev/**',async route=>{
       const request = route.request();
       const url = new URL(request.url());
       requests.push({method:request.method(),path:url.pathname});
       const park = url.pathname.match(/^\/api\/park\/(\d+)$/);
-      if(park) return route.fulfill({json:{
-        parkPulseFormat:2,parkId:Number(park[1]),parkHours:null,crowdLevel:null,
+      if(park) {
+        const parts = new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+        const d = Object.fromEntries(parts.map(p=>[p.type,p.value]));
+        const localDate = d.year+'-'+d.month+'-'+d.day;
+        return route.fulfill({json:{
+        parkPulseFormat:2,parkId:Number(park[1]),
+        parkHours:closedTestMode ? {date:localDate,timezone:'America/Los_Angeles',closedToday:true,
+          openingTime:null,closingTime:null,ticketedEvents:[]} : null,
+        crowdLevel:null,
         rides:[
           {id:'mk:preview-one',name:'Preview Mountain',land:'Tomorrowland',isOpen:true,
            waitTime:20,operationalStatus:'OPERATING',source:'themeparks.wiki',lastUpdated:new Date().toISOString()},
@@ -23,6 +31,7 @@ const {chromium} = require(require.resolve('playwright', {paths:[process.env.COD
            waitTime:30,operationalStatus:'OPERATING',source:'themeparks.wiki',lastUpdated:new Date().toISOString()}
         ]
       }});
+      }
       if(url.pathname==='/health')return route.fulfill({json:{ok:true,version:'2.0.1'}});
       return route.fulfill({json:{ok:true}});
     });
@@ -163,6 +172,23 @@ const {chromium} = require(require.resolve('playwright', {paths:[process.env.COD
       return !!state?.rules?.length && state.dashboard.showHours === true &&
         localStorage.getItem('parkpulse.rideWatcher.v1') === null;
     }),true);
+    // Closed parks must show one integrated status message, no empty KPI tiles or duplicate card.
+    closedTestMode = true;
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForSelector('.dashboard-closed-summary',{timeout:12000});
+    assert.equal(await page.locator('.dashboard-metrics').count(),0);
+    assert.equal(await page.locator('.park-closed-card').count(),0);
+    assert.equal(await page.locator('.park-feature-slot .park-closed-card').count(),0);
+    assert.equal(await page.locator('.dashboard-closed-hours').count(),1);
+    assert.match(await page.locator('.dashboard-closed-summary').innerText(),/No regular operating hours are scheduled today/);
+    assert.match(await page.locator('.dashboard-closed-hours').innerText(),/Closed today/);
+    assert.equal(await page.locator('.park-status-pill.status-closed').count(),1);
+    // If data returns to an open/unknown state, the KPI row must reappear.
+    closedTestMode = false;
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForSelector('.dashboard-metrics > .dashboard-stat',{timeout:12000});
+    assert.equal(await page.locator('.dashboard-closed-summary').count(),0);
+    assert.equal(await page.locator('.dashboard-stat').count(),3);
     assert.equal(requests.some(request=>!['GET','OPTIONS'].includes(request.method)),false);
     assert.deepEqual(errors,[]);
     console.log('PASS: isolated 2.1 hosted preview loads, persists separate settings/watches and sends no production writes');

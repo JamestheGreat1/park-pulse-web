@@ -45,6 +45,10 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.equal(mobileNav.length, 4);
     assert(mobileNav.every(item => item.width >= 44 && item.left >= 0 && item.right <= 320));
     assert(mobileNav.every((item, index) => index === 0 || mobileNav[index - 1].right <= item.left + 1));
+    // The viewport measurement is only meaningful while Resorts is visible.
+    // View switching can finish after the previous click on faster runners.
+    await page.locator('#nav-resorts').click();
+    await page.locator('#view-resorts [data-resort="dlr"]').waitFor({ state: 'visible' });
     const resortCard = await page.locator('[data-resort="dlr"]').boundingBox();
     assert(resortCard && resortCard.x >= 0 && resortCard.x + resortCard.width <= 320);
     await page.setViewportSize({ width: 1440, height: 900 });

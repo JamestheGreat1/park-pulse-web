@@ -22,7 +22,8 @@ jobs:
 
   browser:
     name: PWA browser and offline smoke test
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 is not compatible with Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,6 +44,8 @@ jobs:
           exit 1
       - name: Run browser smoke test
         run: node tests/browser-smoke.cjs
+      - name: Test hosted 2.1 preview isolation
+        run: node preview-2-1/preview-smoke.cjs
       - name: Generate isolated staging frontend preview
         run: node worker/scripts/build-staging.mjs --database-id 11111111-1111-4111-8111-111111111111 --enable-history-cron --preview-url https://parkpulse-api-staging.jamesp5297.workers.dev
       - name: Start staging frontend fixture

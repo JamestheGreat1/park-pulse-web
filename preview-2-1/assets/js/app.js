@@ -910,10 +910,10 @@ function dashboardMetrics(parkId, schedule, status, crowd) {
 function dashboardMetricsMarkup(parkId, schedule, status, crowd, dashboard = store.snapshot.dashboard) {
   const metrics = dashboardMetrics(parkId, schedule, status, crowd);
   return `<div class="dashboard-stat stat-operating" aria-label="${metrics.known == null ? "Operating attractions unavailable" : `${metrics.operating} of ${metrics.known} attractions with fresh status are operating`}">
-      <strong>${metrics.operating == null ? "—" : `${metrics.operating}<span>/${metrics.known}</span>`}</strong><small>Operating</small>
+      <strong class="dashboard-stat-value">${metrics.operating == null ? "—" : `<span class="stat-primary">${metrics.operating}</span><span class="stat-secondary">/${metrics.known}</span>`}</strong><small class="dashboard-stat-label">Operating</small>
     </div>
-    <div class="dashboard-stat stat-median"><strong>${metrics.medianWait == null ? "—" : `${metrics.medianWait}<span> min</span>`}</strong><small>Median live wait</small></div>
-    ${dashboard.showCrowd ? `<div class="dashboard-stat stat-crowd ${metrics.crowdLevel == null ? "crowd-unavailable" : metrics.crowdLevel >= 8 ? "crowd-busy" : metrics.crowdLevel >= 5 ? "crowd-moderate" : "crowd-light"}" aria-label="${metrics.crowdLevel == null ? "Crowd pressure unavailable" : `Crowd pressure ${metrics.crowdLevel} out of 10, ${metrics.crowdText}`}"><strong>${metrics.crowdLevel == null ? "—" : `${metrics.crowdLevel}<span>/10</span>`}</strong><small>Crowd pressure</small></div>` : ""}`;
+    <div class="dashboard-stat stat-median"><strong class="dashboard-stat-value">${metrics.medianWait == null ? "—" : `<span class="stat-primary">${metrics.medianWait}</span><span class="stat-secondary">min</span>`}</strong><small class="dashboard-stat-label">Median live wait</small></div>
+    ${dashboard.showCrowd ? `<div class="dashboard-stat stat-crowd ${metrics.crowdLevel == null ? "crowd-unavailable" : metrics.crowdLevel >= 8 ? "crowd-busy" : metrics.crowdLevel >= 5 ? "crowd-moderate" : "crowd-light"}" aria-label="${metrics.crowdLevel == null ? "Crowd pressure unavailable" : `Crowd pressure ${metrics.crowdLevel} out of 10, ${metrics.crowdText}`}"><strong class="dashboard-stat-value">${metrics.crowdLevel == null ? "—" : `<span class="stat-primary">${metrics.crowdLevel}</span><span class="stat-secondary">/10</span>`}</strong><small class="dashboard-stat-label">Crowd pressure</small></div>` : ""}`;
 }
 
 function dashboardWatchesMarkup(state = store.snapshot) {

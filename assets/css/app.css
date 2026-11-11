@@ -5364,3 +5364,633 @@ body{
   justify-content:flex-end;
   text-align:right;
 }
+
+
+/* ParkPulse 2.1 — compact, configurable Explore dashboard.
+   Existing glass surfaces, color tokens, ride actions, and navigation remain intact. */
+#view-explore .dashboard-overview{
+  position:relative;
+  overflow:hidden;
+  border-radius:25px;
+  padding:18px 20px 15px;
+  background:linear-gradient(125deg,rgba(var(--blue-rgb),.085),transparent 80%),var(--glass);
+}
+.dashboard-overview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.dashboard-overview .resort-switch{min-width:0;text-align:left}
+.dashboard-overview .resort-switch .eyebrow{overflow-wrap:anywhere}
+.dashboard-overview .park-status-slot{flex:0 0 auto}
+.dashboard-overview .overview-unknown{color:var(--muted);font-size:.71rem;font-weight:700}
+.dashboard-overview h2{
+  font-size:clamp(1.4rem,4vw,2rem);letter-spacing:-.035em;
+  line-height:1.12;margin:7px 0 13px;overflow-wrap:anywhere;
+}
+.dashboard-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.dashboard-metrics.dashboard-two-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+.dashboard-stat{min-width:0;padding:3px 12px;border-left:1px solid var(--hair)}
+.dashboard-stat:first-child{border-left:0;padding-left:0}
+.dashboard-stat strong{display:block;color:var(--text);font-size:clamp(1rem,3.8vw,1.55rem);font-weight:850;letter-spacing:-.035em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dashboard-stat strong span{font-size:.65em;letter-spacing:0;color:var(--muted);font-weight:720}
+.dashboard-stat small{display:block;margin-top:4px;color:var(--muted);font-size:.67rem;line-height:1.25}
+.dashboard-overview .park-hours{margin-top:11px;font-weight:650}
+.dashboard-overview .park-events{margin-top:8px}
+.dashboard-overview .refresh-copy{display:block;font-size:.69rem;text-align:right;margin-top:10px}
+#view-explore .park-strip{padding:10px 1px 9px}
+#view-explore .park-feature-slot:empty{display:none}
+.dashboard-pick,.dashboard-watches{border-radius:22px;padding:13px 15px;margin:0 0 11px;overflow:hidden}
+.dashboard-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 8px}
+.dashboard-section-head>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.dashboard-section-head small{color:var(--muted);font-size:.73rem}
+.dashboard-text-action{
+  flex:0 0 auto;min-height:36px;padding:7px 5px;border:0;background:transparent;
+  color:var(--blue);font-size:.76rem;font-weight:780;
+}
+.dashboard-pick-ride,.dashboard-watch{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;min-width:0;
+  width:100%;padding:11px 12px;border:1px solid rgba(var(--blue-rgb),.18);
+  border-radius:14px;text-align:left;background:rgba(var(--blue-rgb),.055);
+}
+.dashboard-pick-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
+.dashboard-pick-copy>strong{font-size:1rem;line-height:1.25;overflow-wrap:anywhere}
+.dashboard-pick-copy>small:last-child{font-size:.74rem;color:var(--muted);line-height:1.3}
+.dashboard-pick-copy>small.positive{color:var(--good)}
+.dashboard-pick-wait{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:0 0 auto}
+.dashboard-pick-wait b{font-size:1.08rem;line-height:1.15;color:var(--text);white-space:nowrap}
+.dashboard-pick-wait small{font-size:.7rem;color:var(--muted)}
+.dashboard-watch-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dashboard-watch{align-items:flex-start;padding:11px 12px;background:rgba(var(--blue-rgb),.045)}
+.dashboard-watch>span:first-child{min-width:0}
+.dashboard-watch strong{display:block;font-size:.82rem;line-height:1.25;overflow-wrap:anywhere}
+.dashboard-watch small{display:block;margin-top:4px;color:var(--muted);font-size:.66rem;line-height:1.25}
+.dashboard-watch-status{flex:0 0 auto;text-align:right}
+.dashboard-watch-status b{font-size:.85rem;white-space:nowrap;color:var(--text)}
+.dashboard-watch-status b.stale{color:var(--warn)}
+.dashboard-watch-status b.closed{color:var(--bad)}
+.dashboard-pick-ride:focus-visible,.dashboard-watch:focus-visible,.dashboard-text-action:focus-visible{
+  outline:2px solid var(--blue);outline-offset:2px;
+}
+@media(hover:hover) and (pointer:fine){
+  .dashboard-pick-ride:hover,.dashboard-watch:hover{background:rgba(var(--blue-rgb),.14)}
+}
+#view-explore .toolbar{
+  grid-template-columns:minmax(0,1fr) auto auto auto;
+  gap:7px;margin:0 0 14px;padding:8px;border-radius:19px;
+}
+#view-explore .toolbar .search{min-width:0}
+#view-explore .toolbar .filter-button,
+#view-explore .toolbar select{min-height:40px;padding:8px 11px;font-size:.78rem}
+#view-explore .dashboard-ride-heading{margin:0 0 10px;padding-inline:2px}
+#view-explore .dashboard-ride-heading h2{font-size:1.35rem;letter-spacing:-.025em}
+#view-explore.dashboard-compact .ride-list{gap:9px}
+#view-explore.dashboard-compact .ride-main{padding:12px 14px}
+#view-explore.dashboard-compact .ride-card{border-radius:19px}
+#view-explore.dashboard-compact .ride-copy h3{margin-top:3px}
+#view-explore.dashboard-compact .ride-meta{margin-top:2px}
+#view-explore.dashboard-compact .recommendation-hint{margin-top:3px}
+#view-explore:not(.dashboard-compact) .dashboard-overview{padding:24px}
+#view-explore:not(.dashboard-compact) .dashboard-pick,
+#view-explore:not(.dashboard-compact) .dashboard-watches{padding:18px;margin-bottom:15px}
+#view-explore:not(.dashboard-compact) .dashboard-overview h2{margin:12px 0 22px}
+#view-explore:not(.dashboard-compact) .park-strip{padding-block:16px}
+#view-explore:not(.dashboard-compact) .toolbar{margin-bottom:21px;padding:12px}
+@media(max-width:640px){
+  #view-explore .dashboard-overview{padding:16px 15px 13px;border-radius:22px}
+  .dashboard-overview h2{margin-bottom:12px}
+  .dashboard-stat{padding-inline:9px}
+  .dashboard-stat small{font-size:.61rem}
+  #view-explore .park-strip{display:flex;overflow-x:auto;flex-wrap:nowrap;gap:7px;padding:10px 0}
+  #view-explore .park-strip .park-chip{padding:9px 12px;flex:0 0 auto;min-height:40px}
+  #view-explore .toolbar{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  #view-explore .toolbar .search{grid-column:1/-1;min-height:40px}
+  #view-explore .toolbar .search input{padding:8px 0}
+  #view-explore .toolbar .filter-button,
+  #view-explore .toolbar select{min-height:44px;padding:7px 5px;font-size:.75rem}
+  #view-explore .dashboard-ride-heading h2{font-size:1.27rem}
+  .dashboard-watch-list{grid-template-columns:1fr}
+  .dashboard-watch{align-items:center}
+}
+@media(max-width:360px){
+  .dashboard-stat strong{font-size:1rem}
+  .dashboard-stat small{font-size:.59rem}
+  .dashboard-metrics{gap:0}
+  #view-explore .toolbar .filter-button,
+  #view-explore .toolbar select{font-size:.68rem}
+}
+@media(forced-colors:active){
+  .dashboard-overview,.dashboard-pick,.dashboard-watches,
+  .dashboard-pick-ride,.dashboard-watch{border:1px solid CanvasText}
+}
+
+
+/* ParkPulse 2.1 Vibrant Glass: meaning-first colors, park-mood glows, less nested chrome. */
+/* These variables style Explore only. Accent/theme and app-wide glass remain user's choice. */
+#view-explore{
+  --park-mood-rgb:75,148,240;
+  --park-spark-rgb:240,183,103;
+  --stat-wait-color:var(--blue);
+  --stat-pressure-color:#e4b879;
+}
+#view-explore[data-park-mood="disneyland"]{--park-mood-rgb:60,119,238;--park-spark-rgb:249,198,95}
+#view-explore[data-park-mood="dca"]{--park-mood-rgb:31,166,177;--park-spark-rgb:239,140,112}
+#view-explore[data-park-mood="magic"]{--park-mood-rgb:145,106,218;--park-spark-rgb:241,196,109}
+#view-explore[data-park-mood="epcot"]{--park-mood-rgb:63,131,232;--park-spark-rgb:179,142,244}
+#view-explore[data-park-mood="studios"]{--park-mood-rgb:196,112,82;--park-spark-rgb:238,184,110}
+#view-explore[data-park-mood="animal"]{--park-mood-rgb:67,150,119;--park-spark-rgb:216,180,100}
+
+#view-explore .dashboard-overview{
+  border-color:rgba(var(--park-mood-rgb),.38);
+  background:
+    radial-gradient(ellipse at 0% 0%,rgba(var(--park-mood-rgb),.29),transparent 66%),
+    radial-gradient(ellipse at 98% 90%,rgba(var(--park-spark-rgb),.14),transparent 66%),
+    linear-gradient(150deg,rgba(var(--park-mood-rgb),.085),transparent 74%),
+    var(--glass);
+  box-shadow:inset 0 1px rgba(255,255,255,.19),0 12px 36px rgba(var(--park-mood-rgb),.075);
+}
+#view-explore .dashboard-overview .resort-switch .eyebrow{
+  color:var(--blue);
+}
+#view-explore .dashboard-overview h2{margin-bottom:12px}
+#view-explore .dashboard-metrics{gap:8px}
+#view-explore .dashboard-stat,
+#view-explore .dashboard-stat:first-child{
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:14px;
+  padding:10px 10px 9px;
+  min-width:0;
+  background:rgba(255,255,255,.035);
+  box-shadow:inset 0 1px rgba(255,255,255,.07);
+}
+#view-explore .dashboard-stat strong{font-variant-numeric:tabular-nums}
+#view-explore .dashboard-stat small{margin-top:4px;font-weight:680;line-height:1.2}
+#view-explore .stat-operating{
+  background:linear-gradient(140deg,rgba(73,204,149,.16),rgba(73,204,149,.03)) !important;
+  border-color:rgba(73,204,149,.16) !important;
+}
+#view-explore .stat-operating strong{color:var(--good)}
+#view-explore .stat-median{
+  background:linear-gradient(140deg,rgba(var(--blue-rgb),.16),rgba(var(--blue-rgb),.025)) !important;
+  border-color:rgba(var(--blue-rgb),.17) !important;
+}
+#view-explore .stat-median strong{color:var(--stat-wait-color)}
+#view-explore .stat-crowd{
+  background:linear-gradient(140deg,rgba(125,146,185,.13),rgba(125,146,185,.025)) !important;
+  border-color:rgba(140,156,195,.17) !important;
+}
+#view-explore .stat-crowd strong{color:var(--muted)}
+#view-explore .stat-crowd.crowd-light{
+  background:linear-gradient(140deg,rgba(62,186,145,.13),rgba(62,186,145,.025)) !important;
+  border-color:rgba(62,186,145,.19) !important;
+}
+#view-explore .stat-crowd.crowd-light strong{color:var(--good)}
+#view-explore .stat-crowd.crowd-moderate{
+  background:linear-gradient(140deg,rgba(235,191,103,.15),rgba(235,191,103,.02)) !important;
+  border-color:rgba(235,191,103,.20) !important;
+}
+#view-explore .stat-crowd.crowd-moderate strong{color:var(--warn)}
+#view-explore .stat-crowd.crowd-busy{
+  background:linear-gradient(140deg,rgba(241,135,90,.19),rgba(241,135,90,.035)) !important;
+  border-color:rgba(241,135,90,.28) !important;
+}
+#view-explore .stat-crowd.crowd-busy strong{color:#ffc093}
+#view-explore .dashboard-stat strong span{color:var(--muted)}
+#view-explore .dashboard-overview .refresh-copy{margin-top:8px;opacity:.92}
+#view-explore .park-chip.active{
+  border-color:rgba(var(--park-mood-rgb),.5);
+  background:linear-gradient(130deg,rgba(var(--park-mood-rgb),.20),rgba(var(--park-spark-rgb),.07));
+  box-shadow:inset 0 1px rgba(255,255,255,.1);
+}
+#view-explore .dashboard-pick{
+  position:relative;
+  border-color:rgba(var(--park-spark-rgb),.30);
+  background:
+    radial-gradient(ellipse at 100% 0%,rgba(var(--park-spark-rgb),.14),transparent 65%),
+    linear-gradient(120deg,rgba(59,185,162,.115),rgba(var(--park-mood-rgb),.075)),
+    var(--glass);
+  box-shadow:inset 0 1px rgba(255,255,255,.14),0 10px 24px rgba(var(--park-spark-rgb),.05);
+}
+#view-explore .dashboard-pick .dashboard-section-head .eyebrow{color:var(--good)}
+#view-explore .dashboard-pick-ride,
+#view-explore .dashboard-watch{
+  border-color:rgba(var(--blue-rgb),.12);
+  background:rgba(var(--blue-rgb),.045);
+  box-shadow:none;
+}
+#view-explore .dashboard-watches{
+  border-color:rgba(var(--park-mood-rgb),.24);
+  background:linear-gradient(120deg,rgba(var(--park-mood-rgb),.09),transparent 90%),var(--glass);
+}
+
+/* Search, centered equal-width filter chips, then full-width sort.
+   The group avoids wrapping artifacts from the prior three-column grid. */
+#view-explore .toolbar{
+  grid-template-columns:minmax(0,1fr);
+  gap:7px;
+  padding:9px;
+  margin-bottom:12px;
+  border-color:rgba(var(--park-mood-rgb),.22);
+  background:linear-gradient(135deg,rgba(var(--park-mood-rgb),.075),transparent 72%),var(--glass);
+  box-shadow:inset 0 1px rgba(255,255,255,.11),0 9px 24px rgba(0,0,0,.07);
+}
+#view-explore .toolbar .search{
+  grid-column:1/-1;
+  min-height:42px;
+  border:1px solid rgba(var(--blue-rgb),.12);
+  background:rgba(255,255,255,.045);
+}
+#view-explore .toolbar .search input{
+  min-width:0;
+  padding:8px 0;
+  font-size:.87rem;
+  text-overflow:ellipsis;
+}
+#view-explore .toolbar .dashboard-filter-row{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,150px));
+  gap:9px;
+  justify-content:center;
+  width:100%;
+  margin:0 auto;
+  grid-column:1/-1;
+}
+#view-explore .toolbar .dashboard-filter-row .filter-button{
+  display:flex;align-items:center;justify-content:center;
+  min-width:0;min-height:40px;width:100%;
+  padding:8px 10px;
+  border-radius:13px;
+  font-size:.79rem;
+  font-weight:720;
+  border-color:rgba(var(--blue-rgb),.15);
+  background:rgba(var(--blue-rgb),.055);
+  box-shadow:none;
+}
+#view-explore .toolbar .dashboard-filter-row .filter-button.active{
+  background:linear-gradient(135deg,rgba(var(--blue-rgb),.24),rgba(var(--park-mood-rgb),.16));
+  border-color:rgba(var(--blue-rgb),.48);
+  color:var(--text);
+}
+#view-explore .toolbar #sortSelect{
+  grid-column:1/-1;
+  display:block;
+  width:100%;min-width:0;min-height:40px;
+  margin:0;
+  padding:8px 12px;
+  border:1px solid rgba(var(--park-mood-rgb),.22);
+  border-radius:13px;
+  background:rgba(255,255,255,.05);
+  font-size:.82rem;
+}
+#view-explore .toolbar .dashboard-filter-row .filter-button:focus-visible,
+#view-explore .toolbar #sortSelect:focus-visible,
+#view-explore .toolbar .search:focus-within{
+  outline:2px solid var(--blue);
+  outline-offset:2px;
+}
+@media(max-width:640px){
+  #view-explore .toolbar{grid-template-columns:minmax(0,1fr);gap:7px;padding:8px}
+  #view-explore .toolbar .search,
+  #view-explore .toolbar .dashboard-filter-row,
+  #view-explore .toolbar #sortSelect{grid-column:1/-1}
+  #view-explore .toolbar .dashboard-filter-row{grid-template-columns:repeat(2,minmax(0,150px))}
+  #view-explore .dashboard-stat,
+  #view-explore .dashboard-stat:first-child{padding:9px 8px 8px}
+  #view-explore .dashboard-stat small{font-size:.62rem}
+  #view-explore .dashboard-stat strong{font-size:clamp(1.05rem,4.1vw,1.42rem)}
+}
+@media(max-width:360px){
+  #view-explore .dashboard-stat,
+  #view-explore .dashboard-stat:first-child{padding:8px 6px}
+  #view-explore .dashboard-stat strong{font-size:1.02rem}
+  #view-explore .dashboard-stat small{font-size:.57rem}
+  #view-explore .dashboard-metrics{gap:5px}
+  #view-explore .toolbar .dashboard-filter-row{grid-template-columns:repeat(2,minmax(0,140px))}
+  #view-explore .toolbar .dashboard-filter-row .filter-button{font-size:.75rem}
+}
+/* Light mode: keep meaningful colors high-contrast against translucent surfaces. */
+:root[data-theme="light"] #view-explore .stat-median strong{color:#205b92}
+:root[data-theme="light"] #view-explore .stat-crowd.crowd-busy strong{color:#944b2a}
+:root[data-theme="light"] #view-explore .stat-crowd.crowd-moderate strong{color:#825800}
+:root[data-theme="light"] #view-explore .dashboard-overview{border-color:rgba(var(--park-mood-rgb),.32)}
+:root[data-theme="light"] #view-explore .dashboard-pick .eyebrow{color:#127758}
+@media(prefers-color-scheme:light){
+  :root[data-theme="system"] #view-explore .stat-median strong{color:#205b92}
+  :root[data-theme="system"] #view-explore .stat-crowd.crowd-busy strong{color:#944b2a}
+  :root[data-theme="system"] #view-explore .stat-crowd.crowd-moderate strong{color:#825800}
+  :root[data-theme="system"] #view-explore .dashboard-overview{border-color:rgba(var(--park-mood-rgb),.32)}
+  :root[data-theme="system"] #view-explore .dashboard-pick .eyebrow{color:#127758}
+}
+@media(forced-colors:active){
+  #view-explore .dashboard-stat,#view-explore .dashboard-stat:first-child,
+  #view-explore .toolbar .dashboard-filter-row .filter-button,
+  #view-explore .toolbar #sortSelect{border:1px solid CanvasText!important}
+}
+
+
+/* ParkPulse 2.1 — compact refinement: centered fixed-width optional tiles.
+   Three visible stats retain the normal three-column layout.
+   Two/one stats use a centered, capped-width row (including future visibility options). */
+#view-explore .dashboard-metrics.dashboard-two-stats,
+#view-explore .dashboard-metrics:has(> .dashboard-stat:only-child){
+  display:flex;
+  justify-content:center;
+  align-items:stretch;
+  gap:9px;
+}
+#view-explore .dashboard-metrics.dashboard-two-stats > .dashboard-stat{
+  flex:0 1 152px;
+  max-width:calc((100% - 9px)/2);
+  min-width:0;
+}
+#view-explore .dashboard-metrics:has(> .dashboard-stat:only-child) > .dashboard-stat{
+  flex:0 1 152px;
+  max-width:100%;
+}
+#view-explore .dashboard-filter-row:has(> .filter-button:only-child){
+  display:flex;
+  justify-content:center;
+}
+#view-explore .toolbar .dashboard-filter-row .filter-button:only-child{
+  flex:0 1 150px;
+}
+
+/* Let park identity show through more confidently without changing user accents. */
+#view-explore .dashboard-overview{
+  background:
+    radial-gradient(ellipse at 0% 0%,rgba(var(--park-mood-rgb),.36),transparent 67%),
+    radial-gradient(ellipse at 98% 88%,rgba(var(--park-spark-rgb),.22),transparent 68%),
+    linear-gradient(155deg,rgba(var(--park-mood-rgb),.12),transparent 78%),
+    var(--glass);
+  border-color:rgba(var(--park-mood-rgb),.48);
+}
+#view-explore .stat-operating{
+  background:linear-gradient(135deg,rgba(73,204,149,.29),rgba(73,204,149,.085))!important;
+  border-color:rgba(73,204,149,.35)!important;
+  box-shadow:inset 0 1px rgba(180,255,218,.10),inset 3px 0 rgba(73,204,149,.52);
+}
+#view-explore .stat-median{
+  background:linear-gradient(135deg,rgba(var(--blue-rgb),.29),rgba(var(--blue-rgb),.08))!important;
+  border-color:rgba(var(--blue-rgb),.36)!important;
+  box-shadow:inset 0 1px rgba(220,239,255,.10),inset 3px 0 rgba(var(--blue-rgb),.56);
+}
+#view-explore .stat-crowd.crowd-light{
+  background:linear-gradient(135deg,rgba(62,186,145,.28),rgba(62,186,145,.075))!important;
+  border-color:rgba(62,186,145,.35)!important;
+  box-shadow:inset 3px 0 rgba(62,186,145,.55);
+}
+#view-explore .stat-crowd.crowd-moderate{
+  background:linear-gradient(135deg,rgba(235,191,103,.29),rgba(235,191,103,.08))!important;
+  border-color:rgba(235,191,103,.38)!important;
+  box-shadow:inset 3px 0 rgba(235,191,103,.57);
+}
+#view-explore .stat-crowd.crowd-busy{
+  background:linear-gradient(135deg,rgba(241,135,90,.32),rgba(241,135,90,.09))!important;
+  border-color:rgba(241,135,90,.45)!important;
+  box-shadow:inset 3px 0 rgba(241,135,90,.65);
+}
+#view-explore .stat-crowd.crowd-unavailable{
+  background:rgba(128,144,168,.10)!important;
+  border-color:rgba(128,144,168,.17)!important;
+  box-shadow:none;
+}
+#view-explore .stat-crowd.crowd-unavailable strong{color:var(--muted)}
+
+/* Compact means less scaffolding, not smaller touch targets. Comfortable stays roomy. */
+#view-explore.dashboard-compact .dashboard-overview{
+  padding:14px 16px 11px;
+}
+#view-explore.dashboard-compact .dashboard-overview h2{
+  margin:6px 0 9px;
+  line-height:1.1;
+}
+#view-explore.dashboard-compact .dashboard-stat,
+#view-explore.dashboard-compact .dashboard-stat:first-child{
+  padding:8px 9px 7px;
+  border-radius:12px;
+}
+#view-explore.dashboard-compact .dashboard-stat small{margin-top:3px}
+#view-explore.dashboard-compact .dashboard-overview .refresh-copy{margin-top:6px}
+#view-explore.dashboard-compact .park-strip{padding:6px 1px}
+#view-explore.dashboard-compact .dashboard-pick,
+#view-explore.dashboard-compact .dashboard-watches{
+  padding:10px 12px;
+  margin-bottom:8px;
+  border-radius:18px;
+}
+#view-explore.dashboard-compact .dashboard-section-head{margin-bottom:5px}
+#view-explore.dashboard-compact .dashboard-pick-ride,
+#view-explore.dashboard-compact .dashboard-watch{padding:9px 10px}
+#view-explore.dashboard-compact .toolbar{padding:7px;margin-bottom:10px;gap:6px}
+#view-explore.dashboard-compact .toolbar .search{min-height:42px}
+#view-explore.dashboard-compact .toolbar .dashboard-filter-row{gap:8px}
+#view-explore.dashboard-compact .dashboard-ride-heading{margin-bottom:7px}
+#view-explore.dashboard-compact .ride-list{gap:7px}
+#view-explore.dashboard-compact .ride-main{padding:10px 13px}
+@media(max-width:640px){
+  #view-explore.dashboard-compact .dashboard-overview{padding:13px 13px 10px}
+  #view-explore.dashboard-compact .dashboard-stat,
+  #view-explore.dashboard-compact .dashboard-stat:first-child{padding:8px 7px 7px}
+  #view-explore.dashboard-compact .park-strip{padding:5px 0}
+  #view-explore.dashboard-compact .park-strip .park-chip{min-height:44px;padding:8px 11px}
+  #view-explore.dashboard-compact .dashboard-pick,
+  #view-explore.dashboard-compact .dashboard-watches{padding:9px 11px}
+  #view-explore.dashboard-compact .toolbar{padding:7px}
+  #view-explore.dashboard-compact .toolbar .dashboard-filter-row .filter-button{min-height:44px}
+}
+@media(max-width:360px){
+  #view-explore.dashboard-compact .dashboard-overview{padding:12px 11px 9px}
+  #view-explore.dashboard-compact .dashboard-stat,
+  #view-explore.dashboard-compact .dashboard-stat:first-child{padding:7px 6px}
+  #view-explore.dashboard-compact .dashboard-metrics{gap:5px}
+}
+@media(forced-colors:active){
+  #view-explore .stat-operating,#view-explore .stat-median,
+  #view-explore .stat-crowd{box-shadow:none}
+}
+
+
+/* ParkPulse 2.1 — unified overview details.
+   Numbers share the same baseline; units and labels use one common hierarchy.
+   A reserved two-line label track keeps all stat cards visually aligned. */
+#view-explore .dashboard-metrics > .dashboard-stat{
+  display:grid;
+  grid-template-rows:30px minmax(27px,auto);
+  align-content:center;
+  align-items:start;
+  row-gap:4px;
+  min-height:78px;
+  min-width:0;
+}
+#view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-value{
+  display:flex;
+  align-items:baseline;
+  gap:3px;
+  min-width:0;
+  height:30px;
+  margin:0;
+  font-size:clamp(1.06rem,3.9vw,1.48rem);
+  font-weight:850;
+  line-height:30px;
+  letter-spacing:-.035em;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+#view-explore .dashboard-metrics > .dashboard-stat .stat-primary{
+  color:inherit;
+  font-size:inherit;
+  font-weight:inherit;
+  letter-spacing:inherit;
+  line-height:inherit;
+}
+#view-explore .dashboard-metrics > .dashboard-stat .stat-secondary{
+  color:var(--muted);
+  font-size:.65em;
+  font-weight:730;
+  line-height:1;
+  letter-spacing:0;
+}
+#view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-label{
+  display:block;
+  min-height:2.35em;
+  margin:0;
+  color:var(--muted);
+  font-size:.68rem;
+  font-weight:670;
+  line-height:1.17;
+  letter-spacing:0;
+  overflow-wrap:normal;
+  word-break:normal;
+}
+@media(max-width:640px){
+  #view-explore .dashboard-metrics > .dashboard-stat{
+    grid-template-rows:27px minmax(25px,auto);
+    min-height:73px;
+    row-gap:3px;
+  }
+  #view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-value{
+    height:27px;
+    line-height:27px;
+    font-size:clamp(1.07rem,4.2vw,1.4rem);
+  }
+  #view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-label{font-size:.65rem}
+}
+@media(max-width:360px){
+  #view-explore .dashboard-metrics > .dashboard-stat{
+    grid-template-rows:26px minmax(24px,auto);
+    min-height:70px;
+  }
+  #view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-value{
+    height:26px;
+    line-height:26px;
+    gap:2px;
+    font-size:1.06rem;
+  }
+  #view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-label{font-size:.62rem}
+}
+
+
+/* ParkPulse 2.1 — consistent green KPI accent and integrated closed state.
+   Use the same inset left rail as the blue/orange details. */
+#view-explore .dashboard-metrics > .dashboard-stat.stat-operating{
+  box-shadow:inset 4px 0 0 rgba(73,204,149,.78),
+             inset 0 1px 0 rgba(180,255,218,.14);
+}
+#view-explore .dashboard-overview .dashboard-condition-slot{
+  min-width:0;
+}
+#view-explore .dashboard-overview .dashboard-closed-summary{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+  padding:12px 14px;
+  border:1px solid rgba(250,133,144,.28);
+  border-radius:16px;
+  background:
+    linear-gradient(120deg,rgba(218,87,114,.14),rgba(var(--park-mood-rgb),.07)),
+    rgba(25,22,33,.055);
+  box-shadow:inset 3px 0 0 rgba(248,131,144,.64);
+}
+#view-explore .dashboard-closed-symbol{
+  display:grid;
+  place-items:center;
+  flex:0 0 42px;
+  width:42px;height:42px;
+  border:1px solid rgba(248,131,144,.24);
+  border-radius:13px;
+  background:rgba(248,131,144,.10);
+  font-size:1.45rem;
+  line-height:1;
+}
+#view-explore .dashboard-closed-copy{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+#view-explore .dashboard-closed-copy .eyebrow{
+  color:var(--bad);
+  font-size:.68rem;
+  letter-spacing:.13em;
+  line-height:1.15;
+}
+#view-explore .dashboard-closed-copy p{
+  margin:0;
+  color:var(--text);
+  font-size:.88rem;
+  font-weight:650;
+  line-height:1.32;
+  overflow-wrap:anywhere;
+}
+#view-explore .dashboard-closed-hours{
+  display:block;
+  margin-top:1px;
+  color:var(--muted);
+  font-size:.76rem;
+  font-weight:660;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+#view-explore.dashboard-compact .dashboard-closed-summary{padding:10px 12px;gap:10px}
+@media(max-width:640px){
+  #view-explore .dashboard-closed-summary{gap:10px;padding:11px 12px}
+  #view-explore .dashboard-closed-symbol{width:38px;height:38px;flex-basis:38px;font-size:1.3rem}
+  #view-explore .dashboard-closed-copy p{font-size:.83rem}
+  #view-explore .dashboard-closed-hours{font-size:.73rem}
+  #view-explore.dashboard-compact .dashboard-closed-summary{padding:9px 10px}
+}
+@media(max-width:360px){
+  #view-explore .dashboard-closed-symbol{width:34px;height:34px;flex-basis:34px}
+}
+@media(forced-colors:active){
+  #view-explore .dashboard-closed-summary,
+  #view-explore .dashboard-closed-symbol{border:1px solid CanvasText}
+  #view-explore .dashboard-metrics > .dashboard-stat.stat-operating{box-shadow:none}
+}
+
+
+/* ParkPulse 2.1 — quiet crowd direction microtrend.
+   Reuse the label's reserved second line, rather than adding another badge/card. */
+#view-explore .dashboard-metrics .dashboard-stat-label .dashboard-stat-trend{
+  display:flex;
+  align-items:center;
+  gap:3px;
+  width:max-content;
+  max-width:100%;
+  margin-top:2px;
+  font-size:.94em;
+  font-weight:760;
+  line-height:1.05;
+  white-space:nowrap;
+  letter-spacing:.005em;
+  color:var(--muted);
+}
+#view-explore .dashboard-metrics .dashboard-stat-trend .dashboard-trend-arrow{
+  display:inline-block;
+  font-size:1.05em;
+  font-weight:850;
+  line-height:1;
+}
+#view-explore .dashboard-metrics .dashboard-stat-trend.trend-down{color:var(--good)}
+#view-explore .dashboard-metrics .dashboard-stat-trend.trend-up{color:var(--warn)}
+#view-explore .dashboard-metrics .dashboard-stat-trend.trend-steady{color:var(--muted)}
+@media(forced-colors:active){
+  #view-explore .dashboard-metrics .dashboard-stat-trend{color:CanvasText}
+}

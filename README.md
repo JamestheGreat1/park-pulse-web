@@ -2,13 +2,17 @@
 
 **Less refreshing. More riding.**
 
-ParkPulse is the Disney theme-park wait-time app I wanted while actually in the parks. Version 2.0 adds Disneyland Resort alongside Walt Disney World.
+ParkPulse is the Disney theme-park wait-time app I wanted while actually in the parks. Version 2.1 keeps all six parks and adds a clearer, more colorful dashboard, with the useful stuff right up front.
 
 Open it, see what looks good right now, save the rides you care about, and let ParkPulse keep an eye on the rest. The whole point is to spend less time staring at wait times and more time actually doing stuff.
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 2.0.0**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 2.1.0**
+
+## What's new in 2.1
+
+A more useful first screen without making the app feel crowded: park conditions at the top, colorful operating/wait/crowd summaries, one **Worth a Look** recommendation, and your watches only when you have active alerts. The new dashboard includes **Compact** and **Comfortable** layouts and simple visibility switches in Settings. Closed parks show their status instead of three empty numbers. Crowd pressure can show **Easing**, **Growing**, or **Steady** when reliable trend data is available.
 
 ## What ParkPulse does
 
@@ -17,7 +21,7 @@ A short wait is not always a *good* wait. A 45-minute line can be great for one 
 - **Wait comparisons** quickly show when something is running better or worse than typical.
 - **Wait trends** add a subtle up/down arrow when the live wait moves by at least 5 minutes in about 15 minutes.
 - **Favorites** let you save rides without turning on notifications.
-- **Next Up** suggests one useful open ride at a time using current waits, normal wait context, and your favorites.
+- **Worth a Look** suggests one useful open ride at a time using current waits, normal wait context, and your favorites.
 - **Wait history** shows how a ride has moved today, over the past 7 days, or over the past 30 days.
 - **Shared ride links** open the right ride immediately and gently steer mobile browser users toward the installable ParkPulse PWA.
 - **Ride watches** can notify you when a ride reopens, hits your wait-time target, or both. Watched rides use a solid bell so they’re easy to spot at a glance.

@@ -4,7 +4,7 @@ import { disneylandRidesForPark } from "./disneyland-rides.js";
 import { liveRideDisplayName } from "./live-ride-names.js";
 import { ensureAlertQueueSchema, enqueueRideAlerts, processPendingRideAlerts, pruneExpiredRideAlerts } from "./alert-queue.js";
 
-const VERSION = "2.0.3";
+const VERSION = "2.0.4";
 const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
 const LIVE_FRESHNESS_MS = 15 * 60 * 1000;
 const BASELINE_REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -971,11 +971,9 @@ async function fetchThemeParksRides(parkId, park, env) {
     });
   }
 
-  // The holiday Jingle Cruise overlay can coexist with the regular entry.
-  // Prefer a fresh operating variant, retaining mk:jungle-cruise for watches/history.
-  return (parkId === 6 || park.resortId === "dlr")
-    ? collapseRideVariants(results)
-    : [...new Map(results.map((item) => [item.id, item])).values()];
+  // Any park can report seasonal and regular variants for the same ride ID.
+  // Never let API order overwrite a fresh observation with an older overlay.
+  return collapseRideVariants(results);
 }
 
 async function fetchQueueTimesRides(parkId, park) {
@@ -1028,11 +1026,9 @@ async function fetchQueueTimesRides(parkId, park) {
   }
   for (const item of payload?.rides || []) ingest(item);
 
-  // The holiday Jingle Cruise overlay can coexist with the regular entry.
-  // Prefer a fresh operating variant, retaining mk:jungle-cruise for watches/history.
-  return (parkId === 6 || park.resortId === "dlr")
-    ? collapseRideVariants(results)
-    : [...new Map(results.map((item) => [item.id, item])).values()];
+  // Any park can report seasonal and regular variants for the same ride ID.
+  // Never let API order overwrite a fresh observation with an older overlay.
+  return collapseRideVariants(results);
 }
 
 async function addDisplayFallbacks(env, parkId, park, snapshot) {

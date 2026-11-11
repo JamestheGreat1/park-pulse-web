@@ -102,6 +102,8 @@ test('ThemeParks attraction waits stay live when the parent park is closed', asy
     Number, String, Map,
     findCatalogRide: () => catalogRide,
     isSingleRiderName: () => false,
+    // One-ride fixture: holiday duplicate selection is exercised in jingle-cruise.test.mjs.
+    collapseRideVariants: rides => rides,
     fetch: async () => ({
       ok: true,
       json: async () => ({

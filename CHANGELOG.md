@@ -1,4 +1,4 @@
-## 2.1.0 — release date pending
+## 2.1.0 — 2026-11-11
 
 - Replaced the oversized Explore intro with a compact, park-first dashboard: fresh operating count, representative live median wait, and optional crowd pressure.
 - Added **Vibrant Glass** park-specific accents, aligned color-coded KPI cards, centered optional stats, and a tighter Compact layout with Comfortable as an alternative.

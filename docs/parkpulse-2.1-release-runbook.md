@@ -1,6 +1,6 @@
 # ParkPulse 2.1.0 — Final Release and Existing PWA Update Runbook
 
-Status: **prepared; not yet approved or deployed**.
+Status: **release procedure authorized on 2026-11-11; verify post-merge health before declaring success**.
 
 Target release: 2.1.0. Stable app: https://app.useparkpulse.com/. Release branch: release/2.1.0-final-prep.
 

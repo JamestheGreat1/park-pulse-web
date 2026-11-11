@@ -58,6 +58,27 @@ jobs:
       - name: Run generated staging frontend smoke test
         run: node tests/staging-preview-smoke.cjs
 
+  pwa-upgrade:
+    name: Installed PWA 2.0 -> 2.1 update compatibility
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/2.1.0-rc.')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the existing stable 2.0 PWA at the PR base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .stable-v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned Playwright and browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Exercise real installed-PWA update button and cache migration
+        run: node tests/pwa-upgrade-2-to-2_1.cjs
   worker-bundle:
     name: Worker bundling smoke test (no deployment)
     runs-on: ubuntu-latest

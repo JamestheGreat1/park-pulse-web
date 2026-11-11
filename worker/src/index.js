@@ -837,7 +837,7 @@ async function fetchFreshParkRides(parkId, park, env) {
     // The selected observation is fresh. Show only curated, source-confirmed
     // variant titles while preserving the permanent ride ID and history key.
     const name = liveRideDisplayName(catalogRide, chosen, true);
-    rides.push({ ...chosen, name, activeVariant: name !== catalogRide.name });
+    rides.push({ ...chosen, name, canonicalName: catalogRide.name, activeVariant: name !== catalogRide.name });
   }
 
   return {
@@ -1052,6 +1052,8 @@ async function addDisplayFallbacks(env, parkId, park, snapshot) {
         parkId,
         name: catalogRide.name,
         rawName: catalogRide.name,
+        canonicalName: catalogRide.name,
+        activeVariant: false,
         aliases: catalogRide.aliases || [],
         land: catalogRide.land,
         isOpen: false,
@@ -1487,6 +1489,7 @@ function staleRowToRide(row) {
     parkId,
     name,
     rawName: name,
+    canonicalName: name,
     activeVariant: false,
     land: String(row.land || "Other"),
     isOpen: Boolean(row.is_open),

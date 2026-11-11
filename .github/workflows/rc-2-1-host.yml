@@ -1,0 +1,72 @@
+name: ParkPulse 2.1 RC hosted PWA validation
+on:
+  pull_request:
+    paths:
+      - rc-2-1/**
+      - .github/workflows/rc-2-1-host.yml
+  push:
+    branches: [main]
+    paths:
+      - rc-2-1/**
+      - .github/workflows/rc-2-1-host.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    name: Isolated RC app, SW, offline and watch safety
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install browser test runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Start local static app server
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/parkpulse-rc-server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/rc-2-1/version.json >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/parkpulse-rc-server.log
+          exit 1
+      - name: Verify RC scoped service worker, separate watches and offline cache
+        run: node rc-2-1/rc-smoke.cjs
+  published:
+    name: Live RC URL and stable 2.0 isolation
+    runs-on: ubuntu-24.04
+    needs: browser
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 8
+    steps:
+      - name: Verify RC published and stable app untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://app.useparkpulse.com"
+          for attempt in $(seq 1 30); do
+            echo "Checking live RC ${attempt}/30"
+            if curl -fsSL --max-time 15 "${BASE}/rc-2-1/version.json?check=${GITHUB_RUN_ID}" -o /tmp/rc-version.json \
+              && grep -q '"version": "2.1.0-rc.1"' /tmp/rc-version.json \
+              && curl -fsSL --max-time 15 "${BASE}/rc-2-1/?check=${GITHUB_RUN_ID}" -o /tmp/rc-index.html \
+              && grep -q '2.1 RC1 TEST' /tmp/rc-index.html \
+              && curl -fsSL --max-time 15 "${BASE}/rc-2-1/manifest.webmanifest?check=${GITHUB_RUN_ID}" -o /tmp/rc-manifest.json \
+              && grep -q '"short_name": "ParkPulse RC"' /tmp/rc-manifest.json \
+              && curl -fsSL --max-time 15 "${BASE}/rc-2-1/service-worker.js?check=${GITHUB_RUN_ID}" -o /tmp/rc-sw.js \
+              && grep -q 'parkpulserc-2.1.0-rc.1' /tmp/rc-sw.js \
+              && curl -fsSL --max-time 15 "${BASE}/rc-2-1/assets/js/push.js?check=${GITHUB_RUN_ID}" -o /tmp/rc-push.js \
+              && grep -q 'candidate.scope!==expectedScope' /tmp/rc-push.js \
+              && curl -fsSL --max-time 15 "${BASE}/version.json?check=${GITHUB_RUN_ID}" -o /tmp/stable-version.json \
+              && grep -q '"version": "2.0.0"' /tmp/stable-version.json; then
+              echo "PASS: RC installable assets live and stable 2.0.0 unaffected"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "FAIL: candidate URL not ready or stable app version unexpected"
+          exit 1

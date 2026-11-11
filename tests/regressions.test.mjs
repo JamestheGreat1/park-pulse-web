@@ -597,7 +597,7 @@ test('PWA keeps Park Day and quick actions native-only', () => {
   const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.doesNotMatch(index, /view-parkday|parkDayShortcut/);
   assert.doesNotMatch(app, /Park Day Lite|data-quick-actions|openQuickActions|quickAction/);
-  assert.match(app, /What should I ride next\?/);
+  assert.match(app, /Worth a Look/);
   assert.match(app, /recommendationReason/);
 });
 

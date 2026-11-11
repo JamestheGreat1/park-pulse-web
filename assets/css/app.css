@@ -5364,3 +5364,118 @@ body{
   justify-content:flex-end;
   text-align:right;
 }
+
+
+/* ParkPulse 2.1 — compact, configurable Explore dashboard.
+   Existing glass surfaces, color tokens, ride actions, and navigation remain intact. */
+#view-explore .dashboard-overview{
+  position:relative;
+  overflow:hidden;
+  border-radius:25px;
+  padding:18px 20px 15px;
+  background:linear-gradient(125deg,rgba(var(--blue-rgb),.085),transparent 80%),var(--glass);
+}
+.dashboard-overview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.dashboard-overview .resort-switch{min-width:0;text-align:left}
+.dashboard-overview .resort-switch .eyebrow{overflow-wrap:anywhere}
+.dashboard-overview .park-status-slot{flex:0 0 auto}
+.dashboard-overview .overview-unknown{color:var(--muted);font-size:.71rem;font-weight:700}
+.dashboard-overview h2{
+  font-size:clamp(1.4rem,4vw,2rem);letter-spacing:-.035em;
+  line-height:1.12;margin:7px 0 13px;overflow-wrap:anywhere;
+}
+.dashboard-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.dashboard-metrics.dashboard-two-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+.dashboard-stat{min-width:0;padding:3px 12px;border-left:1px solid var(--hair)}
+.dashboard-stat:first-child{border-left:0;padding-left:0}
+.dashboard-stat strong{display:block;color:var(--text);font-size:clamp(1rem,3.8vw,1.55rem);font-weight:850;letter-spacing:-.035em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dashboard-stat strong span{font-size:.65em;letter-spacing:0;color:var(--muted);font-weight:720}
+.dashboard-stat small{display:block;margin-top:4px;color:var(--muted);font-size:.67rem;line-height:1.25}
+.dashboard-overview .park-hours{margin-top:11px;font-weight:650}
+.dashboard-overview .park-events{margin-top:8px}
+.dashboard-overview .refresh-copy{display:block;font-size:.69rem;text-align:right;margin-top:10px}
+#view-explore .park-strip{padding:10px 1px 9px}
+#view-explore .park-feature-slot:empty{display:none}
+.dashboard-pick,.dashboard-watches{border-radius:22px;padding:13px 15px;margin:0 0 11px;overflow:hidden}
+.dashboard-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 8px}
+.dashboard-section-head>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.dashboard-section-head small{color:var(--muted);font-size:.73rem}
+.dashboard-text-action{
+  flex:0 0 auto;min-height:36px;padding:7px 5px;border:0;background:transparent;
+  color:var(--blue);font-size:.76rem;font-weight:780;
+}
+.dashboard-pick-ride,.dashboard-watch{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;min-width:0;
+  width:100%;padding:11px 12px;border:1px solid rgba(var(--blue-rgb),.18);
+  border-radius:14px;text-align:left;background:rgba(var(--blue-rgb),.055);
+}
+.dashboard-pick-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
+.dashboard-pick-copy>strong{font-size:1rem;line-height:1.25;overflow-wrap:anywhere}
+.dashboard-pick-copy>small:last-child{font-size:.74rem;color:var(--muted);line-height:1.3}
+.dashboard-pick-copy>small.positive{color:var(--good)}
+.dashboard-pick-wait{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:0 0 auto}
+.dashboard-pick-wait b{font-size:1.08rem;line-height:1.15;color:var(--text);white-space:nowrap}
+.dashboard-pick-wait small{font-size:.7rem;color:var(--muted)}
+.dashboard-watch-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dashboard-watch{align-items:flex-start;padding:11px 12px;background:rgba(var(--blue-rgb),.045)}
+.dashboard-watch>span:first-child{min-width:0}
+.dashboard-watch strong{display:block;font-size:.82rem;line-height:1.25;overflow-wrap:anywhere}
+.dashboard-watch small{display:block;margin-top:4px;color:var(--muted);font-size:.66rem;line-height:1.25}
+.dashboard-watch-status{flex:0 0 auto;text-align:right}
+.dashboard-watch-status b{font-size:.85rem;white-space:nowrap;color:var(--text)}
+.dashboard-watch-status b.stale{color:var(--warn)}
+.dashboard-watch-status b.closed{color:var(--bad)}
+.dashboard-pick-ride:focus-visible,.dashboard-watch:focus-visible,.dashboard-text-action:focus-visible{
+  outline:2px solid var(--blue);outline-offset:2px;
+}
+@media(hover:hover) and (pointer:fine){
+  .dashboard-pick-ride:hover,.dashboard-watch:hover{background:rgba(var(--blue-rgb),.14)}
+}
+#view-explore .toolbar{
+  grid-template-columns:minmax(0,1fr) auto auto auto;
+  gap:7px;margin:0 0 14px;padding:8px;border-radius:19px;
+}
+#view-explore .toolbar .search{min-width:0}
+#view-explore .toolbar .filter-button,
+#view-explore .toolbar select{min-height:40px;padding:8px 11px;font-size:.78rem}
+#view-explore .dashboard-ride-heading{margin:0 0 10px;padding-inline:2px}
+#view-explore .dashboard-ride-heading h2{font-size:1.35rem;letter-spacing:-.025em}
+#view-explore.dashboard-compact .ride-list{gap:9px}
+#view-explore.dashboard-compact .ride-main{padding:12px 14px}
+#view-explore.dashboard-compact .ride-card{border-radius:19px}
+#view-explore.dashboard-compact .ride-copy h3{margin-top:3px}
+#view-explore.dashboard-compact .ride-meta{margin-top:2px}
+#view-explore.dashboard-compact .recommendation-hint{margin-top:3px}
+#view-explore:not(.dashboard-compact) .dashboard-overview{padding:24px}
+#view-explore:not(.dashboard-compact) .dashboard-pick,
+#view-explore:not(.dashboard-compact) .dashboard-watches{padding:18px;margin-bottom:15px}
+#view-explore:not(.dashboard-compact) .dashboard-overview h2{margin:12px 0 22px}
+#view-explore:not(.dashboard-compact) .park-strip{padding-block:16px}
+#view-explore:not(.dashboard-compact) .toolbar{margin-bottom:21px;padding:12px}
+@media(max-width:640px){
+  #view-explore .dashboard-overview{padding:16px 15px 13px;border-radius:22px}
+  .dashboard-overview h2{margin-bottom:12px}
+  .dashboard-stat{padding-inline:9px}
+  .dashboard-stat small{font-size:.61rem}
+  #view-explore .park-strip{display:flex;overflow-x:auto;flex-wrap:nowrap;gap:7px;padding:10px 0}
+  #view-explore .park-strip .park-chip{padding:9px 12px;flex:0 0 auto;min-height:40px}
+  #view-explore .toolbar{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  #view-explore .toolbar .search{grid-column:1/-1;min-height:40px}
+  #view-explore .toolbar .search input{padding:8px 0}
+  #view-explore .toolbar .filter-button,
+  #view-explore .toolbar select{min-height:44px;padding:7px 5px;font-size:.75rem}
+  #view-explore .dashboard-ride-heading h2{font-size:1.27rem}
+  .dashboard-watch-list{grid-template-columns:1fr}
+  .dashboard-watch{align-items:center}
+}
+@media(max-width:360px){
+  .dashboard-stat strong{font-size:1rem}
+  .dashboard-stat small{font-size:.59rem}
+  .dashboard-metrics{gap:0}
+  #view-explore .toolbar .filter-button,
+  #view-explore .toolbar select{font-size:.68rem}
+}
+@media(forced-colors:active){
+  .dashboard-overview,.dashboard-pick,.dashboard-watches,
+  .dashboard-pick-ride,.dashboard-watch{border:1px solid CanvasText}
+}

@@ -55,7 +55,7 @@ const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_
       }
     },{saved});
     await page.route('https://parkpulse-api.jamesp5297.workers.dev/**',async route=>{
-      const req=route.request(),url=new URL(req.url);
+      const req=route.request(),url=new URL(req.url());
       backendRequests.push({method:req.method(),path:url.pathname});
       if(url.pathname.startsWith('/api/park/')){
         const id=Number(url.pathname.split('/').pop());

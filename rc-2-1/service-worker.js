@@ -1,0 +1,76 @@
+const CACHE_NAME = "parkpulserc-2.1.0-rc.1";
+const VERSION = "2.1.0-rc.1";
+const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./version.json",
+  ...["app", "api", "data", "catalog", "store", "push", "config", "seasonal"].map(name => `./assets/js/${name}.js?v=${VERSION}`),
+  `./assets/css/app.css?v=${VERSION}`,
+  ...["icon-192", "icon-512", "apple-touch-icon"].map(name => `./assets/icons/${name}.png?v=${VERSION}`)
+];
+self.addEventListener("install", event => event.waitUntil(
+  caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL.map(url => new Request(url, { cache: "reload" }))))
+));
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+});
+self.addEventListener("activate", event => event.waitUntil(
+  caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith("parkpulserc-") && key !== CACHE_NAME).map(key => caches.delete(key))))
+    .then(() => self.clients.claim())
+));
+self.addEventListener("fetch", event => {
+  if (event.request.method !== "GET" || new URL(event.request.url).origin !== location.origin) return;
+  const url = new URL(event.request.url);
+  // The staging PWA and API share an origin. Never let the offline shell
+  // cache retain JSON responses: an old park response can otherwise make
+  // every ride appear stale and hide operating-status dots indefinitely.
+  // Applies equally to public API, health, and VAPID key endpoints.
+  if (url.pathname.startsWith("/api/") ||
+      url.pathname === "/health" ||
+      url.pathname === "/vapid-key" ||
+      url.pathname.startsWith("/subscriptions")) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
+  if (url.pathname.endsWith("/version.json")) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    if (event.request.mode === "navigate") {
+      try {
+        const response = await fetch(event.request);
+        if (response.ok) return response;
+        return await cache.match("./index.html") || response;
+      } catch { return await cache.match("./index.html") || Response.error(); }
+    }
+    const cached = await cache.match(event.request);
+    if (cached) return cached;
+    const response = await fetch(event.request);
+    if (response.ok && response.type !== "opaque") await cache.put(event.request, response.clone());
+    return response;
+  })());
+});
+self.addEventListener("push", e => { let p={}; try { p=e.data?.json()||{}; } catch { p={body:e.data?.text()||"Ride update"}; } e.waitUntil(self.registration.showNotification(p.title||"ParkPulse", { body:p.body||"One of your watches changed.", icon:"./assets/icons/icon-192.png?v=2.1.0-rc.1", tag:p.tag||"parkpulse", renotify:Boolean(p.renotify), data:{url:p.url||"./"} })); });
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  // Test notifications originate at the real Worker but must open THIS scoped RC app,
+  // never replace/focus an existing production PWA window.
+  const scope = new URL(self.registration.scope);
+  const original = new URL(event.notification.data?.url || "./", scope);
+  const target = new URL("./", scope);
+  if (original.origin === scope.origin) {
+    const ride = original.searchParams.get("ride");
+    if (ride) target.searchParams.set("ride", ride);
+  }
+  const targetUrl = target.href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const client = windows.find(window => window.url.startsWith(self.registration.scope));
+    if (client) {
+      try {
+        const navigated = await client.navigate(targetUrl);
+        if (navigated) return await navigated.focus();
+      } catch { /* Open a fresh window when the old one can no longer navigate. */ }
+    }
+    return self.clients.openWindow?.(targetUrl);
+  })());
+});

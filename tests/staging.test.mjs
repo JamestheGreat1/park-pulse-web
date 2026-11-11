@@ -425,13 +425,14 @@ test("staging ThemeParks history UUID directory lookup is cached and ignores non
   assert.equal(fetches,1,"directory fetched once; subsequent batch uses stored mapping");
 });
 
-test("backend-only 2.0.1 patch leaves public PWA version unchanged", () => {
+test("backend Worker identity remains independent of the 2.1 PWA release", () => {
   const worker=read("worker/src/index.js");
   const pkg=JSON.parse(read("worker/package.json"));
   const app=JSON.parse(read("version.json"));
   assert.equal(pkg.version,"2.0.1");
   assert(worker.includes('const VERSION = "2.0.1";'));
-  assert.equal(app.version,"2.0.0");
+  assert.equal(app.version,"2.1.0");
+  assert.equal(app.channel,"stable");
 });
 
 test("production baseline backfill resolves ThemeParks UUID for fresh Queue-Times rides", async () => {

@@ -7,9 +7,12 @@ const release = JSON.parse(source("version.json"));
 const version = release.version;
 
 test("candidate version and cache references stay synchronized", () => {
-  assert.equal(version, "2.0.0");
+  assert.equal(version, "2.1.0");
   assert.equal(release.channel, "stable");
+  assert.equal(release.released, null);
   const index = source("index.html");
+  const manifest = JSON.parse(source("manifest.webmanifest"));
+  for (const icon of manifest.icons) assert(icon.src.includes("?v=" + version));
   const app = source("assets/js/app.js");
   const sw = source("service-worker.js");
   const worker = source("worker/src/index.js");
@@ -32,7 +35,7 @@ test("candidate version and cache references stay synchronized", () => {
   }
 });
 
-test("stable release prepares all six parks without changing production deployment targets", () => {
+test("release candidate prepares all six parks without changing production deployment targets", () => {
   const catalog = source("assets/js/catalog.js");
   for (const identity of ['id: "dlr"', "id: 16,", "id: 17,"]) {
     const line = catalog.split("\n").find((row) => row.includes(identity));

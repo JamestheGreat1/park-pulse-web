@@ -1,4 +1,4 @@
-import { PARKS, RESORTS, parksForResort, resortForPark } from "./catalog.js?v=2.0.0";
+import { PARKS, RESORTS, parksForResort, resortForPark } from "./catalog.js?v=2.1.0";
 
 const KEY = "parkpulse.rideWatcher.v1";
 
@@ -15,6 +15,13 @@ const defaults = {
   useLocalTime: true,
   favorites: [],
   favoritesOnly: false,
+  dashboard: {
+    density: "compact",
+    showWorth: true,
+    showWatches: true,
+    showHours: false,
+    showCrowd: true
+  },
   rules: []
 };
 
@@ -42,6 +49,14 @@ export class Store extends EventTarget {
     const saved = parse(localStorage.getItem(KEY), {});
     this.state = { ...defaults, ...saved };
     delete this.state.mustDo;
+    // Dashboard options are presentation-only. Preserve existing watch IDs and settings.
+    const savedDashboard = saved.dashboard && typeof saved.dashboard === "object" && !Array.isArray(saved.dashboard)
+      ? saved.dashboard : {};
+    this.state.dashboard = { ...defaults.dashboard };
+    if (["compact", "comfortable"].includes(savedDashboard.density)) this.state.dashboard.density = savedDashboard.density;
+    for (const key of ["showWorth", "showWatches", "showHours", "showCrowd"]) {
+      if (typeof savedDashboard[key] === "boolean") this.state.dashboard[key] = savedDashboard[key];
+    }
     this.state.favorites = [...new Set((Array.isArray(saved.favorites) ? saved.favorites : []).filter(id => typeof id === "string" && id.length < 120))];
     if (!["recommended","wait","name"].includes(this.state.sort)) this.state.sort = "recommended";
     this.state.rules = Array.isArray(saved.rules) ? saved.rules.map(cleanRule).filter(Boolean) : [];

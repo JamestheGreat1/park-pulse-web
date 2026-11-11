@@ -1,3 +1,14 @@
+## 2.1.0 — release date pending
+
+- Replaced the oversized Explore intro with a compact, park-first dashboard: fresh operating count, representative live median wait, and optional crowd pressure.
+- Added **Vibrant Glass** park-specific accents, aligned color-coded KPI cards, centered optional stats, and a tighter Compact layout with Comfortable as an alternative.
+- Added one **Worth a Look** attraction suggestion and conditional previews of up to two watches.
+- Integrated closed-park information directly into the overview rather than showing empty numbers and a duplicate card.
+- Restored quiet **Easing**, **Growing**, and **Steady** crowd direction labels when supported by live trend data.
+- Added local dashboard layout and visibility preferences, preserving prior favorites, watch rules, notification settings, and resort selection.
+- Coordinated frontend version stamps, module URLs, manifest icons, and offline service-worker cache so existing installed PWAs can update without reinstalling. No Cloudflare Worker, D1, or push-engine changes.
+- Preserves the established PWA identity, existing watch storage and active service-worker scope; upgrade behavior is tested from a cached 2.0 installation.
+
 ## 2.0.0 — 2026-10-31
 
 - ParkPulse expands from four Walt Disney World parks to **six parks across Walt Disney World and Disneyland Resort**, covering 101 curated attractions.

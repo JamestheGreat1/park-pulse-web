@@ -17,9 +17,11 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     });
     await page.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => navigator.serviceWorker.controller);
-    await page.waitForSelector('[data-dismiss-first-run]', { timeout: 5000 });
-    await page.locator('[data-dismiss-first-run]').click();
-    await page.waitForFunction(() => !document.querySelector('[data-dismiss-first-run]'));
+    await page.waitForSelector('.dashboard-overview', { timeout: 5000 });
+    assert.equal(await page.locator('.hero-card').count(), 0);
+    assert.equal(await page.locator('.dashboard-stat').count(), 3);
+    assert.equal(await page.locator('.dashboard-compact').count(), 1);
+    assert.equal(await page.locator('.dashboard-watches').count(), 0);
     for (const name of ['watching', 'resorts', 'settings', 'explore']) {
       await page.locator(`#nav-${name}`).click();
       assert.equal(await page.locator(`#nav-${name}`).getAttribute('aria-current'), 'page');
@@ -63,13 +65,27 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
       const state = JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1'));
       return state.selectedResortId === 'wdw' && state.selectedParkId === 5 && state.lastParkByResort.wdw === 5;
     }), true);
-    await page.locator('[data-view-jump="watching"]').click();
-    await page.locator('[data-view-jump="explore"]').click();
+    await page.locator('#nav-settings').click();
+    await page.locator('#dashboardDensitySelect').selectOption('comfortable');
+    await page.locator('#dashboardWorthToggle').uncheck();
+    await page.locator('#dashboardHoursToggle').check();
+    await page.locator('#dashboardCrowdToggle').uncheck();
+    await page.locator('#nav-explore').click();
+    assert.equal(await page.locator('.dashboard-compact').count(), 0);
+    assert.equal(await page.locator('.dashboard-pick').count(), 0);
+    assert.equal(await page.locator('.dashboard-stat').count(), 2);
+    await page.locator('#nav-settings').click();
+    await page.locator('#dashboardDensitySelect').selectOption('compact');
+    await page.locator('#dashboardWorthToggle').check();
+    await page.locator('#dashboardCrowdToggle').check();
+    await page.locator('#nav-explore').click();
     await page.locator('#view-explore [data-open-ride]').first().click();
     await page.keyboard.press('Tab');
     await page.locator('#durationSelect').selectOption('3h');
     await page.locator('#watchForm button[type="submit"]').click();
     const deadline = await page.evaluate(() => JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1')).rules[0].expiresAt);
+    assert.equal(await page.locator('.dashboard-watches').count(), 1);
+    assert.match(await page.locator('.dashboard-watches').innerText(), /Test Mountain/);
     await page.locator('#view-explore [data-open-ride]').first().click();
     assert.equal(await page.locator('#durationSelect').inputValue(), 'keep');
     await page.locator('#thresholdToggle').click();
@@ -90,7 +106,15 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await context.setOffline(true);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#view-explore [data-open-ride]', { timeout: 5000 });
-    assert.equal(await page.locator('[data-dismiss-first-run]').count(), 0);
+    assert.equal(await page.locator('.hero-card').count(), 0);
+    assert.equal(await page.locator('.dashboard-compact').count(), 1);
+    assert.equal(await page.locator('.dashboard-watches').count(), 1);
+    // The fixture has no park hours. The preference must persist offline,
+    // but the dashboard should not render an empty hours line.
+    assert.equal(await page.locator('.park-hours').count(), 0);
+    assert.equal(await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1')).dashboard.showHours
+    ), true);
     assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await page.locator('#nav-resorts').count(), 1);
     assert.match(await page.locator('#networkBanner').textContent(), /offline/i);
@@ -103,7 +127,7 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
     assert.match(await page.locator('#sheetTitle').textContent(), /Test Mountain/);
     assert.deepEqual(errors, []);
-    console.log('PASS: startup with hanging health, onboarding, navigation, view jumps, keyboard dialog, expiration preservation, complete cache, offline relaunch');
+    console.log('PASS: startup with hanging health, compact dashboard, preferences, navigation, keyboard dialog, expiration preservation, complete cache, offline relaunch');
     await context.close();
 
     // Staged multi-resort integration test: serve the public catalog in an

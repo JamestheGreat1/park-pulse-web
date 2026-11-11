@@ -105,7 +105,12 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     assert.equal(await page.locator('.hero-card').count(), 0);
     assert.equal(await page.locator('.dashboard-compact').count(), 1);
     assert.equal(await page.locator('.dashboard-watches').count(), 1);
-    assert.equal(await page.locator('.park-hours').count(), 1);
+    // The fixture has no park hours. The preference must persist offline,
+    // but the dashboard should not render an empty hours line.
+    assert.equal(await page.locator('.park-hours').count(), 0);
+    assert.equal(await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('parkpulse.rideWatcher.v1')).dashboard.showHours
+    ), true);
     assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await page.locator('#nav-resorts').count(), 1);
     assert.match(await page.locator('#networkBanner').textContent(), /offline/i);

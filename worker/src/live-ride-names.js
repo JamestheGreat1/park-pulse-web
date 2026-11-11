@@ -2,6 +2,9 @@
 // Only a fresh observed provider name can activate one; ride keys never change.
 // New aliases must also be configured on the matching park's curated catalog.
 export const LIVE_RIDE_VARIANTS = Object.freeze({
+  "epcot:living-with-the-land": [
+    "Living with the Land – Glimmering Greenhouses"
+  ],
   "mk:jungle-cruise": [
     "Jingle Cruise"
   ],

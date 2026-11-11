@@ -5804,3 +5804,83 @@ body{
   #view-explore .stat-operating,#view-explore .stat-median,
   #view-explore .stat-crowd{box-shadow:none}
 }
+
+
+/* ParkPulse 2.1 — unified overview details.
+   Numbers share the same baseline; units and labels use one common hierarchy.
+   A reserved two-line label track keeps all stat cards visually aligned. */
+#view-explore .dashboard-metrics > .dashboard-stat{
+  display:grid;
+  grid-template-rows:30px minmax(27px,auto);
+  align-content:center;
+  align-items:start;
+  row-gap:4px;
+  min-height:78px;
+  min-width:0;
+}
+#view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-value{
+  display:flex;
+  align-items:baseline;
+  gap:3px;
+  min-width:0;
+  height:30px;
+  margin:0;
+  font-size:clamp(1.06rem,3.9vw,1.48rem);
+  font-weight:850;
+  line-height:30px;
+  letter-spacing:-.035em;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+#view-explore .dashboard-metrics > .dashboard-stat .stat-primary{
+  color:inherit;
+  font-size:inherit;
+  font-weight:inherit;
+  letter-spacing:inherit;
+  line-height:inherit;
+}
+#view-explore .dashboard-metrics > .dashboard-stat .stat-secondary{
+  color:var(--muted);
+  font-size:.65em;
+  font-weight:730;
+  line-height:1;
+  letter-spacing:0;
+}
+#view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-label{
+  display:block;
+  min-height:2.35em;
+  margin:0;
+  color:var(--muted);
+  font-size:.68rem;
+  font-weight:670;
+  line-height:1.17;
+  letter-spacing:0;
+  overflow-wrap:normal;
+  word-break:normal;
+}
+@media(max-width:640px){
+  #view-explore .dashboard-metrics > .dashboard-stat{
+    grid-template-rows:27px minmax(25px,auto);
+    min-height:73px;
+    row-gap:3px;
+  }
+  #view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-value{
+    height:27px;
+    line-height:27px;
+    font-size:clamp(1.07rem,4.2vw,1.4rem);
+  }
+  #view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-label{font-size:.65rem}
+}
+@media(max-width:360px){
+  #view-explore .dashboard-metrics > .dashboard-stat{
+    grid-template-rows:26px minmax(24px,auto);
+    min-height:70px;
+  }
+  #view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-value{
+    height:26px;
+    line-height:26px;
+    gap:2px;
+    font-size:1.06rem;
+  }
+  #view-explore .dashboard-metrics > .dashboard-stat .dashboard-stat-label{font-size:.62rem}
+}

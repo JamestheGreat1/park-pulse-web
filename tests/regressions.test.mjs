@@ -311,7 +311,7 @@ test('editing a watch keeps its exact expiration unless a new duration is select
       store: { snapshot: {}, ruleForRide: () => existing, saveRule: value => { saved = value; } },
       document: { activeElement: null, body: element('body') }, HTMLElement: class {},
       sheet: element('sheet'), backdrop: element('backdrop'), sheetReturnFocus: null,
-      $: element, $$: () => [], escapeHtml: x => x, parkName: () => 'MK', rideStatus: () => ({ wait: 30 }),
+      $: element, $$: () => [], escapeHtml: x => x, parkName: () => 'MK', rideStatus: () => ({ wait: 30 }), rideDisplayName: ride => ride.name || ride.rideName,
       requestAnimationFrame: callback => callback(), loadRideInsights() {}, loadRideHistory() {}, closeSheet() {}, shareRide() {},
     sharedRidePwaHint: () => '', recommendationReason: () => 'A good wait', installApp() {},
       durationExpiry: () => 9999999999, pushOn: false, toast() {}, Date, Number, Boolean

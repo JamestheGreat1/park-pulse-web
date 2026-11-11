@@ -102,7 +102,7 @@ const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_
     assert.equal(waiting.waiting,'installed');
     await page.locator('[data-banner-action="update-app"]').click();
     await page.locator('.dashboard-overview').waitFor({state:'visible',timeout:25000});
-    await page.waitForFunction(()=>{
+    await page.waitForFunction((version)=>{
       const script=document.querySelector('script[type="module"]');
       return script?.getAttribute('src')?.includes(version)&&Boolean(navigator.serviceWorker.controller);
     },candidateVersion,{timeout:20000});

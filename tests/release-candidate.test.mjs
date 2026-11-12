@@ -7,9 +7,9 @@ const release = JSON.parse(source("version.json"));
 const version = release.version;
 
 test("candidate version and cache references stay synchronized", () => {
-  assert.equal(version, "2.1.1");
+  assert.equal(version, "2.1.2");
   assert.equal(release.channel, "stable");
-  assert.equal(release.released, "2026-11-11");
+  assert.equal(release.released, "2026-11-12");
   const index = source("index.html");
   const manifest = JSON.parse(source("manifest.webmanifest"));
   for (const icon of manifest.icons) assert(icon.src.includes("?v=" + version));

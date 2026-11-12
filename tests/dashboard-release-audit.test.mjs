@@ -12,14 +12,14 @@ function functionBody(source, name) {
   return source.slice(start, next < 0 ? source.length : next);
 }
 
-test("2.1 approved dashboard and style remain exactly in sync with the hosted preview", () => {
+test("2.1.2 preserves the approved dashboard logic with desktop-only layout extensions", () => {
   const app = read("assets/js/app.js");
   const preview = read("preview-2-1/assets/js/app.js");
   const shared = [
     "parkOperatingState", "closedParkReason", "parkFeatureMarkup",
     "crowdPresentation", "dashboardMetrics", "dashboardMetricsMarkup",
     "dashboardConditionMarkup",
-    "renderExplore", "renderParkHours", "renderRideDataUpdate",
+    "renderParkHours", "renderRideDataUpdate",
   ];
   for (const name of shared) {
     assert.equal(functionBody(app, name), functionBody(preview, name),
@@ -28,8 +28,14 @@ test("2.1 approved dashboard and style remain exactly in sync with the hosted pr
   // Live watch titles follow the selected provider name after 2.1.0.
   assert.match(app, /function watchDisplayName\(/);
   assert.match(app, /watchDisplayName\(rule, ride\)/);
-  assert.equal(read("assets/css/app.css"), read("preview-2-1/assets/css/app.css"),
-    "Release CSS must match the approved preview before versioning");
+  const css = read("assets/css/app.css");
+  assert(css.startsWith(read("preview-2-1/assets/css/app.css")),
+    "2.1.2 must retain the approved styles before its desktop overrides");
+  const explore = functionBody(app, "renderExplore");
+  for (const name of ["dashboard-intro-grid", "dashboard-overview-stack", "dashboard-actions-stack"])
+    assert(explore.includes(name), "Missing desktop layout wrapper: " + name);
+  assert.match(css, /@media\(min-width:1024px\)\{/);
+  assert.match(css, /#view-explore \.dashboard-intro-grid,\s*#view-explore \.dashboard-overview-stack,\s*#view-explore \.dashboard-actions-stack\{display:contents\}/);
 });
 
 test("2.1 keeps existing watch and preference keys, and normal push functionality", () => {

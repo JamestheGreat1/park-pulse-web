@@ -431,7 +431,7 @@ test("backend Worker identity remains independent of the 2.1 PWA release", () =>
   const app=JSON.parse(read("version.json"));
   assert.equal(pkg.version,"2.0.4");
   assert(worker.includes('const VERSION = "2.0.4";'));
-  assert.equal(app.version,"2.1.1");
+  assert.equal(app.version,"2.1.2");
   assert.equal(app.channel,"stable");
 });
 

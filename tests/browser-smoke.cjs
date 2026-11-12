@@ -59,6 +59,30 @@ const { chromium } = require(require.resolve('playwright', { paths: [process.env
     await page.locator('[data-resort="wdw"]').click();
     assert.equal(await page.locator('#nav-resorts').getAttribute('aria-current'), 'page');
     await page.locator('#nav-explore').click();
+    // 2.1.2: desktop dashboard columns should start together and not leave empty grid rows.
+    const desktop = await page.evaluate(() => {
+      const box = s => {
+        const r = document.querySelector(s).getBoundingClientRect();
+        return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width};
+      };
+      return {
+        display:getComputedStyle(document.querySelector('.dashboard-intro-grid')).display,
+        overview:box('.dashboard-overview'),
+        actions:box('.dashboard-actions-stack'),
+        toolbar:box('#view-explore .toolbar'),
+        heading:box('#view-explore .dashboard-ride-heading')
+      };
+    });
+    assert.equal(desktop.display,'grid');
+    assert(Math.abs(desktop.overview.y-desktop.actions.y)<2,'Dashboard columns start at different heights');
+    assert(Math.abs(desktop.overview.width-desktop.actions.width)<2,'Desktop columns have unequal widths');
+    assert(desktop.actions.x>=desktop.overview.right+8,'Desktop columns overlap');
+    assert(desktop.toolbar.x>=desktop.actions.x-1,'Toolbar drifts outside its column');
+    assert(desktop.heading.y>=desktop.actions.bottom-1,'Attractions overlap dashboard');
+    await page.setViewportSize({width:390,height:844});
+    assert.equal(await page.locator('.dashboard-intro-grid').evaluate(el=>getComputedStyle(el).display),
+      'contents','Mobile dashboard ordering changed');
+    await page.setViewportSize({width:1440,height:900});
     await page.locator('#view-explore [data-park="5"]').click();
     assert.equal(await page.locator('#view-explore [data-park="5"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await page.evaluate(() => {

@@ -1,3 +1,10 @@
+## 2.1.2 — 2026-11-12
+
+- Aligned desktop dashboard sections into two independent, balanced columns.
+- Centered park chips and removed unused desktop grid rows before attraction results.
+- Kept the mobile/tablet design and existing dashboard settings unchanged.
+- Updated the frontend PWA cache, manifest and imports for installed-app upgrades. No Worker or D1 changes.
+
 ## 2.1.1 — 2026-11-11
 
 - Automatically show verified live variant names for ten stable ride identities across Walt Disney World and Disneyland Resort.

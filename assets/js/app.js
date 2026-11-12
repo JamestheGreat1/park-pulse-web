@@ -1,8 +1,8 @@
-import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=2.1.1";
-import { store } from "./store.js?v=2.1.1";
-import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=2.1.1";
-import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe, armStagingLiveProbe, stagingLiveProbeStatus } from "./push.js?v=2.1.1";
-import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=2.1.1";
+import { PARKS, RESORTS, RESORT_BY_ID, parksForResort, parkIdForRideKey, parkName, parkTimezone, minutesLabel, relativeTime, escapeHtml, isRideStale } from "./data.js?v=2.1.2";
+import { store } from "./store.js?v=2.1.2";
+import { rideData, fetchRideHistory, fetchRideInsights, fetchAnalyticsStatus } from "./api.js?v=2.1.2";
+import { currentSubscription, enablePush, syncRules, disablePush, backendHealth, sendTestPush, simulateStagingRideAlert, armStagingCronProbe, armStagingLiveProbe, stagingLiveProbeStatus } from "./push.js?v=2.1.2";
+import { applySeasonalTheme, seasonalEffectsEnabled, setSeasonalEffectsEnabled, glassStyleSetting, setGlassStyleSetting } from "./seasonal.js?v=2.1.2";
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const installHelpSheet = $("#installHelpSheet");
 const installHelpBackdrop = $("#installHelpBackdrop");
 const pullRefresh = $("#pullRefresh");
 const pullRefreshLabel = $("#pullRefreshLabel");
-const APP_VERSION = "2.1.1";
+const APP_VERSION = "2.1.2";
 let installPrompt = null;
 let pushOn = false;
 let rulesSynced = false;
@@ -983,6 +983,8 @@ function renderExplore() {
   views.explore.dataset.parkMood = parkMoods[state.selectedParkId] || "default";
   views.explore.classList.toggle("dashboard-compact", dashboard.density === "compact");
   views.explore.innerHTML = `
+    <div class="dashboard-intro-grid">
+      <div class="dashboard-overview-stack">
     <section class="dashboard-overview liquid-glass" aria-label="Park overview">
       <div class="dashboard-overview-head">
         <button class="resort-switch" type="button" data-view-jump="resorts" aria-label="Switch resort; current destination: ${escapeHtml(activeResort.name)}"><span class="eyebrow">${escapeHtml(activeResort.name)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
@@ -1000,6 +1002,8 @@ function renderExplore() {
         return `<button type="button" class="park-chip ${p.id === state.selectedParkId ? "active" : ""}" data-park="${p.id}" aria-pressed="${p.id === state.selectedParkId}" aria-label="${escapeHtml(p.name + statusLabel)}"><span class="park-chip-icon" aria-hidden="true">${p.emoji}</span>${p.short}<span class="park-chip-status ${parkChipStatusClass(chipStatus)}" aria-hidden="true"></span></button>`;
       }).join("")}
     </div>
+      </div>
+      <div class="dashboard-actions-stack">
     <div class="park-feature-slot" data-park-state="${status.key}">${parkFeatureMarkup(state, schedule, status)}</div>
     ${dashboardWatchesMarkup(state)}
     <section class="toolbar liquid-glass" aria-label="Attraction filters">
@@ -1010,6 +1014,8 @@ function renderExplore() {
       </div>
       <select id="sortSelect" aria-label="Sort rides"><option value="recommended" ${state.sort === "recommended" ? "selected" : ""}>Best now</option><option value="wait" ${state.sort === "wait" ? "selected" : ""}>Lowest wait</option><option value="name" ${state.sort === "name" ? "selected" : ""}>A–Z</option></select>
     </section>
+      </div>
+    </div>
     <div class="section-heading dashboard-ride-heading"><div class="park-heading-copy"><span class="eyebrow">Live waits</span><h2>Attractions</h2></div></div>
     <div class="ride-list">${rideListMarkup(state)}</div>`;
 }

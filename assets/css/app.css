@@ -5994,3 +5994,35 @@ body{
 @media(forced-colors:active){
   #view-explore .dashboard-metrics .dashboard-stat-trend{color:CanvasText}
 }
+
+/* ParkPulse 2.1.2 — desktop-only two-column dashboard; mobile remains unchanged. */
+#view-explore .dashboard-intro-grid,
+#view-explore .dashboard-overview-stack,
+#view-explore .dashboard-actions-stack{display:contents}
+@media(min-width:1024px){
+  #view-explore.active{display:block}
+  #view-explore .dashboard-intro-grid{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    align-items:start;gap:16px;width:100%;margin-inline:auto
+  }
+  #view-explore .dashboard-overview-stack,
+  #view-explore .dashboard-actions-stack{
+    display:flex;flex-direction:column;align-items:stretch;gap:12px;min-width:0
+  }
+  #view-explore .dashboard-overview-stack>.dashboard-overview{width:100%;margin:0}
+  #view-explore .dashboard-overview-stack>.park-strip{
+    display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+    gap:8px;overflow:visible;padding:8px 0 0;margin:0
+  }
+  #view-explore:not(.dashboard-compact) .dashboard-overview-stack>.park-strip{padding:10px 0 0}
+  #view-explore.dashboard-compact .dashboard-overview-stack>.park-strip{padding:6px 0 0}
+  #view-explore .dashboard-overview-stack>.park-strip .park-chip{
+    width:auto;min-width:88px;max-width:100%;flex:0 1 auto;padding:10px 14px
+  }
+  #view-explore .dashboard-actions-stack>.park-feature-slot,
+  #view-explore .dashboard-actions-stack>.toolbar{width:100%;min-width:0}
+  #view-explore .dashboard-actions-stack .dashboard-pick,
+  #view-explore .dashboard-actions-stack .dashboard-watches{width:100%;margin:0}
+  #view-explore .dashboard-actions-stack>.toolbar{align-self:stretch;margin:0}
+  #view-explore .dashboard-ride-heading{margin:22px 0 12px}
+}

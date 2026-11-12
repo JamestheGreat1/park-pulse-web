@@ -8,7 +8,11 @@ Open it, see what looks good right now, save the rides you care about, and let P
 
 A short wait is not always a *good* wait. A 45-minute line can be great for one ride and terrible for another. ParkPulse tries to give that number some context.
 
-**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 2.1.1**
+**[Open ParkPulse](https://app.useparkpulse.com/) · [Visit the site](https://useparkpulse.com/) · Version 2.1.2**
+
+## New in 2.1.2
+
+Desktop Explore now has balanced, aligned overview and recommendation/filter columns, a centered park picker, and no wasted grid rows above attractions. The mobile layout stays as-is. Installed PWAs update normally; no Worker deploy is needed.
 
 ## New in 2.1.1
 

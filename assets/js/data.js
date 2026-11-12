@@ -1,4 +1,4 @@
-export { PARKS, ALL_PARKS, PARK_BY_ID, RESORTS, RESORT_BY_ID, parksForResort, resortForPark, parkIdForRideKey, parkTimezone, parkName } from "./catalog.js?v=2.1.1";
+export { PARKS, ALL_PARKS, PARK_BY_ID, RESORTS, RESORT_BY_ID, parksForResort, resortForPark, parkIdForRideKey, parkTimezone, parkName } from "./catalog.js?v=2.1.2";
 
 export const STALE_AFTER_MS = 15 * 60 * 1000;
 
